@@ -23,11 +23,11 @@ ask before building it — don't silently expand scope.
    the request body or form data.
 
 2a. **Every write to `Booking` re-verifies its foreign keys before inserting.** A Prisma
-foreign key only checks that a `staffId`/`serviceId`/`customerId` row exists somewhere —
-not that it belongs to the tenant making the request. Before creating a `Booking`, the
-write helper in `lib/db/bookings.ts` must re-fetch the staff/service/customer scoped by
-`tenantId` and fail if any of them don't belong to that tenant. This is the only thing
-standing between a bug and one tenant's booking pointing at another tenant's staff.
+    foreign key only checks that a `staffId`/`serviceId`/`customerId` row exists somewhere —
+    not that it belongs to the tenant making the request. Before creating a `Booking`, the
+    write helper in `lib/db/bookings.ts` must re-fetch the staff/service/customer scoped by
+    `tenantId` and fail if any of them don't belong to that tenant. This is the only thing
+    standing between a bug and one tenant's booking pointing at another tenant's staff.
 
 3. **Any change to `prisma/schema.prisma` or any migration file requires a plan first,
    in plain language, before you write it.** Explain what's changing and why. Wait for
@@ -75,11 +75,14 @@ standing between a bug and one tenant's booking pointing at another tenant's sta
   Convert with Luxon using `tenant.timezone` only at the boundary — when parsing user input
   and when rendering for display. If a column is ever changed to `@db.Timestamptz`, the
   exclusion constraint's `tsrange` must change to `tstzrange` to match.
-- Auth.js v5 config is split: `auth.config.ts` holds only edge-safe config and is what
-  `middleware.ts` imports; `auth.ts` holds the Prisma-backed Credentials `authorize`
+- Auth.js v5 config is split: `auth.config.ts` holds only dependency-free config and is what
+  `proxy.ts` imports; `auth.ts` holds the Prisma-backed Credentials `authorize`
   callback and only ever runs in the Node runtime. Never import the Prisma-backed config
-  into `middleware.ts` — Prisma cannot run on the edge runtime.
+  into `proxy.ts` — it runs on every matched request and has no reason to open a
+  database connection.
 - Never run `prisma db push` in this project — always `prisma migrate dev` / `deploy`.
+  `db push` has no record of the hand-written exclusion constraint (Prisma can't express it
+  in schema language) and will silently drop it as unrecognized drift.
 - Prisma is pinned to v6 (`prisma@6`, `@prisma/client@6`). Prisma 7 requires driver adapters
   and moves connection config out of `schema.prisma` into `prisma.config.ts` — a real
   migration, not a bump. Don't let a dependency update carry it forward silently; revisit
@@ -91,9 +94,7 @@ standing between a bug and one tenant's booking pointing at another tenant's sta
   exists, verify by diffing against a pre-scaffolding snapshot; once a git history exists,
   diff against that instead. Anything a generator produced that conflicts with the
   hand-authored version is discarded, not merged.
-  `db push` has no record of the hand-written exclusion constraint (Prisma can't express it
-  in schema language) and will silently drop it as unrecognized drift.
-- Booking confirmation and owner-notification emails are sent _after_ the booking is
+- Booking confirmation and owner-notification emails are sent *after* the booking is
   committed, awaited inside a try/catch — a failed send must never fail the booking, but it
   must also never be fire-and-forget. Vercel kills un-awaited work once the response is
   sent, so an un-awaited send silently never happens. Log send failures; don't retry inline.
@@ -105,7 +106,7 @@ standing between a bug and one tenant's booking pointing at another tenant's sta
 - The person you're working with uses PowerShell. Give commands as separate lines, not
   chained with `&&`.
 - Plan mode for anything touching: schema, migrations, `lib/db/*`, `lib/auth/*`,
-  `middleware.ts`, or the availability/slot computation logic. Implement freely, without
+  `proxy.ts`, or the availability/slot computation logic. Implement freely, without
   a pre-approval step, for UI components, styling, seed scripts, and tests.
 - When in doubt about scope, ask. A clarifying question costs a few seconds; unwinding
   unwanted scope costs an afternoon.

@@ -65,7 +65,7 @@ The one piece Prisma can't express natively: the **overlap-prevention exclusion 
 
 **Tenant-scoped data access layer:** every query that touches tenant-owned data goes through `lib/db/*`, where each function requires `tenantId` as a parameter and bakes it into the `where` clause. Components and server actions never call `prisma.booking.findMany(...)` directly — they call `getBookingsForTenant(tenantId, ...)`. This is the single structural guardrail against cross-tenant data leaks, and it's cheap to enforce if you do it from day one and expensive to retrofit later.
 
-**Auth:** Auth.js v5, Credentials provider, JWT session strategy (no `Account`/`Session` tables needed — one less thing to manage). Session payload: `{ userId, tenantId, role }`. `middleware.ts` protects everything under `/dashboard`. Email is globally unique across the whole app for MVP — one email maps to exactly one tenant, so there's no multi-tenant-per-user complexity to handle yet.
+**Auth:** Auth.js v5, Credentials provider, JWT session strategy (no `Account`/`Session` tables needed — one less thing to manage). Session payload: `{ userId, tenantId, role }`. `proxy.ts` protects everything under `/dashboard`. Email is globally unique across the whole app for MVP — one email maps to exactly one tenant, so there's no multi-tenant-per-user complexity to handle yet.
 
 **Availability computation:** a single module (`lib/availability/slots.ts`) takes a tenant's settings, a staff member's working hours + time-off, and existing bookings with status `CONFIRMED` or `COMPLETED` (the identical set the exclusion constraint protects — see `schema.prisma`), and returns open slots for a given date, using Luxon for timezone-safe math. This is the most logic-dense part of the app — keep it a pure function, easy to unit test, no side effects.
 
@@ -112,7 +112,7 @@ The one piece Prisma can't express natively: the **overlap-prevention exclusion 
       services.ts
       customers.ts
     /auth
-      auth.config.ts             # edge-safe config, imported by middleware.ts
+      auth.config.ts             # dependency-free config, imported by proxy.ts
       auth.ts                    # full config incl. Prisma-backed Credentials authorize (Node runtime only)
       session.ts                # getCurrentTenant()/getCurrentUser() helpers
     /availability
@@ -132,7 +132,7 @@ The one piece Prisma can't express natively: the **overlap-prevention exclusion 
     /dashboard                  # Calendar, BookingList, ServiceForm, StaffForm
     /ui                          # shared primitives (Button, Input, Card, etc.)
 
-  middleware.ts
+  proxy.ts
 
 CLAUDE.md
 AGENTS.md         # one-line pointer at CLAUDE.md — this project uses Claude Code only,
@@ -164,7 +164,7 @@ Phases 0–3 map to the 14-day roadmap below. Phases 4–5 start as soon as ther
 - Every migration file, especially the exclusion-constraint SQL
 - `lib/db/*` — anything that takes or omits a `tenantId` parameter
 - `lib/auth/*` — session/auth configuration
-- `middleware.ts`
+- `proxy.ts`
 - Any new npm dependency — approve before it's added, not after
 - Pricing or business-rule logic (buffer time, lead time, cancellation window enforcement)
 
@@ -197,7 +197,7 @@ de-risks the project; a slightly later demo does not.
 | Day | Deliverable |
 |---|---|
 | 1 | Next.js project init (TS strict, Tailwind, ESLint incl. the `no-restricted-imports` rule banning Prisma outside `lib/db/**`), Vercel linked, Neon DB provisioned, Prisma initialized, first migration. Also start Resend domain DNS verification now — propagation takes time and shouldn't block Day 8 |
-| 2 | Auth.js v5, split into `auth.config.ts` (edge-safe, used by `middleware.ts`) and `auth.ts` (Prisma-backed Credentials `authorize`, Node runtime only) — get this split right now, not after `middleware.ts` breaks on import. Login page, route protection, seed script creating one demo tenant + owner. Also write a small CLI script to manually reset an owner's password hash — no in-app reset flow is in MVP scope, but a forgotten password shouldn't be able to kill a live customer trial |
+| 2 | Auth.js v5, split into `auth.config.ts` (dependency-free, used by `proxy.ts`) and `auth.ts` (Prisma-backed Credentials `authorize`, Node runtime only) — get this split right now, not after `proxy.ts` breaks on import. Login page, route protection, seed script creating one demo tenant + owner. Also write a small CLI script to manually reset an owner's password hash — no in-app reset flow is in MVP scope, but a forgotten password shouldn't be able to kill a live customer trial |
 | 3 | Exclusion-constraint migration (raw SQL, ranging over `blockedUntil`, status `IN ('CONFIRMED','COMPLETED')`), `cancelToken` via `crypto.randomUUID()`. Probe script asserts **both** directions: concurrent overlapping bookings → one rejected, genuinely back-to-back bookings (buffer = 0) → both accepted |
 | 4 | `lib/availability/slots.ts` — working hours + time-off + existing bookings + buffer/lead time → open slots, unit tested (~2 sessions) |
 | 5 | Public business page (`/b/[slug]`) — info + service list |
