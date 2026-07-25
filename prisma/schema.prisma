@@ -185,10 +185,15 @@ model Booking {
 }
 
 // ============================================================
-// IMPORTANT — not expressible in Prisma's schema language:
+// IMPORTANT — not expressible in Prisma's schema language.
 //
-// After running `prisma migrate dev --create-only --name add_booking`,
-// edit the generated SQL file and add:
+// STATUS: implemented in
+//   prisma/migrations/20260725124130_add_booking_overlap_constraint
+// This block is kept as the rationale for why that SQL looks the way
+// it does — it is not an outstanding TODO.
+//
+// The migration was created empty (`prisma migrate dev --create-only`,
+// no schema diff) and then hand-written with:
 //
 //   CREATE EXTENSION IF NOT EXISTS btree_gist;
 //

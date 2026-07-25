@@ -9,7 +9,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "db:seed": "prisma db seed",
-    "reset-password": "tsx scripts/reset-password.ts"
+    "reset-password": "tsx scripts/reset-password.ts",
+    "probe:constraint": "tsx scripts/probe-exclusion-constraint.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
