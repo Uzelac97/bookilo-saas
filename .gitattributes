@@ -1,0 +1,14 @@
+# Normalize line endings to LF in the repository, regardless of platform.
+# Prevents CRLF churn showing up as spurious diffs when the same files are
+# touched from Windows, CI, or Vercel's build environment.
+* text=auto eol=lf
+
+# Binary files git should never try to normalize.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary

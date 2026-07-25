@@ -1,0 +1,221 @@
+// ============================================================
+// Barbershop Booking SaaS — MVP schema
+// Single-location tenants, generalist staff, no marketplace.
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // url is the pooled (pgbouncer) connection the app uses at runtime.
+  // directUrl is the non-pooled connection; the Prisma CLI needs it because
+  // migrations use advisory locks and DDL that don't survive a pooler.
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------- Enums ----------
+
+enum BusinessType {
+  BARBERSHOP
+  // future: SALON, MASSAGE, WELLNESS — additive, no rebuild needed
+}
+
+enum UserRole {
+  OWNER
+  STAFF // reserved for Phase 2 staff self-login
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+enum BookingSource {
+  ONLINE
+  MANUAL
+}
+
+// ---------- Core models ----------
+
+model Tenant {
+  id           String       @id @default(cuid())
+  slug         String       @unique
+  name         String
+  businessType BusinessType @default(BARBERSHOP)
+  timezone     String       @default("Europe/Berlin")
+
+  // Address/contact — no separate Location model for MVP.
+  address      String?
+  contactEmail String
+  phone        String?
+
+  // Booking rules
+  bufferMinutes             Int @default(0)
+  minLeadMinutes            Int @default(60)
+  cancellationWindowMinutes Int @default(120)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  staff     Staff[]
+  services  Service[]
+  customers Customer[]
+  bookings  Booking[]
+
+  @@index([slug])
+}
+
+model User {
+  id           String   @id @default(cuid())
+  tenantId     String
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(OWNER)
+  createdAt    DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+model Staff {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  photoUrl  String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workingHours WorkingHours[]
+  timeOff      TimeOff[]
+  bookings     Booking[]
+
+  @@index([tenantId])
+}
+
+model Service {
+  id              String   @id @default(cuid())
+  tenantId        String
+  name            String
+  durationMinutes Int
+  priceMinorUnits Int // EUR cents
+  category        String? // plain grouping label, not a taxonomy table
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@index([tenantId])
+}
+
+model WorkingHours {
+  id          String @id @default(cuid())
+  staffId     String
+  dayOfWeek   Int    // 0 = Sunday .. 6 = Saturday
+  startMinute Int    // minutes from midnight, local tenant timezone
+  endMinute   Int
+
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([staffId])
+}
+
+model TimeOff {
+  id       String   @id @default(cuid())
+  staffId  String
+  startAt  DateTime
+  endAt    DateTime
+  reason   String?
+
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([staffId])
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  phone     String
+  email     String?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@unique([tenantId, phone])
+}
+
+model Booking {
+  id          String        @id @default(cuid())
+  tenantId    String
+  staffId     String
+  serviceId   String
+  customerId  String
+
+  startAt     DateTime
+  endAt       DateTime
+  // endAt + tenant.bufferMinutes at the moment this booking was created.
+  // Stays fixed per-booking even if the tenant's buffer setting changes later.
+  // Used only by the exclusion constraint below — endAt stays the honest value
+  // for emails, the calendar display, and everything else.
+  blockedUntil DateTime
+  status      BookingStatus @default(CONFIRMED)
+  source      BookingSource @default(ONLINE)
+  cancelToken String        @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  staff    Staff    @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  service  Service  @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, staffId, startAt])
+}
+
+// ============================================================
+// IMPORTANT — not expressible in Prisma's schema language:
+//
+// After running `prisma migrate dev --create-only --name add_booking`,
+// edit the generated SQL file and add:
+//
+//   CREATE EXTENSION IF NOT EXISTS btree_gist;
+//
+//   ALTER TABLE "Booking"
+//   ADD CONSTRAINT no_overlapping_bookings
+//   EXCLUDE USING gist (
+//     "staffId" WITH =,
+//     tsrange("startAt", "blockedUntil") WITH &&
+//   ) WHERE (status IN ('CONFIRMED', 'COMPLETED'));
+//
+// Two details that are easy to get wrong:
+//
+// - Range is over blockedUntil, not endAt, so bufferMinutes is
+//   actually enforced under concurrency, not just in slots.ts.
+// - Status list includes COMPLETED, not just CONFIRMED — otherwise
+//   marking a booking complete silently reopens its own time slot.
+//   The availability query in slots.ts must treat the identical
+//   status set as "occupied," or you get ghost slots that look
+//   open in the UI and fail at submit.
+//
+// This is what actually prevents double-booking under concurrent
+// requests. Prisma will not surface this as a typed error — expect
+// a PrismaClientUnknownRequestError with SQLSTATE 23P01. Write a
+// small probe script that fires two concurrent bookings for the
+// same staff/slot and confirms one is rejected. Also assert the
+// opposite case: two genuinely back-to-back bookings (10:00–10:30
+// and 10:30–11:00, buffer = 0) both succeed — tsrange is half-open,
+// so adjacency should be legal. Testing only the rejection case
+// hides an off-by-one that would block every consecutive booking.
+// ============================================================
