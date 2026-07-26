@@ -10,6 +10,39 @@ import { normalizePhone, phoneDigitCount } from "./phone";
 const MIN_PHONE_DIGITS = 6;
 
 /**
+ * Characters a name may not contain: C0 and C1 control characters, plus the
+ * Unicode line and paragraph separators.
+ *
+ * Rejected rather than stripped, deliberately. A name with a line break in it is
+ * a different value from the same name without one — usually a paste that
+ * brought a second field along with it — and quietly rewriting what someone
+ * typed means the shop calls a customer by a name they never gave. Trailing
+ * whitespace is the opposite case and is still trimmed: nobody means to type it.
+ *
+ * The concrete reason a name has to be a single line: it goes into the subject
+ * header of the owner's notification email. That isn't header injection with
+ * Resend — the SDK posts JSON to an HTTP API rather than writing SMTP headers,
+ * so the transport encodes it — but it does produce a mangled subject, and a
+ * value that can't survive being written on one line has no business here.
+ */
+function hasControlCharacters(value: string): boolean {
+  for (const char of value) {
+    const code = char.codePointAt(0) ?? 0;
+
+    if (
+      code <= 0x1f || // C0: tab, newline, carriage return, NUL, …
+      (code >= 0x7f && code <= 0x9f) || // DEL and C1
+      code === 0x2028 || // line separator
+      code === 0x2029 // paragraph separator
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * The customer-supplied half of a public booking.
  *
  * Written on Day 6 for the form; Day 7's submission action validates against
@@ -22,11 +55,22 @@ const MIN_PHONE_DIGITS = 6;
  * would make them look like ordinary form input.
  */
 export const customerDetailsSchema = z.object({
+  /**
+   * Trimmed, length-bounded, and required to be a single line — see
+   * hasControlCharacters above for why that last one is a rejection rather than
+   * a clean-up. The order matters: `trim` first, so a trailing newline from a
+   * paste is removed rather than reported, and the single-line check last, so an
+   * empty or over-long field gets the message that actually describes it.
+   */
   name: z
     .string()
     .trim()
     .min(2, "Enter your name.")
-    .max(80, "That name is too long."),
+    .max(80, "That name is too long.")
+    .refine(
+      (name) => !hasControlCharacters(name),
+      "Enter your name on a single line.",
+    ),
   /**
    * Phone is the identity key for a customer within a tenant
    * (`@@unique([tenantId, phone])`) and the only reliable way a barber can
