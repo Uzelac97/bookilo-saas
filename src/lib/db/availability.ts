@@ -44,6 +44,13 @@ export async function getStaffAvailability(
       active: true,
       ...(staffId ? { id: staffId } : {}),
     },
+    // ORDERING CONTRACT — must stay identical to getActiveStaff in ./staff.ts.
+    // mergeStaffSlots in lib/availability/booking-options.ts preserves this
+    // order into each slot's `staffIds`, and the "any barber" path resolves a
+    // booking by taking the first id in that array. These two `orderBy` clauses
+    // together decide which barber a customer actually gets, so a change here
+    // that isn't mirrored there makes that choice arbitrary — with no test
+    // failure to warn you.
     orderBy: { createdAt: "asc" },
     select: {
       id: true,
