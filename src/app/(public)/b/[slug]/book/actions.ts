@@ -16,10 +16,12 @@ import {
 } from "@/lib/db/availability";
 import {
   createBooking,
+  getBookingByCancelToken,
   getBookingRateForPhone,
   type BookingRate,
 } from "@/lib/db/bookings";
 import { findOrCreateCustomer } from "@/lib/db/customers";
+import { sendBookingEmails } from "@/lib/email/booking-emails";
 import { getActiveServices } from "@/lib/db/services";
 import { getTenantBySlug } from "@/lib/db/tenant";
 import {
@@ -289,7 +291,30 @@ export async function submitBooking(
     return { status: "error" };
   }
 
-  // 9. Outside the try block: redirect() signals by throwing, and the catch
+  // 9. Emails, after the booking is committed and never before it.
+  //
+  //    Awaited inside its own try/catch, per CLAUDE.md: un-awaited work is
+  //    killed the moment Vercel sends the response, so a fire-and-forget send
+  //    silently never happens — and a send that fails must never turn a saved
+  //    booking into an error the customer sees. sendBookingEmails already
+  //    swallows and logs per-message failures; this catch covers the re-read.
+  //
+  //    Re-read rather than assembled from the variables above: the email should
+  //    describe what was actually committed, and this is the same shape the
+  //    confirmation page renders, so the two can't disagree. `contactEmail` and
+  //    the phone come from scope because neither is part of that shape — the
+  //    owner's address isn't the booking's, and the phone is what was just
+  //    validated.
+  try {
+    const committed = await getBookingByCancelToken(token);
+    if (committed) {
+      await sendBookingEmails(committed, tenant.contactEmail, customer.phone);
+    }
+  } catch (error) {
+    console.error("booking emails failed", error);
+  }
+
+  // 10. Outside the try block: redirect() signals by throwing, and the catch
   //    above would swallow it and leave the customer staring at a filled-in
   //    form with no confirmation — the same trap as loginAction.
   redirect(`/b/${slug}/booked/${token}`);

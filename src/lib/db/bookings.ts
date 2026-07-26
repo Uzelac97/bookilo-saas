@@ -186,7 +186,15 @@ export async function getBookingRateForPhone(
   return { recent, upcoming };
 }
 
-/** A booking as the confirmation and cancellation pages render it. */
+/**
+ * A booking as everything outside the dashboard sees it: the two token-addressed
+ * pages, and the two booking emails.
+ *
+ * One shape for all four on purpose. They describe the same appointment to the
+ * same people, and letting the emails assemble their own view from the action's
+ * in-flight variables is how a confirmation ends up describing something
+ * marginally different from the page it links to.
+ */
 export type BookingByToken = {
   id: string;
   startAt: Date;
@@ -201,6 +209,7 @@ export type BookingByToken = {
     name: string;
     timezone: string;
     phone: string | null;
+    address: string | null;
     cancellationWindowMinutes: number;
   };
 };
@@ -245,9 +254,13 @@ export async function getBookingByCancelToken(
           name: true,
           timezone: true,
           // For the cancel page's "too late to do this online" branch, which has
-          // to offer a way to reach the shop instead. Nullable in the schema, so
-          // the page must handle its absence rather than assume a number.
+          // to offer a way to reach the shop instead, and for the confirmation
+          // email's footer. Nullable in the schema, so callers must handle its
+          // absence rather than assume a number.
           phone: true,
+          // For the confirmation email. A customer who has never been to the
+          // shop needs the address more than anything else in that message.
+          address: true,
           cancellationWindowMinutes: true,
         },
       },
