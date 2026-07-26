@@ -1,9 +1,7 @@
 "use client";
 
+import { ANY_STAFF } from "@/lib/availability/booking-options";
 import type { PublicStaff } from "@/lib/db/staff";
-
-/** The sentinel for "no preference" — never a real staff id. */
-export const ANY_STAFF = "any";
 
 /**
  * Optional barber preference. "Any barber" is the default and is listed first:

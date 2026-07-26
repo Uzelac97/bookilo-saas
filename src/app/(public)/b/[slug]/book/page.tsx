@@ -5,9 +5,9 @@ import { cache } from "react";
 
 import { BookingFlow } from "@/components/booking/booking-flow";
 import { ServiceSummary } from "@/components/booking/service-summary";
-import { ANY_STAFF } from "@/components/booking/staff-picker";
 import type { SlotGridEmptyReason } from "@/components/booking/slot-grid";
 import {
+  ANY_STAFF,
   canPageBack,
   canPageForward,
   dateStrip,

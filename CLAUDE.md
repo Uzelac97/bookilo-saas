@@ -75,6 +75,18 @@ ask before building it — don't silently expand scope.
   Convert with Luxon using `tenant.timezone` only at the boundary — when parsing user input
   and when rendering for display. If a column is ever changed to `@db.Timestamptz`, the
   exclusion constraint's `tsrange` must change to `tstzrange` to match.
+- Constants and types shared across the client/server boundary live in plain modules — never
+  exported from a file marked `"use client"` or `"use server"`. Only components belong in a
+  `"use client"` module's exports, and only async server actions in a `"use server"` module's.
+  Both directives rewrite *every* export in the file into a reference: a constant exported
+  from a `"use client"` file arrives in a server component as a throwing client-reference
+  proxy, and one exported from a `"use server"` file arrives on the client as a callable
+  action proxy. Neither is a type error, so nothing warns you — the value is simply not the
+  value, and it can appear to work for a while if it's only ever compared against itself.
+  Both of these were real bugs here: `ANY_STAFF` exported from `staff-picker.tsx`, and a
+  `useActionState` initial-state constant exported from a booking action module. To confirm a
+  suspect export, check `.next/**/server-reference-manifest.json` — anything listed there
+  with a non-function `exportedName` is being shipped as a reference.
 - Auth.js v5 config is split: `auth.config.ts` holds only dependency-free config and is what
   `proxy.ts` imports; `auth.ts` holds the Prisma-backed Credentials `authorize`
   callback and only ever runs in the Node runtime. Never import the Prisma-backed config

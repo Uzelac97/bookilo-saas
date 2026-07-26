@@ -13,7 +13,7 @@ import type { PublicStaff } from "@/lib/db/staff";
 import { BookingForm } from "./booking-form";
 import { DateStrip } from "./date-strip";
 import { SlotGrid, type SlotGridEmptyReason } from "./slot-grid";
-import { ANY_STAFF, StaffPicker } from "./staff-picker";
+import { StaffPicker } from "./staff-picker";
 
 /**
  * The only component that writes the URL.
@@ -146,5 +146,3 @@ export function BookingFlow({
     </div>
   );
 }
-
-export { ANY_STAFF };

@@ -31,6 +31,23 @@ export const BOOKING_HORIZON_DAYS = 30;
 export const STRIP_LENGTH = 7;
 
 /**
+ * The `?staff=` sentinel for "no preference" — never a real staff id.
+ *
+ * Lives in this plain module rather than beside the picker that renders it, and
+ * that placement is load-bearing. It was previously exported from
+ * components/booking/staff-picker.tsx, which is `"use client"`: every export of
+ * a client module becomes a *client reference* when a server component imports
+ * it, so the booking page's server render held a throwing proxy here instead of
+ * the string "any". It happened to behave, because the sentinel was only ever
+ * compared against itself — one `.startsWith()` or one comparison to the literal
+ * "any" and it would have broken with no type error to warn anyone.
+ *
+ * It sits next to resolveBookingDate on purpose: that function decides how the
+ * `?date=` parameter is interpreted, and this is the same job for `?staff=`.
+ */
+export const ANY_STAFF = "any";
+
+/**
  * One pickable time, plus every barber free at it.
  *
  * `staffIds` is the reason this isn't just a Date. The "any barber" path has to
