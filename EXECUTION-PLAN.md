@@ -11,15 +11,15 @@ This is the **final** scope. Where I cut something from the earlier strategy dra
 
 ### What gets built
 
-| Area | Included |
-|---|---|
-| Public booking | Tenant booking page at `/b/{slug}`, service list, live slot picker, booking form (name, phone, optional email), confirmation screen |
-| Booking engine | Concurrency-safe slot booking (Postgres exclusion constraint), buffer time, minimum lead time, cancellation window |
-| Cancellation | Token-based cancel link, no customer account |
-| Owner auth | Email + password login (Auth.js v5, Credentials, JWT sessions) — one owner account per tenant |
-| Owner dashboard | Day/week calendar, manual booking entry (walk-ins), services CRUD, staff CRUD (including each staff member's working hours), settings (buffer, lead time, cancellation window) |
-| Notifications | Email only (Resend): booking confirmation to customer, new-booking alert to owner |
-| Tenancy | Single business per tenant, generalist staff (any active barber can take any active service). Opening hours are per-staff (`WorkingHours`) — there is no separate business-level hours field; "closed Sunday" simply means no staff has Sunday hours. |
+| Area            | Included                                                                                                                                                                                                                                              |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Public booking  | Tenant booking page at `/b/{slug}`, service list, live slot picker, booking form (name, phone, optional email), confirmation screen                                                                                                                   |
+| Booking engine  | Concurrency-safe slot booking (Postgres exclusion constraint), buffer time, minimum lead time, cancellation window                                                                                                                                    |
+| Cancellation    | Token-based cancel link, no customer account                                                                                                                                                                                                          |
+| Owner auth      | Email + password login (Auth.js v5, Credentials, JWT sessions) — one owner account per tenant                                                                                                                                                         |
+| Owner dashboard | Day/week calendar, manual booking entry (walk-ins), services CRUD, staff CRUD (including each staff member's working hours), settings (buffer, lead time, cancellation window)                                                                        |
+| Notifications   | Email only (Resend): booking confirmation to customer, new-booking alert to owner                                                                                                                                                                     |
+| Tenancy         | Single business per tenant, generalist staff (any active barber can take any active service). Opening hours are per-staff (`WorkingHours`) — there is no separate business-level hours field; "closed Sunday" simply means no staff has Sunday hours. |
 
 ### What's explicitly cut from the earlier draft, and why
 
@@ -31,6 +31,18 @@ This is the **final** scope. Where I cut something from the earlier strategy dra
 ### What's excluded entirely for now
 
 Staff login, SMS/WhatsApp reminders, deposits/payments, multi-location, analytics dashboard, customer accounts, i18n, recurring/subscription bookings, reviews or any marketplace surface, POS/inventory, granular permissions beyond Owner/Staff.
+
+### Standing boundary: per-tenant customization vs. custom development
+
+Decided early, deliberately, so it's not renegotiated live under pressure from an eager first customer.
+
+**Unbounded and already supported, no architecture change needed:** how many services, categories, staff members, and how long the descriptions are. A tenant with 5 services and one with 40 already hit the same `Service` table and the same `service-list.tsx` component — more data, not different code.
+
+**Safe to add later, cheap, same additive pattern as `Location`/`StaffService` being deferred from the MVP:** logo, one or two brand colors, a photo gallery, staff bios/headshots. A small number of nullable `Tenant` columns (or one small table), rendered in a fixed spot in the shared template. Build when a real customer asks, not speculatively.
+
+**The line that must not move: every tenant renders through the same components and the same layout, always.** Bounded content and branding variation, yes. Structural variation — a different arrangement of sections, a new section type invented per customer, custom CSS — no. If a real prospect's actual ask is custom layout, that's a signal they're outside this product's target customer (independent shops with no website today, not design-opinionated clients), not a feature gap to close. The moment layout varies per tenant, this stops being a flat-fee SaaS product with zero marginal cost per customer and becomes a web design agency with a booking feature bolted on.
+
+If bounded optional sections (About, Gallery, Testimonials, Team) are ever built, they're a fixed menu of block _types_ a tenant can toggle on/off and fill with content — never an open-ended page builder.
 
 ---
 
@@ -57,9 +69,10 @@ The one piece Prisma can't express natively: the **overlap-prevention exclusion 
 
 ## 3. Application Architecture
 
-**Rendering/data flow:** Server Actions for all mutations and most data fetching. No separate REST API layer for the first-party frontend — you don't have an external consumer yet, so a parallel API surface is pure overhead. Add a Route Handler only where something *outside* your own app needs to call in (a future Stripe webhook is the first realistic case).
+**Rendering/data flow:** Server Actions for all mutations and most data fetching. No separate REST API layer for the first-party frontend — you don't have an external consumer yet, so a parallel API surface is pure overhead. Add a Route Handler only where something _outside_ your own app needs to call in (a future Stripe webhook is the first realistic case).
 
 **Tenant resolution, two paths, never mixed:**
+
 - Public routes (`/b/[slug]`) resolve the tenant from the URL slug, server-side, on every request.
 - Dashboard routes resolve the tenant from the authenticated session (`session.tenantId`). A dashboard mutation must never accept a client-supplied `tenantId` — it always comes from the server-side session.
 
@@ -144,14 +157,14 @@ SPEC.md          # (this file + schema doubles as your source of truth)
 
 ## 5. Development Phases
 
-| Phase | Goal |
-|---|---|
-| **0 — Foundation** | Schema, migrations, exclusion constraint, auth, tenant scoping, deploy pipeline live |
-| **1 — Booking Core** | Public booking flow end-to-end: browse → pick slot → book → email confirmation → cancel |
-| **2 — Owner Dashboard** | Calendar, manual booking entry, services/staff CRUD, settings |
-| **3 — Demo Polish** | Realistic seeded demo tenant, mobile pass, visual design pass |
-| **4 — Validation** | Show the live demo to 3–5 real barbershop owners, capture what actually confuses or excites them |
-| **5 — Onboarding + Outreach** | Self-serve signup wizard, first paying/founding customers |
+| Phase                         | Goal                                                                                             |
+| ----------------------------- | ------------------------------------------------------------------------------------------------ |
+| **0 — Foundation**            | Schema, migrations, exclusion constraint, auth, tenant scoping, deploy pipeline live             |
+| **1 — Booking Core**          | Public booking flow end-to-end: browse → pick slot → book → email confirmation → cancel          |
+| **2 — Owner Dashboard**       | Calendar, manual booking entry, services/staff CRUD, settings                                    |
+| **3 — Demo Polish**           | Realistic seeded demo tenant, mobile pass, visual design pass                                    |
+| **4 — Validation**            | Show the live demo to 3–5 real barbershop owners, capture what actually confuses or excites them |
+| **5 — Onboarding + Outreach** | Self-serve signup wizard, first paying/founding customers                                        |
 
 Phases 0–3 map to the 14-day roadmap below. Phases 4–5 start as soon as there's something worth showing — realistically partway through Phase 2, not after Phase 3 finishes.
 
@@ -160,6 +173,7 @@ Phases 0–3 map to the 14-day roadmap below. Phases 4–5 start as soon as ther
 ## 6. Personal Review vs. Claude Code Autonomy
 
 ### You review personally, every time
+
 - `prisma/schema.prisma` — any change, before it's applied
 - Every migration file, especially the exclusion-constraint SQL
 - `lib/db/*` — anything that takes or omits a `tenantId` parameter
@@ -169,6 +183,7 @@ Phases 0–3 map to the 14-day roadmap below. Phases 4–5 start as soon as ther
 - Pricing or business-rule logic (buffer time, lead time, cancellation window enforcement)
 
 ### Claude Code can implement autonomously (review after, not before)
+
 - `components/*` — once a design direction is agreed
 - Tailwind styling and layout
 - Email templates
@@ -194,22 +209,22 @@ aren't one-day tasks even with Claude Code doing the typing. If something has to
 protect Day 7 and let Days 10–13 absorb the slack — a working booking loop is what actually
 de-risks the project; a slightly later demo does not.
 
-| Day | Deliverable |
-|---|---|
-| 1 | Next.js project init (TS strict, Tailwind, ESLint incl. the `no-restricted-imports` rule banning Prisma outside `lib/db/**`), Vercel linked, Neon DB provisioned, Prisma initialized, first migration. Also start Resend domain DNS verification now — propagation takes time and shouldn't block Day 8 |
-| 2 | Auth.js v5, split into `auth.config.ts` (dependency-free, used by `proxy.ts`) and `auth.ts` (Prisma-backed Credentials `authorize`, Node runtime only) — get this split right now, not after `proxy.ts` breaks on import. Login page, route protection, seed script creating one demo tenant + owner. Also write a small CLI script to manually reset an owner's password hash — no in-app reset flow is in MVP scope, but a forgotten password shouldn't be able to kill a live customer trial |
-| 3 | Exclusion-constraint migration (raw SQL, ranging over `blockedUntil`, status `IN ('CONFIRMED','COMPLETED')`), `cancelToken` via `crypto.randomUUID()`. Probe script asserts **both** directions: concurrent overlapping bookings → one rejected, genuinely back-to-back bookings (buffer = 0) → both accepted |
-| 4 | `lib/availability/slots.ts` — working hours + time-off + existing bookings + buffer/lead time → open slots, unit tested (~2 sessions) |
-| 5 | Public business page (`/b/[slug]`) — info + service list |
-| 6 | Booking flow UI — date/slot picker, service selection (delegate build to Claude Code once the flow is agreed) |
-| 7 | Booking submission server action (re-verifying staff/service/customer belong to the tenant before insert), `SLOT_TAKEN` handling, confirmation screen — **core loop works end-to-end today, even if ugly** |
-| 8 | Resend integration — confirmation email, owner notification, `/cancel/[token]` flow, per-phone rate limiting on the public submission (per-IP deferred — see `CLAUDE.md`) |
-| 9 | Dashboard shell — layout, nav, auth guard, "today" overview pulling real data |
-| 10 | Calendar view (day/week, staff columns) (~2 sessions) |
-| 11 | Manual booking entry (walk-ins), services + staff CRUD — staff "removal" is `active = false`, never a real delete (~2 sessions) |
-| 12 | Settings screen wired to `Tenant` fields (buffer, lead time, cancellation window) — opening hours are edited per staff member on the Staff screen, not here |
-| 13 | Seed a polished demo tenant (real-looking branding, services, prices), mobile/design polish pass on the public flow |
-| 14 | Full dry run as both "owner" and "customer," fix rough edges, deploy, prepare the live in-person demo script, book your first 3–5 demo meetings |
+| Day | Deliverable                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Next.js project init (TS strict, Tailwind, ESLint incl. the `no-restricted-imports` rule banning Prisma outside `lib/db/**`), Vercel linked, Neon DB provisioned, Prisma initialized, first migration. Also start Resend domain DNS verification now — propagation takes time and shouldn't block Day 8                                                                                                                                                                                         |
+| 2   | Auth.js v5, split into `auth.config.ts` (dependency-free, used by `proxy.ts`) and `auth.ts` (Prisma-backed Credentials `authorize`, Node runtime only) — get this split right now, not after `proxy.ts` breaks on import. Login page, route protection, seed script creating one demo tenant + owner. Also write a small CLI script to manually reset an owner's password hash — no in-app reset flow is in MVP scope, but a forgotten password shouldn't be able to kill a live customer trial |
+| 3   | Exclusion-constraint migration (raw SQL, ranging over `blockedUntil`, status `IN ('CONFIRMED','COMPLETED')`), `cancelToken` via `crypto.randomUUID()`. Probe script asserts **both** directions: concurrent overlapping bookings → one rejected, genuinely back-to-back bookings (buffer = 0) → both accepted                                                                                                                                                                                   |
+| 4   | `lib/availability/slots.ts` — working hours + time-off + existing bookings + buffer/lead time → open slots, unit tested (~2 sessions)                                                                                                                                                                                                                                                                                                                                                           |
+| 5   | Public business page (`/b/[slug]`) — info + service list                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 6   | Booking flow UI — date/slot picker, service selection (delegate build to Claude Code once the flow is agreed)                                                                                                                                                                                                                                                                                                                                                                                   |
+| 7   | Booking submission server action (re-verifying staff/service/customer belong to the tenant before insert), `SLOT_TAKEN` handling, confirmation screen — **core loop works end-to-end today, even if ugly**                                                                                                                                                                                                                                                                                      |
+| 8   | Resend integration — confirmation email, owner notification, `/cancel/[token]` flow, per-phone rate limiting on the public submission (per-IP deferred — see `CLAUDE.md`)                                                                                                                                                                                                                                                                                                                       |
+| 9   | Dashboard shell — layout, nav, auth guard, "today" overview pulling real data                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| 10  | Calendar view (day/week, staff columns) (~2 sessions)                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 11  | Manual booking entry (walk-ins), services + staff CRUD — staff "removal" is `active = false`, never a real delete (~2 sessions)                                                                                                                                                                                                                                                                                                                                                                 |
+| 12  | Settings screen wired to `Tenant` fields (buffer, lead time, cancellation window) — opening hours are edited per staff member on the Staff screen, not here                                                                                                                                                                                                                                                                                                                                     |
+| 13  | Seed a polished demo tenant (real-looking branding, services, prices), mobile/design polish pass on the public flow                                                                                                                                                                                                                                                                                                                                                                             |
+| 14  | Full dry run as both "owner" and "customer," fix rough edges, deploy, prepare the live in-person demo script, book your first 3–5 demo meetings                                                                                                                                                                                                                                                                                                                                                 |
 
 By day 7 you have a working booking loop. By day 14 — realistically closer to day ~18–20
 once the two-session items above are accounted for — you have something you can put in
