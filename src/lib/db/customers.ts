@@ -4,7 +4,12 @@ import { prisma } from "./prisma";
 
 export type CustomerIdentity = {
   name: string;
-  /** Stored as typed — normalisation is a Day 8 concern, with the rate limiter. */
+  /**
+   * Canonical form, as produced by lib/validation/phone.ts — digits, optional
+   * leading `+`. Callers must pass a normalised value: this is the tenant's
+   * identity key (`@@unique([tenantId, phone])`), so a raw "030 / 123" arriving
+   * here silently creates a second customer for someone who already exists.
+   */
   phone: string;
   email?: string | undefined;
 };

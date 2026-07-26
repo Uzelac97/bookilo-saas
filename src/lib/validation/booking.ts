@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+import { normalizePhone, phoneDigitCount } from "./phone";
+
+/**
+ * The shortest thing that can still be a real phone number, counted in digits
+ * rather than characters. Short enough to admit a local number typed without
+ * an area code, since rejecting a reachable number is the worse failure here.
+ */
+const MIN_PHONE_DIGITS = 6;
+
 /**
  * The customer-supplied half of a public booking.
  *
@@ -27,15 +36,29 @@ export const customerDetailsSchema = z.object({
    * shops taking local numbers in whatever shape the customer types them
    * (+49 30 123, 030/123, 0176-123). A strict E.164 rule would reject valid
    * input from real customers, which is a worse failure than storing a
-   * slightly ragged string. Normalisation is a Day 8 concern, alongside the
-   * per-phone rate limiting that has to compare them.
+   * slightly ragged string.
+   *
+   * Accepted loosely, *stored* canonically: normalizePhone collapses the
+   * spacing and punctuation, because this value is the customer identity key
+   * and what the per-phone rate limiter counts against — see ./phone.ts for
+   * why that matters and what it deliberately doesn't unify.
+   *
+   * The order of the chain is load-bearing. `min` runs on the raw string so an
+   * empty or obviously short field gets the friendly message rather than the
+   * regex's; the digit-count check runs after the transform, because
+   * "12 () - ." clears a six-character minimum with two digits in it.
    */
   phone: z
     .string()
     .trim()
     .min(6, "Enter a phone number so the shop can reach you.")
     .max(32, "That phone number is too long.")
-    .regex(/^[+\d][\d\s()/.-]*$/, "Enter a valid phone number."),
+    .regex(/^[+\d][\d\s()/.-]*$/, "Enter a valid phone number.")
+    .transform(normalizePhone)
+    .refine(
+      (phone) => phoneDigitCount(phone) >= MIN_PHONE_DIGITS,
+      "Enter a phone number so the shop can reach you.",
+    ),
   /**
    * Optional, and normalised the same way as the login schema. An empty string
    * from an untouched input becomes undefined rather than failing validation —
