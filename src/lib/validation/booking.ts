@@ -48,3 +48,34 @@ export const customerDetailsSchema = z.object({
 });
 
 export type CustomerDetails = z.infer<typeof customerDetailsSchema>;
+
+/**
+ * The whole public booking request, as it arrives at the submission action.
+ *
+ * Still no `tenantId`, for the reason above. `slug` is here instead: the action
+ * is called from a client component that has no URL of its own, so the slug
+ * travels in the payload and the tenant is looked up from it server-side on
+ * arrival. That keeps the public resolution path intact (EXECUTION-PLAN.md §3) —
+ * the slug names *which shop*, it does not authorize anything, and every id
+ * below is re-checked against the tenant it resolves to.
+ *
+ * `staffId` is required rather than optional. The form has already resolved
+ * "any barber" to a concrete id by the time it submits, because it shows the
+ * customer that barber's name before they commit — so the id it sends is the one
+ * they agreed to, and the action verifies that barber is genuinely free at the
+ * chosen instant rather than re-resolving to someone else.
+ */
+export const bookingSubmissionSchema = customerDetailsSchema.extend({
+  slug: z.string().trim().min(1),
+  serviceId: z.string().trim().min(1),
+  staffId: z.string().trim().min(1),
+  /**
+   * A UTC instant, serialized by the client as ISO 8601. Parsed to a Date here
+   * so nothing downstream handles the string form — and never used as-is: the
+   * action re-derives the tenant-local day from it and re-computes whether that
+   * instant is actually bookable.
+   */
+  startAt: z.iso.datetime().pipe(z.coerce.date()),
+});
+
+export type BookingSubmission = z.infer<typeof bookingSubmissionSchema>;

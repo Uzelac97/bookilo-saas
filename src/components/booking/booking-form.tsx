@@ -1,7 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 
+import {
+  submitBooking,
+  type BookingSubmitState,
+  type LostSlotState,
+} from "@/app/(public)/b/[slug]/book/actions";
 import type { BookableSlot } from "@/lib/availability/booking-options";
 import type { PublicService } from "@/lib/db/services";
 import type { PublicStaff } from "@/lib/db/staff";
@@ -14,35 +19,78 @@ import {
 type FieldErrors = Partial<Record<keyof CustomerDetails, string>>;
 
 /**
+ * Lives here rather than next to the action: a "use server" module turns every
+ * export into a server reference, so a constant exported from there reaches the
+ * client as an action proxy instead of this object. See the note in actions.ts.
+ */
+const INITIAL_STATE: BookingSubmitState = { status: "idle" };
+
+/**
  * Step three: confirm what's being booked, collect who's booking it.
  *
- * Day 6 stops at the validated payload — `onSubmit` is a stub. Day 7 replaces
- * it with the server action, which validates against the *same* schema, so the
- * messages a customer sees here and the ones the server enforces cannot drift.
+ * Validation runs twice against the *same* schema — here for the instant
+ * feedback, and again inside the server action, which is the one that counts. A
+ * customer therefore cannot see a message the server wouldn't have produced.
+ *
+ * On success the action redirects and this component never re-renders, so there
+ * is no success state to hold. The failures it does render are the ones a
+ * customer can act on by typing. The three that aren't — the barber being taken,
+ * the whole slot being taken, or a time the shop never offered — are handed
+ * upward via `onSlotLost`, because each is fixed by fresh server data, and in two
+ * of the three cases this form is about to unmount along with the selection that
+ * produced it.
  */
 export function BookingForm({
+  slug,
   service,
   date,
   slot,
   staff,
   timezone,
+  onSlotLost,
 }: {
+  slug: string;
   service: PublicService;
   date: string;
   slot: BookableSlot;
   staff: PublicStaff[];
   timezone: string;
+  onSlotLost: (lost: LostSlotState) => void;
 }) {
-  const [errors, setErrors] = useState<FieldErrors>({});
+  const [clientErrors, setClientErrors] = useState<FieldErrors>({});
+  const [state, formAction, pending] = useActionState<
+    BookingSubmitState,
+    FormData
+  >(submitBooking, INITIAL_STATE);
 
   // "Any barber" resolves to the first id in staffIds — the order the two
   // lib/db queries agree on. Shown here so the customer knows who they're
-  // getting before they commit, not after the email arrives.
+  // getting before they commit, not after the email arrives. The same id is
+  // submitted below, so the barber they were promised is the barber the server
+  // verifies is free.
   const assigned = staff.find((member) => member.id === slot.staffIds[0]);
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  const errors: FieldErrors =
+    state.status === "invalid" ? state.fieldErrors : clientErrors;
 
+  // The whole state object goes up, not just its tag: `staff_taken` carries the
+  // staffId, and the flow needs it to name the barber who was taken.
+  useEffect(() => {
+    if (
+      state.status === "staff_taken" ||
+      state.status === "slot_taken" ||
+      state.status === "unavailable"
+    ) {
+      onSlotLost(state);
+    }
+  }, [state, onSlotLost]);
+
+  /**
+   * Client-side gate in front of the action. Returning early from a form
+   * action's onSubmit requires preventDefault, so this validates first and only
+   * lets the submission through when the payload would pass on the server too.
+   */
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     const form = new FormData(event.currentTarget);
     const parsed = customerDetailsSchema.safeParse({
       name: form.get("name"),
@@ -51,30 +99,38 @@ export function BookingForm({
     });
 
     if (!parsed.success) {
+      event.preventDefault();
+
       const next: FieldErrors = {};
       for (const issue of parsed.error.issues) {
         const field = issue.path[0] as keyof CustomerDetails;
         next[field] ??= issue.message;
       }
-      setErrors(next);
+      setClientErrors(next);
       return;
     }
 
-    setErrors({});
-
-    // TODO(Day 7): replace with the submitBooking server action — it resolves
-    // tenantId from the slug server-side, re-verifies the staff/service against
-    // it (CLAUDE.md rule 2a), and handles the SLOT_TAKEN result.
-    console.log("booking payload (stub)", {
-      serviceId: service.id,
-      staffId: slot.staffIds[0],
-      startAt: slot.startAt.toISOString(),
-      customer: parsed.data,
-    });
+    setClientErrors({});
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+    <form
+      action={formAction}
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-5"
+    >
+      {/* The parts of the request that aren't the customer's to type. None of
+          these is trusted: the slug is re-looked-up server-side, and the
+          service/barber/instant are re-checked against freshly computed
+          availability before anything is inserted. */}
+      <input type="hidden" name="slug" value={slug} />
+      <input type="hidden" name="serviceId" value={service.id} />
+      <input type="hidden" name="staffId" value={slot.staffIds[0]} />
+      <input
+        type="hidden"
+        name="startAt"
+        value={slot.startAt.toISOString()}
+      />
       <dl className="flex flex-col gap-1.5 rounded-2xl border border-zinc-200 bg-white p-4 text-sm">
         <SummaryRow label="Service" value={service.name} />
         <SummaryRow
@@ -106,11 +162,19 @@ export function BookingForm({
         error={errors.email}
       />
 
+      {state.status === "error" ? (
+        <p role="alert" className="text-sm text-red-700">
+          Something went wrong on our end and the booking wasn&rsquo;t saved.
+          Please try again.
+        </p>
+      ) : null}
+
       <button
         type="submit"
-        className="mt-1 rounded-lg bg-zinc-900 px-4 py-2.5 text-base font-medium text-white transition-colors hover:bg-zinc-800"
+        disabled={pending}
+        className="mt-1 rounded-lg bg-zinc-900 px-4 py-2.5 text-base font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
       >
-        Confirm booking
+        {pending ? "Confirming…" : "Confirm booking"}
       </button>
     </form>
   );

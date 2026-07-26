@@ -108,6 +108,34 @@ export function mergeStaffSlots(perStaff: StaffSlots[]): BookableSlot[] {
 }
 
 /**
+ * Finds the offered slot matching a requested instant and barber, or null.
+ *
+ * This is the predicate the submission action gates on, kept pure and next to
+ * mergeStaffSlots so it can be tested directly. Two conditions, both required:
+ * the instant must be one the server just computed as open, and the requested
+ * barber must be among the ones free at it. Checking only the instant would let
+ * a customer be booked with a barber who is busy at that moment but whose
+ * colleague is free.
+ *
+ * Compared by epoch millis, not by Date identity or reference — the requested
+ * instant arrives as a freshly parsed Date and would never be `===` anything.
+ */
+export function findSlot(
+  slots: BookableSlot[],
+  startAt: Date,
+  staffId: string,
+): BookableSlot | null {
+  const requested = startAt.getTime();
+
+  return (
+    slots.find(
+      (slot) =>
+        slot.startAt.getTime() === requested && slot.staffIds.includes(staffId),
+    ) ?? null
+  );
+}
+
+/**
  * Validates and clamps a `?date=` parameter into the bookable window.
  *
  * Clamps rather than throws on purpose: a stale bookmark, a hand-edited URL, or

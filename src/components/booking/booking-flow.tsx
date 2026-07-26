@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 
+import type { LostSlotState } from "@/app/(public)/b/[slug]/book/actions";
 import type {
   BookableSlot,
   StripDay,
@@ -76,7 +77,43 @@ export function BookingFlow({
   const selectedSlot =
     slots.find((slot) => slot.startAt.getTime() === selectedStartAt) ?? null;
 
+  // A rejected submission is reported here rather than inside the form, and this
+  // is the reason: `selectedSlot` above is *derived* from the server's slot list,
+  // so the moment the refresh below lands without that slot in it, the selection
+  // collapses to null and the form unmounts — taking any message inside it along
+  // with it. The notice has to outlive the form that produced it, and it belongs
+  // next to the grid the customer now has to pick from again.
+  const [slotLost, setSlotLost] = useState<LostSlotState | null>(null);
+
+  // useCallback because the form calls this from an effect keyed on the action
+  // state — a fresh identity every render would re-fire it.
+  const handleSlotLost = useCallback(
+    (lost: LostSlotState) => {
+      setSlotLost(lost);
+      // This refresh is REQUIRED, not belt-and-braces. Measured against the dev
+      // server rather than assumed: a Server Action that returns a value without
+      // calling revalidatePath sends back only that value — a 77-byte response
+      // carrying the return object and nothing else — and the page's server
+      // component is never re-invoked. The same action with a revalidatePath call
+      // came back as a 7.6KB flight tree with a freshly rendered page in it. So
+      // absent this line, the customer would be told their slot was taken while
+      // still looking at a grid that offers it.
+      //
+      // revalidatePath inside the action is the other way to get there, and it
+      // saves a round trip by folding the new tree into the action response. It's
+      // rejected on purpose: it needs the concrete path for a dynamic segment
+      // built by hand, and the staleness being fixed is this component's own, so
+      // it belongs next to the state that owns it.
+      startTransition(() => router.refresh());
+    },
+    [router],
+  );
+
   function navigate(changes: Record<string, string>) {
+    // Any deliberate move to a different date or barber is the customer moving
+    // on; the stale notice shouldn't follow them there.
+    setSlotLost(null);
+
     const next = new URLSearchParams(searchParams);
     for (const [key, value] of Object.entries(changes)) {
       next.set(key, value);
@@ -119,6 +156,14 @@ export function BookingFlow({
         <h2 className="text-lg font-semibold tracking-tight text-zinc-900">
           Pick a time
         </h2>
+        {slotLost ? (
+          <p
+            role="alert"
+            className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          >
+            {lostSlotMessage(slotLost, staff)}
+          </p>
+        ) : null}
         <SlotGrid
           slots={slots}
           selectedStartAt={selectedSlot?.startAt ?? null}
@@ -135,14 +180,39 @@ export function BookingFlow({
             Your details
           </h2>
           <BookingForm
+            slug={slug}
             service={service}
             date={selectedDate}
             slot={selectedSlot}
             staff={staff}
             timezone={timezone}
+            onSlotLost={handleSlotLost}
           />
         </section>
       ) : null}
     </div>
   );
+}
+
+/**
+ * What to tell a customer whose submission bounced.
+ *
+ * Each case gets the advice that is actually true for it. `staff_taken` is the
+ * one worth care: the time is still open with someone else, and the refreshed
+ * form below has already re-resolved to that barber, so the next tap finishes the
+ * booking. Telling them to pick a different time there — as a single shared
+ * "unavailable" message did — would send them away from a slot they can still have.
+ */
+function lostSlotMessage(lost: LostSlotState, staff: PublicStaff[]): string {
+  switch (lost.status) {
+    case "staff_taken": {
+      const name = staff.find((member) => member.id === lost.staffId)?.name;
+
+      return `${name ?? "That barber"} was just booked at this time. Another barber is still free — the details below now show who, so you can confirm again.`;
+    }
+    case "slot_taken":
+      return "Someone else booked that time just before you. The times below are up to date — please pick another.";
+    case "unavailable":
+      return "That time isn't available anymore. The times below are up to date — please pick another.";
+  }
 }

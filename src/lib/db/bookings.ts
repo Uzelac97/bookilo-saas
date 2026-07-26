@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
 
-import type { Booking, BookingSource } from "@prisma/client";
+import type { Booking, BookingSource, BookingStatus } from "@prisma/client";
 
 import { prisma } from "./prisma";
 
 // Re-exported so app code can name these types without importing @prisma/client,
 // which the no-restricted-imports rule bans outside lib/db/**.
-export type { Booking, BookingSource };
+export type { Booking, BookingSource, BookingStatus };
 
 // Kept in sync with prisma/migrations/20260725124130_add_booking_overlap_constraint.
 const OVERLAP_CONSTRAINT = "no_overlapping_bookings";
@@ -122,6 +122,70 @@ export async function createBooking(
     }
     throw error;
   }
+}
+
+/** A booking as the confirmation and cancellation pages render it. */
+export type BookingByToken = {
+  id: string;
+  startAt: Date;
+  endAt: Date;
+  status: BookingStatus;
+  cancelToken: string;
+  service: { name: string; durationMinutes: number; priceMinorUnits: number };
+  staff: { name: string };
+  customer: { name: string; email: string | null };
+  tenant: {
+    slug: string;
+    name: string;
+    timezone: string;
+    cancellationWindowMinutes: number;
+  };
+};
+
+/**
+ * Loads a booking by its cancel token.
+ *
+ * DELIBERATELY NOT TENANT-SCOPED, and the only function in lib/db/** that isn't.
+ * `cancelToken` is a bearer secret, not an identifier (CLAUDE.md) — holding it
+ * *is* the authorization, which is the whole design of a cancel link that works
+ * with no customer account. There is no session and no slug to scope by on this
+ * path, so a `tenantId` parameter here could only come from the URL, which would
+ * be security theatre: an attacker supplying a token they don't have can't guess
+ * one, and an attacker holding a real token can also read the slug off it.
+ *
+ * The tenant is *returned* rather than taken, so the caller can check the token
+ * against the slug in its own URL — see the confirmation page, which 404s on a
+ * mismatch so one shop's URL can never render another's booking.
+ *
+ * Callers must treat "not found" and "wrong token" as the same outcome. Never
+ * echo the token back into an error message or a log line.
+ */
+export async function getBookingByCancelToken(
+  cancelToken: string,
+): Promise<BookingByToken | null> {
+  return prisma.booking.findUnique({
+    where: { cancelToken },
+    select: {
+      id: true,
+      startAt: true,
+      endAt: true,
+      status: true,
+      cancelToken: true,
+      service: {
+        select: { name: true, durationMinutes: true, priceMinorUnits: true },
+      },
+      staff: { select: { name: true } },
+      customer: { select: { name: true, email: true } },
+      tenant: {
+        select: {
+          slug: true,
+          name: true,
+          timezone: true,
+          cancellationWindowMinutes: true,
+        },
+      },
+    },
+  });
 }
 
 /**

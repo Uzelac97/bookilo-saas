@@ -6,6 +6,7 @@ import {
   canPageBack,
   canPageForward,
   dateStrip,
+  findSlot,
   mergeStaffSlots,
   resolveBookingDate,
   shiftByWeek,
@@ -95,6 +96,49 @@ describe("mergeStaffSlots", () => {
 
     expect(merged).toHaveLength(1);
     expect(merged[0].staffIds).toEqual(["marco", "ivan"]);
+  });
+});
+
+describe("findSlot", () => {
+  const offered = mergeStaffSlots([
+    staff("marco", ["2026-07-28T09:00", "2026-07-28T14:30"]),
+    staff("ivan", ["2026-07-28T14:30"]),
+  ]);
+
+  it("matches an offered instant for a barber free at it", () => {
+    const found = findSlot(offered, at("2026-07-28T14:30"), "ivan");
+
+    expect(found?.staffIds).toEqual(["marco", "ivan"]);
+  });
+
+  it("compares by instant, not by Date identity", () => {
+    // The action parses the instant out of a submitted ISO string, so the Date
+    // it passes is never the same object the slot holds.
+    const found = findSlot(
+      offered,
+      new Date("2026-07-28T12:30:00.000Z"),
+      "marco",
+    );
+
+    expect(found).not.toBeNull();
+  });
+
+  it("rejects an instant nobody was offered", () => {
+    expect(findSlot(offered, at("2026-07-28T14:45"), "marco")).toBeNull();
+  });
+
+  it("rejects a barber who is busy at an otherwise-open instant", () => {
+    // 09:00 is a real slot, but only Marco is free then. Matching on the instant
+    // alone would book Ivan into an appointment he already has.
+    expect(findSlot(offered, at("2026-07-28T09:00"), "ivan")).toBeNull();
+  });
+
+  it("rejects a staff id that isn't in the list at all", () => {
+    expect(findSlot(offered, at("2026-07-28T14:30"), "someone-else")).toBeNull();
+  });
+
+  it("rejects everything when nothing is offered", () => {
+    expect(findSlot([], at("2026-07-28T14:30"), "marco")).toBeNull();
   });
 });
 
