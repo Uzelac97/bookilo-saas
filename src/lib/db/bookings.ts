@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import type { Booking, BookingSource, BookingStatus } from "@prisma/client";
 
+import { canCancel } from "@/lib/availability/cancellation";
+
 import { prisma } from "./prisma";
 
 // Re-exported so app code can name these types without importing @prisma/client,
@@ -198,6 +200,7 @@ export type BookingByToken = {
     slug: string;
     name: string;
     timezone: string;
+    phone: string | null;
     cancellationWindowMinutes: number;
   };
 };
@@ -241,11 +244,93 @@ export async function getBookingByCancelToken(
           slug: true,
           name: true,
           timezone: true,
+          // For the cancel page's "too late to do this online" branch, which has
+          // to offer a way to reach the shop instead. Nullable in the schema, so
+          // the page must handle its absence rather than assume a number.
+          phone: true,
           cancellationWindowMinutes: true,
         },
       },
     },
   });
+}
+
+export type CancelBookingResult =
+  | { ok: true }
+  | { ok: false; reason: "NOT_FOUND" | "TOO_LATE" | "NOT_CANCELLABLE" };
+
+/**
+ * Cancels a booking on the strength of its cancel token.
+ *
+ * Not tenant-scoped, for the same reason as getBookingByCancelToken above — the
+ * token is the authorization, and there is no session on this path. Callers must
+ * treat NOT_FOUND as covering both "no such booking" and "wrong token", and must
+ * never put the token in a log line or an error message.
+ *
+ * Cancelling frees the slot with no further work: `CANCELLED` sits outside both
+ * the `no_overlapping_bookings` constraint's WHERE clause and OCCUPYING_STATUSES
+ * in ./availability.ts, so the time reappears in the grid and a new booking can
+ * take it. Probe phase E covers exactly this.
+ *
+ * The write is a conditional updateMany rather than an update, so a double-click
+ * or a reloaded form is idempotent instead of a race: the second one matches no
+ * rows because the first already moved the status off CONFIRMED.
+ */
+export async function cancelBookingByToken(
+  cancelToken: string,
+  now: Date,
+): Promise<CancelBookingResult> {
+  const booking = await prisma.booking.findUnique({
+    where: { cancelToken },
+    select: {
+      status: true,
+      startAt: true,
+      tenant: { select: { cancellationWindowMinutes: true } },
+    },
+  });
+
+  if (!booking) return { ok: false, reason: "NOT_FOUND" };
+  // Already cancelled is a success, not an error. The customer asked for this
+  // booking to be off the books and it is — telling them something went wrong
+  // because they pressed the button twice would be false.
+  if (booking.status === "CANCELLED") return { ok: true };
+  // COMPLETED or NO_SHOW: the appointment already happened. Not something a
+  // cancel link should be able to rewrite.
+  if (booking.status !== "CONFIRMED") {
+    return { ok: false, reason: "NOT_CANCELLABLE" };
+  }
+
+  if (
+    !canCancel({
+      startAt: booking.startAt,
+      now,
+      windowMinutes: booking.tenant.cancellationWindowMinutes,
+    })
+  ) {
+    return { ok: false, reason: "TOO_LATE" };
+  }
+
+  const { count } = await prisma.booking.updateMany({
+    where: { cancelToken, status: "CONFIRMED" },
+    data: { status: "CANCELLED" },
+  });
+
+  if (count === 0) {
+    // The status changed between the read above and this write — the owner
+    // marking it complete from the dashboard, or a second tab that got there
+    // first. Re-read rather than guess, so a double submit still reports the
+    // success it actually achieved.
+    const current = await prisma.booking.findUnique({
+      where: { cancelToken },
+      select: { status: true },
+    });
+
+    return current?.status === "CANCELLED"
+      ? { ok: true }
+      : { ok: false, reason: "NOT_CANCELLABLE" };
+  }
+
+  return { ok: true };
 }
 
 /**

@@ -74,14 +74,15 @@ export default async function BookedPage({ params }: PageProps) {
 
         {booking.status === "CANCELLED" ? null : (
           <p className="text-sm text-zinc-500">
-            {/* Day 8 turns this into the real cancel link, and emails the same
-                URL to the customer. Until then this page is the only copy of
-                it — which is exactly why it's a route and not a panel that a
-                page refresh would throw away. */}
-            Need to change something? Keep this page — it&rsquo;s how you cancel.
-            You can cancel up to{" "}
-            {formatDuration(tenant.cancellationWindowMinutes)} before your
-            appointment.
+            Need to change something? You can{" "}
+            <Link
+              href={`/b/${slug}/cancel/${booking.cancelToken}`}
+              className="font-medium text-zinc-900 underline underline-offset-4 hover:text-zinc-600"
+            >
+              cancel this booking
+            </Link>{" "}
+            up to {formatDuration(tenant.cancellationWindowMinutes)} before your
+            appointment. The confirmation email carries the same link.
           </p>
         )}
 
