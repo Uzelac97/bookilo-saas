@@ -14,7 +14,11 @@ import {
   getStaffAvailability,
   type StaffAvailability,
 } from "@/lib/db/availability";
-import { createBooking } from "@/lib/db/bookings";
+import {
+  createBooking,
+  getBookingRateForPhone,
+  type BookingRate,
+} from "@/lib/db/bookings";
 import { findOrCreateCustomer } from "@/lib/db/customers";
 import { getActiveServices } from "@/lib/db/services";
 import { getTenantBySlug } from "@/lib/db/tenant";
@@ -50,7 +54,42 @@ export type BookingSubmitState =
   | { status: "staff_taken"; staffId: string }
   | { status: "slot_taken" }
   | { status: "unavailable" }
+  | { status: "rate_limited"; reason: RateLimitReason; shopPhone: string | null }
   | { status: "error" };
+
+/**
+ * Which limit was hit — two different situations that need two different things
+ * said, on the same reasoning as the three rejection states above.
+ *
+ * `too_many_upcoming` is the one a *legitimate* customer can reach: someone who
+ * genuinely has five appointments booked ahead. Telling them they've been
+ * booking too fast would be false and would read as an accusation.
+ */
+export type RateLimitReason = "too_many_recent" | "too_many_upcoming";
+
+/**
+ * The limits, as plain module constants.
+ *
+ * Not `Tenant` columns: nobody has asked to tune these per shop, and a settings
+ * field added "in case" is exactly what CLAUDE.md says to flag instead of build.
+ * Moving them into the database later is additive and cheap.
+ *
+ * Sized to be invisible to real use and awkward for a script. A barber's regular
+ * booking their next four Saturdays in one sitting stays under both; so does a
+ * family booking three cuts back to back from one phone. Someone submitting the
+ * form in a loop hits the first within a minute.
+ */
+const RATE_WINDOW_MINUTES = 60;
+const MAX_BOOKINGS_PER_WINDOW = 3;
+const MAX_UPCOMING_BOOKINGS = 5;
+
+/** Which limit this phone has hit, or null if it's within both. */
+function rateLimitReason(rate: BookingRate): RateLimitReason | null {
+  if (rate.recent >= MAX_BOOKINGS_PER_WINDOW) return "too_many_recent";
+  if (rate.upcoming >= MAX_UPCOMING_BOOKINGS) return "too_many_upcoming";
+
+  return null;
+}
 
 /**
  * The rejections the *flow* renders rather than the form, because the fix for
@@ -78,12 +117,15 @@ export type LostSlotState = Extract<
  * constraint in the database prevents *overlap* and nothing else — it knows
  * nothing about working hours, time off, the minimum lead time, or the booking
  * horizon. So a payload is not trusted because it inserts cleanly; it's trusted
- * because step 4 re-computes availability from the database and finds the
+ * because step 5 re-computes availability from the database and finds the
  * requested instant in the result. Without that, a hand-crafted request books
  * 03:00 on a closed Sunday and Postgres accepts it happily.
  *
- * This is the unauthenticated path by design (no customer accounts). Per-phone
- * rate limiting is Day 8, per CLAUDE.md.
+ * This is the unauthenticated path by design (no customer accounts), so step 3
+ * is the only thing between the form and an unbounded number of submissions.
+ * Per-IP limiting stays deferred (CLAUDE.md): it needs a persistent store that
+ * Vercel's serverless runtime can't provide in memory, which is a dependency and
+ * therefore a decision, not a detail.
  */
 export async function submitBooking(
   _prevState: BookingSubmitState,
@@ -128,11 +170,36 @@ export async function submitBooking(
   const tenant = await getTenantBySlug(slug);
   if (!tenant) return { status: "unavailable" };
 
-  // 3. Derive the tenant-local day that contains the requested instant, and
+  const now = new Date();
+
+  // 3. Rate-limit by phone, before anything expensive runs. Shedding load is the
+  //    point, so this sits ahead of the availability computation in step 5 and
+  //    ahead of step 6, which is what would otherwise leave a Customer row
+  //    behind for every attempt.
+  //
+  //    The phone arrives normalised from the schema — the whole reason that
+  //    normalisation exists is that this compares stored strings, and "030 123"
+  //    vs "030123" would hand out a fresh allowance per spelling.
+  const rate = await getBookingRateForPhone(tenant.id, customer.phone, {
+    now,
+    windowMinutes: RATE_WINDOW_MINUTES,
+  });
+
+  const limited = rateLimitReason(rate);
+  if (limited) {
+    return {
+      status: "rate_limited",
+      reason: limited,
+      // Carried in the payload rather than threaded down as a prop: the action
+      // already holds the tenant, and the form has no route params of its own.
+      shopPhone: tenant.phone,
+    };
+  }
+
+  // 4. Derive the tenant-local day that contains the requested instant, and
   //    reject anything outside the bookable window. resolveBookingDate clamps
   //    rather than throws, which makes it usable as a predicate: if clamping
   //    moved the date, it was in the past or beyond the horizon.
-  const now = new Date();
   const local = DateTime.fromJSDate(startAt).setZone(tenant.timezone);
   const date = local.isValid ? local.toISODate() : null;
 
@@ -143,7 +210,7 @@ export async function submitBooking(
   const service = await findActiveService(tenant.id, serviceId);
   if (!service) return { status: "unavailable" };
 
-  // 4. Re-compute availability and require the requested instant to be in it.
+  // 5. Re-compute availability and require the requested instant to be in it.
   //
   //    Deliberately NOT scoped to the requested barber, even though that would be
   //    a narrower query. The whole shop's availability is what makes it possible
@@ -174,13 +241,13 @@ export async function submitBooking(
   let token: string;
 
   try {
-    // 5. Resolve the customer. After the availability check, so a request that
+    // 6. Resolve the customer. After the availability check, so a request that
     //    was never going to succeed doesn't leave a Customer row behind.
     const { id: customerId } = await findOrCreateCustomer(tenant.id, customer);
 
-    // 6. Insert. createBooking re-verifies staff/service/customer against the
+    // 7. Insert. createBooking re-verifies staff/service/customer against the
     //    tenant (CLAUDE.md rule 2a) and owns the endAt/blockedUntil arithmetic
-    //    and the cancel token. Step 4 already implies the staff and service
+    //    and the cancel token. Step 5 already implies the staff and service
     //    belong to this tenant; that check stays as the structural guarantee,
     //    not a redundancy to remove.
     const result = await createBooking({
@@ -191,7 +258,7 @@ export async function submitBooking(
       startAt,
     });
 
-    // 7. The race the exclusion constraint exists to catch: the slot was open
+    // 8. The race the exclusion constraint exists to catch: the slot was open
     //    when we computed it a moment ago and taken by the time we inserted.
     //
     //    Classified against *freshly re-read* availability rather than reported
@@ -216,13 +283,13 @@ export async function submitBooking(
     token = result.booking.cancelToken;
   } catch (error) {
     // createBooking throws on a foreign key that doesn't belong to the tenant —
-    // after step 4 that means a service or barber was deactivated mid-request,
+    // after step 5 that means a service or barber was deactivated mid-request,
     // or a bug. Either way it's ours to see and not the customer's to read.
     console.error("submitBooking failed", error);
     return { status: "error" };
   }
 
-  // 8. Outside the try block: redirect() signals by throwing, and the catch
+  // 9. Outside the try block: redirect() signals by throwing, and the catch
   //    above would swallow it and leave the customer staring at a filled-in
   //    form with no confirmation — the same trap as loginAction.
   redirect(`/b/${slug}/booked/${token}`);

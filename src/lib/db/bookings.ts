@@ -124,6 +124,66 @@ export async function createBooking(
   }
 }
 
+/** How much this phone number has been booking, as the rate limiter reads it. */
+export type BookingRate = {
+  /** Bookings created inside the window, whatever became of them since. */
+  recent: number;
+  /** Confirmed appointments still in the future — slots currently held. */
+  upcoming: number;
+};
+
+/**
+ * The two counts the public form's per-phone rate limiting decides on.
+ *
+ * `phone` must be normalised (lib/validation/phone.ts). This compares stored
+ * strings, so an un-normalised value silently counts a different customer's
+ * rows — usually nobody's, which fails open.
+ *
+ * The two numbers answer deliberately different questions, and the status
+ * filters are not a copy-paste slip:
+ *
+ * - `recent` counts every status, cancellations included. Book, cancel, book,
+ *   cancel is precisely the loop worth stopping, and a counter that a
+ *   cancellation reset would be bypassable by anyone who noticed.
+ * - `upcoming` counts CONFIRMED only, because it's about slots being held.
+ *   A cancelled future booking holds nothing, so counting it would punish the
+ *   customer who did the right thing and freed the slot.
+ *
+ * Scoped by `tenantId` on both the booking and the customer. The nested filter
+ * is technically implied by the outer one — createBooking guarantees a booking's
+ * customer shares its tenant — but this query decides whether someone gets
+ * turned away, so it states its own boundary rather than inheriting one.
+ *
+ * Not indexed for: there's no index on `Booking.createdAt` or `(tenantId,
+ * customerId)`, so this is a scan of a small table. Correct at MVP volume and
+ * not worth a schema change until a real shop's numbers say otherwise.
+ */
+export async function getBookingRateForPhone(
+  tenantId: string,
+  phone: string,
+  opts: { now: Date; windowMinutes: number },
+): Promise<BookingRate> {
+  const { now, windowMinutes } = opts;
+  const since = new Date(now.getTime() - windowMinutes * 60_000);
+  const customer = { tenantId, phone };
+
+  const [recent, upcoming] = await Promise.all([
+    prisma.booking.count({
+      where: { tenantId, createdAt: { gte: since }, customer },
+    }),
+    prisma.booking.count({
+      where: {
+        tenantId,
+        status: "CONFIRMED",
+        startAt: { gte: now },
+        customer,
+      },
+    }),
+  ]);
+
+  return { recent, upcoming };
+}
+
 /** A booking as the confirmation and cancellation pages render it. */
 export type BookingByToken = {
   id: string;

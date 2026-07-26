@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "db:seed": "prisma db seed",
     "reset-password": "tsx scripts/reset-password.ts",
-    "probe:constraint": "tsx scripts/probe-exclusion-constraint.ts"
+    "probe:constraint": "tsx scripts/probe-exclusion-constraint.ts",
+    "probe:rate-limit": "tsx scripts/probe-rate-limit.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

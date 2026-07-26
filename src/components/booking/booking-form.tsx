@@ -6,6 +6,7 @@ import {
   submitBooking,
   type BookingSubmitState,
   type LostSlotState,
+  type RateLimitReason,
 } from "@/app/(public)/b/[slug]/book/actions";
 import type { BookableSlot } from "@/lib/availability/booking-options";
 import type { PublicService } from "@/lib/db/services";
@@ -162,6 +163,20 @@ export function BookingForm({
         error={errors.email}
       />
 
+      {state.status === "rate_limited" ? (
+        // Rendered here rather than handed to the flow via onSlotLost, unlike
+        // the three states above: nothing is wrong with the chosen slot, so
+        // refreshing the grid would be beside the point — and it would unmount
+        // this form and the message with it, for a customer who hasn't been
+        // asked to change anything.
+        <p
+          role="alert"
+          className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+        >
+          {rateLimitMessage(state.reason, state.shopPhone)}
+        </p>
+      ) : null}
+
       {state.status === "error" ? (
         <p role="alert" className="text-sm text-red-700">
           Something went wrong on our end and the booking wasn&rsquo;t saved.
@@ -178,6 +193,32 @@ export function BookingForm({
       </button>
     </form>
   );
+}
+
+/**
+ * What to tell someone the rate limiter turned away.
+ *
+ * Both messages assume a real customer, because most of the people who see this
+ * will be one — a shop's regular booking their next few Saturdays, or a family
+ * sharing a phone number. The limiter can't tell them apart from a script, so
+ * the wording doesn't try to: it states the situation and offers the phone,
+ * rather than implying anything about what they were doing.
+ *
+ * Falling back to "get in touch with the shop" when there's no number on file:
+ * `Tenant.phone` is nullable, and inventing a way to reach a shop that hasn't
+ * given one would be worse than saying it plainly.
+ */
+function rateLimitMessage(
+  reason: RateLimitReason,
+  shopPhone: string | null,
+): string {
+  const contact = shopPhone
+    ? `call the shop on ${shopPhone}`
+    : "get in touch with the shop directly";
+
+  return reason === "too_many_upcoming"
+    ? `You already have several appointments booked here. To add another, ${contact}.`
+    : `That's a few bookings in a short time. If you need another appointment, ${contact}.`;
 }
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
