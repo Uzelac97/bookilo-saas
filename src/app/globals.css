@@ -1,6 +1,17 @@
 @import "tailwindcss";
 
 :root {
+  /* This app is light-only by design: every surface picks an explicit Tailwind
+     colour (bg-white, bg-zinc-50, text-zinc-900), so there is no dark theme for
+     the browser to cooperate with. Declaring it stops native form controls and
+     other UA-painted chrome — scrollbars, autofill shading, the date/time picker
+     panel, select popups, spin buttons, the text caret — from following the OS
+     preference into a dark palette that clashes with a white page.
+
+     This alone does NOT fix dark-mode input text; see the note below. Both
+     changes are needed, for two different halves of the same symptom. */
+  color-scheme: light;
+
   --background: #ffffff;
   --foreground: #171717;
 }
@@ -12,12 +23,25 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* The create-next-app scaffold shipped a `@media (prefers-color-scheme: dark)`
+   block here that flipped --foreground to #ededed and --background to #0a0a0a.
+   It is deleted rather than kept, and it — not the missing color-scheme — is what
+   actually rendered white text on a white background:
+
+     Tailwind v4's preflight resets form controls to
+       `button, input, select, optgroup, textarea { color: inherit;
+        background-color: #0000; }`
+
+   so an <input> takes its colour from the cascade, not from the UA. With the OS
+   in dark mode the input inherited body's #ededed while its transparent
+   background showed the white card behind it. `color-scheme: light` cannot reach
+   that, because preflight has already overridden the UA's fieldtext/field values
+   the property governs.
+
+   Nothing else in the app responds to prefers-color-scheme, so a dark theme was
+   never half-built — this was scaffold residue that only surfaced once real form
+   inputs existed. If a dark theme is ever wanted, it needs the whole palette,
+   not two variables. */
 
 body {
   background: var(--background);

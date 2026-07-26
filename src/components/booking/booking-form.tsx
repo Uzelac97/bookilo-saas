@@ -221,7 +221,15 @@ function Field({
         className={[
           // text-base, not text-sm — iOS Safari zooms the viewport on focus for
           // anything under 16px, and this form is demoed on a phone.
-          "rounded-lg border px-3 py-2 text-base outline-none focus:ring-1",
+          //
+          // bg-white and text-zinc-900 are stated rather than inherited on
+          // purpose. Tailwind's preflight resets form controls to
+          // `color: inherit; background-color: #0000`, so without these an input
+          // renders in whatever colour an ancestor happens to carry — which is
+          // how a leftover dark-mode block in globals.css once made these fields
+          // near-white text on a white card. Naming both here means a future
+          // change to body colour can't reach back into this input.
+          "rounded-lg border bg-white px-3 py-2 text-base text-zinc-900 outline-none focus:ring-1",
           error
             ? "border-red-400 focus:border-red-500 focus:ring-red-500"
             : "border-zinc-300 focus:border-zinc-900 focus:ring-zinc-900",
