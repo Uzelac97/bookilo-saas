@@ -68,6 +68,25 @@ export function formatSlotTime(instant: Date, timezone: string): string {
 }
 
 /**
+ * An appointment's span as the shop's wall clock: "09:00–09:30".
+ *
+ * En dash, not a hyphen — this is a range, and it sits next to names and service
+ * labels where a hyphen reads as part of a word.
+ *
+ * Same `timezone` contract as formatSlotTime above, which this is built on: it
+ * is required and must be tenant.timezone. A dashboard render is server-side
+ * today, but nothing stops a future client component importing this, and that is
+ * exactly where an implicit zone would start showing the wrong hour.
+ */
+export function formatTimeRange(
+  start: Date,
+  end: Date,
+  timezone: string,
+): string {
+  return `${formatSlotTime(start, timezone)}–${formatSlotTime(end, timezone)}`;
+}
+
+/**
  * A tenant-local calendar day for display: "2026-07-28" -> "Tue, 28 Jul".
  *
  * Takes the ISO date string the URL carries, not an instant, so there is no

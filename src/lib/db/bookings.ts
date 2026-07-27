@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { Booking, BookingSource, BookingStatus } from "@prisma/client";
 
 import { canCancel } from "@/lib/availability/cancellation";
+import { localDayWindowUtc } from "@/lib/availability/slots";
 
 import { prisma } from "./prisma";
 
@@ -344,6 +345,75 @@ export async function cancelBookingByToken(
   }
 
   return { ok: true };
+}
+
+/**
+ * A booking as the owner's dashboard renders it.
+ *
+ * Narrower than the Prisma model on purpose, same reasoning as PublicService in
+ * ./services.ts. `cancelToken` is deliberately absent: it's a bearer secret, the
+ * dashboard has no use for it, and selecting it would put it in the serialized
+ * RSC payload of every overview render for no reason.
+ */
+export type DashboardBooking = {
+  id: string;
+  startAt: Date;
+  endAt: Date;
+  status: BookingStatus;
+  source: BookingSource;
+  service: { name: string; priceMinorUnits: number };
+  staff: { name: string };
+  // phone so the owner can call the customer; email because a no-show is worth
+  // following up in writing.
+  customer: { name: string; phone: string; email: string | null };
+};
+
+/**
+ * Every booking on a tenant's books for one tenant-local calendar day.
+ *
+ * Signature mirrors getStaffAvailability in ./availability.ts, and for the same
+ * reason reuses localDayWindowUtc: the day boundary is defined once, so both
+ * stay correct on the 23- and 25-hour days either side of a DST change.
+ *
+ * `tenantId` comes from the server-side session on dashboard routes — never from
+ * client input (CLAUDE.md rule 2).
+ *
+ * Two things here look like getStaffAvailability and deliberately aren't:
+ *
+ * - The filter is `startAt` inside [from, to), NOT the blockedUntil overlap that
+ *   availability.ts uses. That query answers "is this slot occupied", where a
+ *   booking bleeding across a boundary genuinely matters at both ends. This one
+ *   answers "what is on the books today", and an appointment belongs to the day
+ *   it starts on — an overlap filter here would list one booking under two days.
+ * - There is no status filter at all. OCCUPYING_STATUSES in ./availability.ts is
+ *   pinned to the exclusion constraint's WHERE clause and says nothing about
+ *   what a human should see: an owner needs the cancellation and the no-show in
+ *   front of them precisely because those aren't holding a slot. The caller
+ *   decides how to render each status.
+ */
+export async function getBookingsForDay(
+  tenantId: string,
+  opts: { date: string; timezone: string },
+): Promise<DashboardBooking[]> {
+  const { from, to } = localDayWindowUtc(opts.date, opts.timezone);
+
+  return prisma.booking.findMany({
+    where: { tenantId, startAt: { gte: from, lt: to } },
+    // createdAt is a stable tie-break for two barbers booked at the same time —
+    // without it Postgres is free to return them in a different order per query,
+    // and the list would reshuffle on every refresh.
+    orderBy: [{ startAt: "asc" }, { createdAt: "asc" }],
+    select: {
+      id: true,
+      startAt: true,
+      endAt: true,
+      status: true,
+      source: true,
+      service: { select: { name: true, priceMinorUnits: true } },
+      staff: { select: { name: true } },
+      customer: { select: { name: true, phone: true, email: true } },
+    },
+  });
 }
 
 /**
