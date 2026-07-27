@@ -34,10 +34,9 @@ export type DaySummary = {
  *   because nobody paid — this is the one that quietly reads high if the filter
  *   gets copied from `booked`, and it's the number an owner would trust most.
  *
- * Price comes off the Booking's Service row, so it's whatever that service costs
- * now, not what it cost when the appointment was made. There's no price snapshot
- * on Booking and adding one for a screen with no payments behind it would be
- * inventing a column — worth revisiting if deposits ever ship.
+ * `revenueMinorUnits` also carries an assumption about *where the price comes
+ * from* that anyone building payments has to revisit — see the comment at the
+ * accumulation itself.
  */
 export function summariseDay(
   bookings: DashboardBooking[],
@@ -51,6 +50,22 @@ export function summariseDay(
     if (booking.status !== "CANCELLED") booked += 1;
 
     if (booking.status === "CONFIRMED" || booking.status === "COMPLETED") {
+      // LIVE PRICE, NOT A HISTORICAL ONE. `priceMinorUnits` is read from the
+      // Service row as it stands right now — there is no price snapshot on
+      // Booking — so this is "what these appointments would cost at today's
+      // prices", not "what was quoted when they were booked". The two diverge
+      // the moment anyone edits a service's price, which the Day 11 services
+      // CRUD is precisely the feature that enables: change a price at noon and
+      // this morning's completed cuts silently re-value themselves.
+      //
+      // That's an acceptable approximation only while this number is a glanceable
+      // indicator with no money moving behind it. IF YOU ARE HERE BUILDING
+      // PAYMENTS OR DEPOSITS, STOP AND REVISIT THIS: the moment a customer is
+      // charged, what they were charged is a fact about that booking and has to
+      // be stored on the Booking row (a `pricePaidMinorUnits`, snapshotted at
+      // creation the way `blockedUntil` already snapshots the buffer). Summing
+      // live Service prices to produce a figure anyone reconciles against real
+      // takings would be quietly, unfixably wrong after the first price change.
       revenueMinorUnits += booking.service.priceMinorUnits;
     }
 
