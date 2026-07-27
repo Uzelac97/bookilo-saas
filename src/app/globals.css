@@ -23,6 +23,36 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Hides the scrollbar on a horizontally scrolling strip while leaving the
+   scrolling itself completely intact — the element still scrolls by touch,
+   wheel, and keyboard, and still scrolls a focused child into view.
+
+   Defined here rather than pulled in as `tailwind-scrollbar-hide`: it is six
+   lines of CSS, and a dependency needs approval (CLAUDE.md rule 4). Tailwind v4
+   has no built-in equivalent — `@utility` is how you add one, and it makes this
+   behave like any other Tailwind class (variants, ordering) instead of a bare
+   CSS class that sits outside the system.
+
+   USE THIS ONLY WHERE THE CONTENT IS OBVIOUSLY SCROLLABLE WITHOUT THE BAR. The
+   scrollbar is the one visual cue that there is more to the side; removing it
+   from something that doesn't otherwise advertise its overflow hides the content
+   rather than tidying it. Both current callers qualify — the date strip has ‹ ›
+   page buttons doing that job, and both only ever overflow on narrow screens,
+   which are touch screens where swiping is the expected gesture anyway.
+
+   No `-ms-overflow-style`: that targets IE and pre-Chromium Edge, both retired.
+   The two declarations below cover every browser this app supports. */
+@utility scrollbar-hide {
+  /* Firefox. */
+  scrollbar-width: none;
+
+  /* Chrome, Safari, and every other WebKit/Blink browser, which ignore the
+     standard property above. */
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* The create-next-app scaffold shipped a `@media (prefers-color-scheme: dark)`
    block here that flipped --foreground to #ededed and --background to #0a0a0a.
    It is deleted rather than kept, and it — not the missing color-scheme — is what

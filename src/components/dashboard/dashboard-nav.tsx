@@ -36,7 +36,11 @@ export function DashboardNav() {
   return (
     <nav
       aria-label="Dashboard"
-      className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0"
+      // Same overflow treatment as the public date strip, and scrollbar-hide
+      // (app/globals.css) for the same reason: a native bar under five nav items
+      // reads as a rendering fault, not as a control. Only ever overflows on a
+      // narrow screen, where swiping is the expected gesture.
+      className="-mx-4 overflow-x-auto px-4 scrollbar-hide sm:mx-0 sm:px-0"
     >
       <ul className="flex min-w-max gap-1">
         {NAV_ITEMS.map((item) => {

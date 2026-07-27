@@ -39,7 +39,10 @@ export function DateStrip({
       <div
         role="group"
         aria-label="Choose a date"
-        className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto"
+        // scrollbar-hide is ours, defined in app/globals.css — it hides the bar
+        // without touching the scrolling. The ‹ › buttons flanking this strip
+        // are what tell the customer there is more week either side.
+        className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto scrollbar-hide"
       >
         {days.map((day) => {
           const { weekday, dayOfMonth } = formatStripDay(day.date, timezone);
