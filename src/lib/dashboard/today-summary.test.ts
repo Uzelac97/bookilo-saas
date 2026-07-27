@@ -34,7 +34,7 @@ function booking(
     status,
     source,
     service: { name: "Haircut", priceMinorUnits: price },
-    staff: { name: "Marco Rossi" },
+    staff: { id: "staff-marco", name: "Marco Rossi" },
     customer: { name: "Luka M.", phone: "+4930111", email: null },
   };
 }

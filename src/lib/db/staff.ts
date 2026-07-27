@@ -38,6 +38,46 @@ export async function getActiveStaff(tenantId: string): Promise<PublicStaff[]> {
   });
 }
 
+/** A staff member as the owner's calendar needs them. */
+export type CalendarStaff = {
+  id: string;
+  name: string;
+  /** False for a "removed" barber — see below. Never a reason to hide the row. */
+  active: boolean;
+};
+
+/**
+ * Every barber a tenant has ever had, active or not, in the same order.
+ *
+ * The one function in this file that deliberately does NOT filter on `active`,
+ * and the reason is the soft delete. "Removing" a barber is always
+ * `active = false` (CLAUDE.md) and `Booking.staffId` is `onDelete: Restrict`, so
+ * a deactivated barber keeps every appointment they were ever booked for —
+ * including ones still in the future. A calendar that took its columns from
+ * getActiveStaff would drop those appointments off the screen entirely while
+ * they still occupy real time in the shop, and the owner's first sign of it
+ * would be two customers arriving for the same chair.
+ *
+ * Callers get `active` so they can render a retired barber's column differently
+ * and sort it out of the way — not so they can filter it out. The public booking
+ * flow is the opposite case and must keep using getActiveStaff above: a customer
+ * may never be offered a barber who no longer works here.
+ *
+ * Same `createdAt` ordering as getActiveStaff, so a barber sits in the same
+ * position on the calendar as in the booking flow. Not the load-bearing ordering
+ * contract documented there — nothing resolves a booking from this order — but
+ * gratuitously disagreeing with it would be its own kind of confusing.
+ */
+export async function getStaffForCalendar(
+  tenantId: string,
+): Promise<CalendarStaff[]> {
+  return prisma.staff.findMany({
+    where: { tenantId },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, name: true, active: true },
+  });
+}
+
 /**
  * Every working-hours row belonging to a tenant's *active* staff, unmerged.
  *

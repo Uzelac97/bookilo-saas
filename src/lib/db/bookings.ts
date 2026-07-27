@@ -362,18 +362,24 @@ export type DashboardBooking = {
   status: BookingStatus;
   source: BookingSource;
   service: { name: string; priceMinorUnits: number };
-  staff: { name: string };
+  // `id` is here for the calendar, which groups bookings into one column per
+  // barber and cannot do that by name — two barbers called Marco would collapse
+  // into one column, and a renamed barber would split into two.
+  staff: { id: string; name: string };
   // phone so the owner can call the customer; email because a no-show is worth
   // following up in writing.
   customer: { name: string; phone: string; email: string | null };
 };
 
 /**
- * Every booking on a tenant's books for one tenant-local calendar day.
+ * Every booking on a tenant's books across a span of tenant-local calendar days,
+ * `fromDate` and `toDate` both inclusive.
  *
- * Signature mirrors getStaffAvailability in ./availability.ts, and for the same
- * reason reuses localDayWindowUtc: the day boundary is defined once, so both
- * stay correct on the 23- and 25-hour days either side of a DST change.
+ * Reuses localDayWindowUtc at both ends for the same reason getStaffAvailability
+ * in ./availability.ts does: the day boundary is defined once, so this stays
+ * correct on the 23- and 25-hour days either side of a DST change. Taking
+ * `to` from the *last* day's window rather than adding 7×24h to the first is
+ * what makes a week containing a transition still cover exactly seven days.
  *
  * `tenantId` comes from the server-side session on dashboard routes — never from
  * client input (CLAUDE.md rule 2).
@@ -383,19 +389,28 @@ export type DashboardBooking = {
  * - The filter is `startAt` inside [from, to), NOT the blockedUntil overlap that
  *   availability.ts uses. That query answers "is this slot occupied", where a
  *   booking bleeding across a boundary genuinely matters at both ends. This one
- *   answers "what is on the books today", and an appointment belongs to the day
- *   it starts on — an overlap filter here would list one booking under two days.
+ *   answers "what is on the books", and an appointment belongs to the day it
+ *   starts on — an overlap filter here would list one booking under two days.
  * - There is no status filter at all. OCCUPYING_STATUSES in ./availability.ts is
  *   pinned to the exclusion constraint's WHERE clause and says nothing about
  *   what a human should see: an owner needs the cancellation and the no-show in
  *   front of them precisely because those aren't holding a slot. The caller
  *   decides how to render each status.
  */
-export async function getBookingsForDay(
+export async function getBookingsForRange(
   tenantId: string,
-  opts: { date: string; timezone: string },
+  opts: { fromDate: string; toDate: string; timezone: string },
 ): Promise<DashboardBooking[]> {
-  const { from, to } = localDayWindowUtc(opts.date, opts.timezone);
+  const { fromDate, toDate, timezone } = opts;
+
+  if (toDate < fromDate) {
+    throw new Error(
+      `getBookingsForRange: toDate "${toDate}" precedes fromDate "${fromDate}"`,
+    );
+  }
+
+  const { from } = localDayWindowUtc(fromDate, timezone);
+  const { to } = localDayWindowUtc(toDate, timezone);
 
   return prisma.booking.findMany({
     where: { tenantId, startAt: { gte: from, lt: to } },
@@ -410,9 +425,26 @@ export async function getBookingsForDay(
       status: true,
       source: true,
       service: { select: { name: true, priceMinorUnits: true } },
-      staff: { select: { name: true } },
+      staff: { select: { id: true, name: true } },
       customer: { select: { name: true, phone: true, email: true } },
     },
+  });
+}
+
+/**
+ * Every booking on a tenant's books for one tenant-local calendar day.
+ *
+ * A single-day range rather than its own query, so the overview and the calendar
+ * can never disagree about what "on the books today" means.
+ */
+export async function getBookingsForDay(
+  tenantId: string,
+  opts: { date: string; timezone: string },
+): Promise<DashboardBooking[]> {
+  return getBookingsForRange(tenantId, {
+    fromDate: opts.date,
+    toDate: opts.date,
+    timezone: opts.timezone,
   });
 }
 

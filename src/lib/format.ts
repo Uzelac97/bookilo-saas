@@ -97,6 +97,29 @@ export function formatBookingDate(date: string, timezone: string): string {
   return DateTime.fromISO(date, { zone: timezone }).toFormat("ccc, d LLL");
 }
 
+/**
+ * A span of tenant-local calendar days for a heading: "27 Jul – 2 Aug".
+ *
+ * Collapses the repeated month when both ends share one — "27 – 31 Jul" rather
+ * than "27 Jul – 31 Jul". Same en dash as formatTimeRange, and for the same
+ * reason: it's a range, and a hyphen next to a month abbreviation reads as a
+ * hyphenated word.
+ */
+export function formatDateRange(
+  fromDate: string,
+  toDate: string,
+  timezone: string,
+): string {
+  const from = DateTime.fromISO(fromDate, { zone: timezone });
+  const to = DateTime.fromISO(toDate, { zone: timezone });
+
+  const sameMonth = from.hasSame(to, "month") && from.hasSame(to, "year");
+
+  return sameMonth
+    ? `${from.toFormat("d")} – ${to.toFormat("d LLL")}`
+    : `${from.toFormat("d LLL")} – ${to.toFormat("d LLL")}`;
+}
+
 /** The parts a date-strip cell shows: "Tue" over "28". */
 export function formatStripDay(
   date: string,
