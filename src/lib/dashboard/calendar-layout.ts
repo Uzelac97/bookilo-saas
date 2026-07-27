@@ -48,6 +48,73 @@ const MIN_GRID_MINUTES = 6 * MINUTES_PER_HOUR;
  */
 const MIN_VISIBLE_MINUTES = 10;
 
+/**
+ * How tall an hour is on the grid.
+ *
+ * The axis is sized from this rather than the grid having a fixed total height,
+ * and that distinction is load-bearing. With a fixed height, pixels-per-minute
+ * depends on how long the shop's day is: a 9-hour shop got 80px/hour and a
+ * 14-hour shop 51px/hour, so the same 30-minute booking was comfortably legible
+ * for one tenant and unreadably squashed for another, with nothing in the code
+ * to suggest why. Pinning the hour instead makes a booking's height a function
+ * of its duration alone — which is what lets blockDensity below be decided from
+ * the duration, and tested from it.
+ *
+ * The grid grows taller for a shop that opens longer. That's correct: it has
+ * more day to show.
+ */
+export const CALENDAR_PX_PER_HOUR = 80;
+
+/**
+ * How much of a booking's detail fits in its block.
+ *
+ * A block's height is its duration and nothing else, so a 15-minute beard trim
+ * gets ~20px however roomy the rest of the grid is — that is nowhere near the
+ * three stacked lines a 45-minute cut has room for. Rendering the same three
+ * lines regardless is what produced the original bug: the text overflowed the
+ * block and `overflow-hidden` clipped it *through the middle of the second
+ * line*, which reads as garbled rather than as truncated. Note that `truncate`
+ * on each line does not help here — it is `ellipsis` + `nowrap`, purely
+ * horizontal, and says nothing about a stack that is too tall.
+ *
+ * So the component picks its content from this instead. The thresholds are
+ * derived, not taste: each is the smallest height whose content box still fits
+ * that tier's text at that tier's padding. See the table in the test file.
+ */
+export type BlockDensity = "full" | "compact" | "minimal" | "sliver";
+
+/** 3 lines (13.75px each) + 11px of border/padding = 52.25px. */
+const FULL_MIN_PX = 56;
+/** 2 lines (13.75px each) + 7px of border/padding = 34.5px. */
+const COMPACT_MIN_PX = 36;
+/** 1 line (10px) + 3px of border/padding = 13px. */
+const MINIMAL_MIN_PX = 13;
+
+/**
+ * Which tier a block of this pixel height can carry.
+ *
+ * Kept here rather than in the component so it is decided once, from the same
+ * geometry that produced the height, and covered by the same tests. The
+ * component's job is to render a tier, not to work out which one applies.
+ *
+ * `sliver` renders no text at all. Nothing stops an owner creating a 5-minute
+ * service, and at 80px an hour that is a 6.7px block — under half a line of the
+ * smallest type on the grid. A coloured bar with its full detail on hover and in
+ * the accessible description is honest about having no room; half a line of
+ * sliced glyphs is the bug this tier exists to close off rather than shrink.
+ *
+ * The alternative — a minimum block height — was considered and rejected: two
+ * back-to-back short appointments would then be drawn taller than the gap
+ * between them, so the fix for unreadable blocks would be overlapping ones.
+ */
+export function blockDensity(heightPx: number): BlockDensity {
+  if (heightPx >= FULL_MIN_PX) return "full";
+  if (heightPx >= COMPACT_MIN_PX) return "compact";
+  if (heightPx >= MINIMAL_MIN_PX) return "minimal";
+
+  return "sliver";
+}
+
 /** A booking's span in tenant-local minutes from midnight. */
 export type BookingSpan = {
   /** Always within [0, MINUTES_PER_DAY). */
@@ -66,6 +133,10 @@ export type PlacedBooking = BookingSpan & {
   /** Percent of the grid's height, ready for a `style` prop. */
   topPercent: number;
   heightPercent: number;
+  /** The same height in pixels — what the block actually gets to draw in. */
+  heightPx: number;
+  /** How much detail that height can carry. See blockDensity. */
+  density: BlockDensity;
 };
 
 /** One vertical strip of the grid: a barber in the day view, a day in the week view. */
@@ -82,6 +153,17 @@ export type GridColumn = {
   bookings: PlacedBooking[];
 };
 
+/**
+ * A booking with its lane resolved but not yet sized against the grid. What
+ * assignLanes returns: lanes depend only on the bookings in a column, whereas
+ * the percentages and the pixel height need the axis, which isn't known until
+ * every column has been collected.
+ */
+export type LanedBooking = Omit<
+  PlacedBooking,
+  "topPercent" | "heightPercent" | "heightPx" | "density"
+>;
+
 /** A labelled horizontal rule on the time axis. */
 export type HourMark = {
   minute: number;
@@ -94,6 +176,13 @@ export type CalendarGrid = {
   /** Tenant-local minute the axis starts at. Always a whole hour. */
   startMinute: number;
   endMinute: number;
+  /**
+   * The grid's rendered height. Derived from the axis span at
+   * CALENDAR_PX_PER_HOUR, and handed over rather than left to the component: the
+   * blocks are positioned in percentages, which resolve against nothing unless
+   * this container has a definite height.
+   */
+  heightPx: number;
   hourMarks: HourMark[];
   columns: GridColumn[];
 };
@@ -194,7 +283,7 @@ export function gridBounds(
  */
 export function assignLanes(
   spans: (BookingSpan & { booking: DashboardBooking })[],
-): Omit<PlacedBooking, "topPercent" | "heightPercent">[] {
+): LanedBooking[] {
   // getBookingsForRange already orders by startAt, but this function is the one
   // place the sweep's correctness depends on that order, so it states it rather
   // than inherits it. Longer bookings first on a tie keeps the big block on the
@@ -206,7 +295,7 @@ export function assignLanes(
       a.booking.id.localeCompare(b.booking.id),
   );
 
-  const placed: Omit<PlacedBooking, "topPercent" | "heightPercent">[] = [];
+  const placed: LanedBooking[] = [];
   // Index into `placed` where the current cluster began, so its laneCount can be
   // written back across all its members once the cluster closes.
   let clusterStart = 0;
@@ -391,6 +480,7 @@ function assemble(
 ): CalendarGrid {
   const { startMinute, endMinute } = gridBounds(allSpans, workingHours);
   const span = endMinute - startMinute;
+  const heightPx = (span / MINUTES_PER_HOUR) * CALENDAR_PX_PER_HOUR;
 
   const toPercent = (minute: number) => ((minute - startMinute) / span) * 100;
 
@@ -410,22 +500,31 @@ function assemble(
   return {
     startMinute,
     endMinute,
+    heightPx,
     hourMarks,
     columns: columns.map(({ column, spans }) => ({
       ...column,
       bookings: assignLanes(spans).map((placed) => {
         const topPercent = clamp(toPercent(placed.startMinute), 0, 100);
+        // Clamped against the top offset, not against 100 alone, so a block
+        // running to the edge stops there instead of overflowing the grid.
+        const heightPercent = clamp(
+          ((placed.endMinute - placed.startMinute) / span) * 100,
+          0,
+          100 - topPercent,
+        );
+        // Derived from the clamped percentage rather than from the duration, so
+        // the tier is decided from the height the block actually gets. A booking
+        // cut short by the bottom of the grid must not be handed a tier's worth
+        // of text it no longer has room for.
+        const blockHeightPx = (heightPercent / 100) * heightPx;
 
         return {
           ...placed,
           topPercent,
-          // Clamped against the top offset, not against 100 alone, so a block
-          // running to the edge stops there instead of overflowing the grid.
-          heightPercent: clamp(
-            ((placed.endMinute - placed.startMinute) / span) * 100,
-            0,
-            100 - topPercent,
-          ),
+          heightPercent,
+          heightPx: blockHeightPx,
+          density: blockDensity(blockHeightPx),
         };
       }),
     })),

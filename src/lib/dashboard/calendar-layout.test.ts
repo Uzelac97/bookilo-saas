@@ -7,8 +7,10 @@ import type { CalendarStaff } from "@/lib/db/staff";
 
 import {
   assignLanes,
+  blockDensity,
   buildDayGrid,
   buildWeekGrid,
+  CALENDAR_PX_PER_HOUR,
   gridBounds,
   positionBooking,
   weekdaysOf,
@@ -838,5 +840,169 @@ describe("weekdaysOf", () => {
 
   it("returns nothing for no dates", () => {
     expect(weekdaysOf([], TZ)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Block density
+//
+// Added after a real bug: every block rendered the same three stacked lines
+// regardless of its height, so a 20-minute booking overflowed its box and
+// `overflow-hidden` clipped it through the middle of the second line. It read
+// as garbled text rather than as truncation, and `truncate` on each line never
+// applied — that is `ellipsis` + `nowrap`, purely horizontal.
+//
+// The tests below deliberately cover a spread of durations rather than the one
+// that was reported. The failure was never specific to 20 minutes; it was
+// specific to "shorter than three lines of text", and the only honest way to
+// show it is fixed is to check the whole range.
+// ---------------------------------------------------------------------------
+
+/**
+ * What each tier costs, in the units the CSS actually uses.
+ *
+ * Mirrors DENSITY_STYLES in components/dashboard/calendar-grid.tsx: `li`
+ * pb-px (1px) + the block's 1px border top and bottom (2px) + that tier's
+ * vertical padding, against N lines at that tier's font size and line height.
+ * If someone changes the padding in the component without moving the
+ * thresholds in calendar-layout.ts, the fit assertion below is what fails.
+ */
+const TIER_METRICS = {
+  full: { chromePx: 1 + 2 + 8, lines: 3, lineHeightPx: 11 * 1.25 },
+  compact: { chromePx: 1 + 2 + 4, lines: 2, lineHeightPx: 11 * 1.25 },
+  minimal: { chromePx: 1 + 2 + 0, lines: 1, lineHeightPx: 10 },
+  // Renders no text, so it fits by construction at any height.
+  sliver: { chromePx: 1 + 2 + 0, lines: 0, lineHeightPx: 0 },
+} as const;
+
+/** Builds a one-booking day grid and returns the placed block. */
+function blockOfDuration(minutes: number) {
+  const startAt = local(TUESDAY, "10:00");
+  const grid = buildDayGrid({
+    bookings: [
+      booking(startAt, new Date(startAt.getTime() + minutes * 60_000)),
+    ],
+    staff: [staffMember(MARCO.id, MARCO.name)],
+    workingHours: [hours(TUESDAY_DOW)],
+    timezone: TZ,
+  });
+
+  return grid.columns[0].bookings[0];
+}
+
+describe("blockDensity", () => {
+  it("puts each tier boundary where the text stops fitting", () => {
+    expect(blockDensity(56)).toBe("full");
+    expect(blockDensity(55.9)).toBe("compact");
+    expect(blockDensity(36)).toBe("compact");
+    expect(blockDensity(35.9)).toBe("minimal");
+    expect(blockDensity(13)).toBe("minimal");
+    expect(blockDensity(12.9)).toBe("sliver");
+    expect(blockDensity(0)).toBe("sliver");
+  });
+});
+
+describe("block geometry across durations", () => {
+  // 80px an hour, so height is duration and nothing else. The reported bug had
+  // these depending on the shop's opening hours too, which is why a booking
+  // could be legible for one tenant and garbled for another.
+  it.each([
+    [5, 6.67, "sliver"],
+    [10, 13.33, "minimal"],
+    [15, 20, "minimal"],
+    [20, 26.67, "minimal"],
+    [25, 33.33, "minimal"],
+    [30, 40, "compact"],
+    [40, 53.33, "compact"],
+    [45, 60, "full"],
+    [60, 80, "full"],
+    [90, 120, "full"],
+  ])("a %i-minute booking is %fpx and renders %s", (minutes, px, density) => {
+    const block = blockOfDuration(minutes as number);
+
+    expect(block.heightPx).toBeCloseTo(px as number, 1);
+    expect(block.density).toBe(density);
+  });
+
+  // The invariant that actually protects the fix. Every duration a shop could
+  // plausibly sell, checked against the arithmetic that decides whether text
+  // overflows its box. A tier that doesn't fit is the original bug returning.
+  it.each(
+    Array.from({ length: 24 }, (_, i) => (i + 1) * 5),
+  )("fits its tier's text at %i minutes", (minutes) => {
+    const block = blockOfDuration(minutes);
+    const tier = TIER_METRICS[block.density];
+    const contentPx = block.heightPx - tier.chromePx;
+
+    expect(
+      contentPx,
+      `${minutes}min -> ${block.heightPx.toFixed(1)}px, tier "${block.density}" needs ` +
+        `${tier.lines} x ${tier.lineHeightPx}px + ${tier.chromePx}px chrome`,
+    ).toBeGreaterThanOrEqual(tier.lines * tier.lineHeightPx);
+  });
+
+  it("scales an hour identically however long the shop's day is", () => {
+    // The second half of the bug: with a fixed total grid height, a 9-hour shop
+    // got 80px/hour and a 14-hour shop 51px/hour, so the same appointment was
+    // readable for one tenant and clipped for another.
+    const startAt = local(TUESDAY, "10:00");
+    const thirtyMinutes = booking(
+      startAt,
+      new Date(startAt.getTime() + 30 * 60_000),
+    );
+
+    const heights = [
+      [9 * 60, 18 * 60],
+      [7 * 60, 21 * 60],
+    ].map(([open, close]) => {
+      const grid = buildDayGrid({
+        bookings: [thirtyMinutes],
+        staff: [staffMember(MARCO.id, MARCO.name)],
+        workingHours: [hours(TUESDAY_DOW, open, close)],
+        timezone: TZ,
+      });
+
+      return grid.columns[0].bookings[0];
+    });
+
+    expect(heights[0].heightPx).toBeCloseTo(heights[1].heightPx, 5);
+    expect(heights[0].density).toBe(heights[1].density);
+  });
+
+  it("sizes the grid from the axis span so the percentages resolve", () => {
+    const grid = buildDayGrid({
+      bookings: [],
+      staff: [staffMember(MARCO.id, MARCO.name)],
+      workingHours: [hours(TUESDAY_DOW)],
+      timezone: TZ,
+    });
+
+    // 09:00-18:00 is nine hours.
+    expect(grid.heightPx).toBe(9 * CALENDAR_PX_PER_HOUR);
+  });
+
+  it("grows the axis for an appointment running past closing rather than cutting it", () => {
+    // Worth pinning because the tier is derived from the *clamped* height, so
+    // the obvious worry is a block truncated by the bottom of the grid being
+    // handed more text than it has room for. It can't happen: gridBounds is
+    // computed from these same spans and always widens to contain them, so the
+    // clamp in `assemble` is unreachable through the public API and stays purely
+    // defensive. If that ever stops being true, this is the test that says so.
+    const grid = buildDayGrid({
+      bookings: [booking(local(TUESDAY, "17:50"), local(TUESDAY, "18:50"))],
+      staff: [staffMember(MARCO.id, MARCO.name)],
+      workingHours: [hours(TUESDAY_DOW)],
+      timezone: TZ,
+    });
+
+    const block = grid.columns[0].bookings[0];
+
+    // 09:00–18:00 became 09:00–19:00 to cover the overrun.
+    expect(grid.endMinute).toBe(19 * 60);
+    expect(grid.heightPx).toBe(10 * CALENDAR_PX_PER_HOUR);
+    expect(block.topPercent + block.heightPercent).toBeLessThanOrEqual(100);
+    // A full hour, drawn at its full height — not squeezed by the boundary.
+    expect(block.heightPx).toBeCloseTo(CALENDAR_PX_PER_HOUR, 5);
+    expect(block.density).toBe("full");
   });
 });

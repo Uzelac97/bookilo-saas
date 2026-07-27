@@ -9,7 +9,7 @@ import type {
   PlacedBooking,
 } from "@/lib/dashboard/calendar-layout";
 import type { DashboardBooking } from "@/lib/db/bookings";
-import { formatTimeRange } from "@/lib/format";
+import { formatSlotTime, formatTimeRange } from "@/lib/format";
 
 /**
  * The three lengths the layout is built from.
@@ -23,13 +23,28 @@ const AXIS_WIDTH = "4rem";
 const MIN_COLUMN_WIDTH = "9rem";
 
 /**
- * Fixed, because the blocks are positioned in percentages: a percentage height
- * resolves against nothing on an auto-height parent, so a `h-auto` grid would
- * collapse every appointment to zero. 720px is twelve hours at a readable 60px
- * an hour, and the axis is elastic anyway — a six-hour day just gets roomier
- * rows rather than a shorter grid.
+ * The chrome and text metrics each density tier is allowed, and the content it
+ * renders. The thresholds that pick a tier live in lib/dashboard/calendar-layout
+ * next to the geometry that produces the height; these are the other half of
+ * that contract, and the two must be read together — the numbers in
+ * FULL_MIN_PX/COMPACT_MIN_PX are derived from exactly this padding and this
+ * line height. Change the padding here and the thresholds there are wrong.
+ *
+ *   full     3 lines, py-1     (8px)  — time range / customer / service
+ *   compact  2 lines, py-0.5   (4px)  — time + customer / service
+ *   minimal  1 line,  py-0     (0px)  — time + customer, at 10px
+ *   sliver   no text                  — a bar, with everything on hover
+ *
+ * Detail is dropped from the bottom up because that is the order it stops
+ * earning its space: the block's position on the axis already says roughly when
+ * the appointment is, so the customer's name is the last thing to go.
  */
-const GRID_HEIGHT = "h-[720px]";
+const DENSITY_STYLES: Record<PlacedBooking["density"], string> = {
+  full: "px-1.5 py-1 text-[11px] leading-tight",
+  compact: "px-1.5 py-0.5 text-[11px] leading-tight",
+  minimal: "px-1.5 text-[10px] leading-none",
+  sliver: "",
+};
 
 /**
  * How each status reads on a block. Same semantics as today-list.tsx — CONFIRMED
@@ -105,8 +120,13 @@ export function CalendarGrid({
         </div>
 
         <div
-          style={{ gridTemplateColumns: template }}
-          className={`relative grid ${GRID_HEIGHT}`}
+          // The height is computed rather than a fixed class because the blocks
+          // are positioned in percentages, which resolve against nothing on an
+          // auto-height parent — and because an hour must be the same number of
+          // pixels for every tenant, whatever their opening hours. See
+          // CALENDAR_PX_PER_HOUR.
+          style={{ gridTemplateColumns: template, height: `${grid.heightPx}px` }}
+          className="relative grid"
         >
           {grid.hourMarks.map((mark) => (
             <div
@@ -215,6 +235,25 @@ function BookingBlock({
   // booking online.
   const walkIn = booking.source === "MANUAL";
 
+  /**
+   * Everything about the appointment, in one string.
+   *
+   * Used three times over, which is the point: as the block's `title` so a
+   * mouse can recover whatever the tier dropped, as the accessible description
+   * so a screen reader never sees the abridged version, and as the entire
+   * content of a `sliver`. One source, so the short tiers can't quietly say
+   * something different from the tall ones.
+   */
+  const description = [
+    formatTimeRange(booking.startAt, booking.endAt, timezone),
+    booking.customer.name,
+    booking.service.name,
+    statusLabel,
+    walkIn ? "Walk-in" : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <li
       style={{
@@ -235,27 +274,63 @@ function BookingBlock({
       className="absolute px-px pb-px"
     >
       <div
+        // Recovers on hover whatever the tier had no room to draw. Cheap, and
+        // the only thing standing between a sliver and an unidentifiable bar.
+        title={description}
         className={[
-          "flex h-full flex-col overflow-hidden rounded-lg border px-1.5 py-1 text-[11px] leading-tight",
+          "flex h-full flex-col overflow-hidden rounded-lg border",
+          DENSITY_STYLES[placed.density],
           STATUS_BLOCK_STYLES[booking.status],
           // A "Walk-in" badge like today-list's costs a whole line, and a
-          // 15-minute block is barely two lines tall — the accent edge costs no
-          // vertical space at all. It is decoration only, hence the sr-only text
-          // below: nothing here may depend on noticing a 3px stripe.
+          // 15-minute block has only one — the accent edge costs no vertical
+          // space at all. Decoration only, which is why `description` says it in
+          // words: nothing may depend on noticing a 3px stripe.
           walkIn ? "border-l-4" : "",
         ].join(" ")}
       >
-        {/* Every line truncates and the box hides its overflow, so a short
-            appointment degrades to just its time rather than spilling its
-            customer's name across the block below it. */}
-        <span className="truncate font-mono tabular-nums">
-          {formatTimeRange(booking.startAt, booking.endAt, timezone)}
-        </span>
-        <span className="truncate font-medium">{booking.customer.name}</span>
-        <span className="truncate opacity-75">{booking.service.name}</span>
+        {/* The complete description at every density, so what a screen reader
+            gets never depends on how long the appointment happens to be. The
+            visible text below is hidden from it precisely because it is the
+            abridged version of this. */}
+        <span className="sr-only">{description}</span>
 
-        {statusLabel ? <span className="sr-only">{statusLabel}</span> : null}
-        {walkIn ? <span className="sr-only">Walk-in</span> : null}
+        {/* Every line still truncates horizontally for a long name. What the
+            tiers add is the vertical half of the same problem, which `truncate`
+            has nothing to say about. */}
+        <span aria-hidden="true" className="contents">
+          {placed.density === "full" ? (
+            <>
+              <span className="truncate font-mono tabular-nums">
+                {formatTimeRange(booking.startAt, booking.endAt, timezone)}
+              </span>
+              <span className="truncate font-medium">
+                {booking.customer.name}
+              </span>
+              <span className="truncate opacity-75">
+                {booking.service.name}
+              </span>
+            </>
+          ) : placed.density === "compact" ? (
+            <>
+              <span className="truncate">
+                <span className="font-mono tabular-nums">
+                  {formatSlotTime(booking.startAt, timezone)}
+                </span>{" "}
+                <span className="font-medium">{booking.customer.name}</span>
+              </span>
+              <span className="truncate opacity-75">
+                {booking.service.name}
+              </span>
+            </>
+          ) : placed.density === "minimal" ? (
+            <span className="truncate">
+              <span className="font-mono tabular-nums">
+                {formatSlotTime(booking.startAt, timezone)}
+              </span>{" "}
+              <span className="font-medium">{booking.customer.name}</span>
+            </span>
+          ) : null /* sliver: the bar itself is the whole of it */}
+        </span>
       </div>
     </li>
   );
