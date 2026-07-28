@@ -1,10 +1,16 @@
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 
 import {
   calendarCardWidth,
   CalendarGrid,
 } from "@/components/dashboard/calendar-grid";
 import { CalendarNav } from "@/components/dashboard/calendar-nav";
+import {
+  CALENDAR_ASIDE_GAP,
+  CALENDAR_ASIDE_WIDTH,
+  CalendarSummary,
+} from "@/components/dashboard/calendar-summary";
 import { WeekAgenda } from "@/components/dashboard/week-agenda";
 import { getCurrentTenant } from "@/lib/auth/session";
 import {
@@ -14,6 +20,7 @@ import {
   weekdaysOf,
 } from "@/lib/dashboard/calendar-layout";
 import { staffColorMap } from "@/lib/dashboard/staff-colors";
+import { summariseDay } from "@/lib/dashboard/today-summary";
 import {
   calendarRange,
   rangeContainsToday,
@@ -61,6 +68,14 @@ function first(value: string | string[] | undefined): string | undefined {
 const PAGE_GUTTER = "3rem";
 const MIN_PAGE_WIDTH = "64rem";
 const MAX_PAGE_WIDTH = "120rem";
+
+/**
+ * The ceiling when the sidebar is showing — the widest grid plus the sidebar
+ * beside it. Without raising it, a seven-column week and an 18rem aside would
+ * total ~139rem, hit the 120rem cap, and push the grid into a scroll on a
+ * monitor wide enough to have shown both.
+ */
+const MAX_PAGE_WIDTH_WITH_ASIDE = "140rem";
 
 /**
  * The owner's calendar: a day grid with one column per barber, or a week grid
@@ -113,6 +128,11 @@ export default async function CalendarPage({ searchParams }: PageProps) {
   // instant becomes a tenant-local day stays lib/dashboard/calendar-layout.
   const bookingsByDate = groupByLocalDate(bookings, tenant.timezone);
 
+  // The same three figures the overview shows, over whatever range is on screen
+  // rather than over today — the sidebar's whole reason for existing is that the
+  // calendar is usually not showing today.
+  const summary = summariseDay(bookings, now);
+
   const grid =
     view === "week"
       ? buildWeekGrid({
@@ -129,6 +149,17 @@ export default async function CalendarPage({ searchParams }: PageProps) {
           timezone: tenant.timezone,
         });
 
+  // Two container widths, one per breakpoint — see the note on the wrapper.
+  // The week view keeps the narrow value in both slots: its grid already fills
+  // a 1920px screen, so giving it a sidebar would buy 18rem of figures at the
+  // cost of pushing the seven columns into a horizontal scroll.
+  const cardWidth = calendarCardWidth(grid.columns.length);
+  const narrowWidth = `clamp(${MIN_PAGE_WIDTH}, calc(${cardWidth} + ${PAGE_GUTTER}), ${MAX_PAGE_WIDTH})`;
+  const wideWidth =
+    view === "week"
+      ? narrowWidth
+      : `clamp(${MIN_PAGE_WIDTH}, calc(${cardWidth} + ${CALENDAR_ASIDE_WIDTH} + ${CALENDAR_ASIDE_GAP} + ${PAGE_GUTTER}), ${MAX_PAGE_WIDTH_WITH_ASIDE})`;
+
   return (
     // Sized to the grid rather than to the viewport, then centred.
     //
@@ -143,11 +174,20 @@ export default async function CalendarPage({ searchParams }: PageProps) {
     // stops a two-barber day collapsing to something that reads as broken, and
     // the ceiling stops an ultrawide monitor stretching the header past the
     // widest grid that can exist.
+    //
+    // Two widths rather than one because the sidebar only appears at 2xl, and a
+    // max-width can't carry a media query inline. Both are published as custom
+    // properties and the breakpoint picks between them in the class list, so the
+    // container is sized to what is actually beside the grid at that width
+    // rather than to the widest case at every width.
     <div
-      style={{
-        maxWidth: `clamp(${MIN_PAGE_WIDTH}, calc(${calendarCardWidth(grid.columns.length)} + ${PAGE_GUTTER}), ${MAX_PAGE_WIDTH})`,
-      }}
-      className="mx-auto flex w-full flex-col gap-6 px-4 py-8 sm:px-6"
+      style={
+        {
+          "--cal-w": narrowWidth,
+          "--cal-w-aside": wideWidth,
+        } as CSSProperties
+      }
+      className="mx-auto flex w-full max-w-(--cal-w) flex-col gap-6 px-4 py-8 sm:px-6 2xl:max-w-(--cal-w-aside)"
     >
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
@@ -216,12 +256,27 @@ export default async function CalendarPage({ searchParams }: PageProps) {
           // shop's barbers rather than a fixed seven, so it fits a phone at the
           // one-to-three chairs this product is aimed at. See the Day 13 note in
           // EXECUTION-PLAN.md for where that stops being true.
-          <CalendarGrid
-            grid={grid}
-            timezone={tenant.timezone}
-            staffColors={staffColors}
-            showBarber={false}
-          />
+          //
+          // From 2xl up it gains the summary beside it. That is where the space
+          // exists — a two-barber day is 578px of grid, so on anything wider
+          // than about 1536px the alternative is empty page. The pair is
+          // centred as a unit rather than the grid alone, or the sidebar would
+          // push the grid off-centre by half its own width.
+          <div className="mx-auto flex w-fit max-w-full flex-col gap-6 2xl:flex-row 2xl:items-start">
+            <CalendarGrid
+              grid={grid}
+              timezone={tenant.timezone}
+              staffColors={staffColors}
+              showBarber={false}
+            />
+
+            <aside
+              style={{ width: CALENDAR_ASIDE_WIDTH }}
+              className="hidden shrink-0 2xl:block"
+            >
+              <CalendarSummary summary={summary} timezone={tenant.timezone} />
+            </aside>
+          </div>
         )}
       </CalendarNav>
     </div>

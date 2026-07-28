@@ -176,7 +176,15 @@ export function TodaySummary({
   );
 }
 
-function SummaryCell({
+/**
+ * One figure in a summary panel.
+ *
+ * Exported for the calendar's sidebar, which shows the same three numbers for
+ * whatever range is on screen. Only the cell is shared, not TodaySummary itself:
+ * that one is grid-cols-3 and says "today" in its copy, and a sidebar is neither
+ * a row nor necessarily today.
+ */
+export function SummaryCell({
   label,
   value,
   detail,
