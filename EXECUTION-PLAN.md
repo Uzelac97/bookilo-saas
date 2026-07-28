@@ -253,3 +253,26 @@ both items are dashboard-side.
   page repeats its own `max-w-5xl` wrapper, so the fix is either widening the header (which
   affects all five pages) or accepting the inset as deliberate. Not a call the calendar
   should make on its own, which is why it waited.
+
+### Deliberately not built: the day view's mobile fallback
+
+Decided during Day 10, recorded here so it reads as a decision rather than an oversight.
+
+The **week** view falls back to a vertical agenda below `md`
+(`components/dashboard/week-agenda.tsx`), because its seven columns need 1072px before
+they start scrolling and that is fixed no matter how small the shop is. The **day** view
+did not get the same treatment, and that is deliberate: its column count is the shop's
+barbers, so at the one-to-three chairs this product targets it fits a phone. Building a
+second fallback for a problem nobody has yet is the speculative work `CLAUDE.md` says to
+skip.
+
+**Where that stops being true:** each column has a 9rem floor plus a 4rem axis, so the day
+view starts scrolling on a 390px phone at four barbers (640px) and is meaningfully awkward
+at five (784px). If a real customer arrives with four or more chairs, this is the thing
+that breaks first.
+
+**`WeekAgenda` was built with exactly that reuse in mind.** It takes
+`{ date, bookings }[]` and carries no week-specific logic — no geometry, no lanes, no
+axis, and no assumption that there are seven of anything. A day view fallback is the same
+component passed a single-entry array, plus the same `hidden md:block` / `md:hidden` swap
+already in `dashboard/calendar/page.tsx`. Do not write a second agenda component for it.

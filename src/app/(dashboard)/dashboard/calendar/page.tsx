@@ -2,12 +2,15 @@ import type { Metadata } from "next";
 
 import { CalendarGrid } from "@/components/dashboard/calendar-grid";
 import { CalendarNav } from "@/components/dashboard/calendar-nav";
+import { WeekAgenda } from "@/components/dashboard/week-agenda";
 import { getCurrentTenant } from "@/lib/auth/session";
 import {
   buildDayGrid,
   buildWeekGrid,
+  groupByLocalDate,
   weekdaysOf,
 } from "@/lib/dashboard/calendar-layout";
+import { staffColorMap } from "@/lib/dashboard/staff-colors";
 import {
   calendarRange,
   rangeContainsToday,
@@ -17,7 +20,6 @@ import {
   todayInZone,
   weekDays,
 } from "@/lib/dashboard/calendar-range";
-import { staffColorMap } from "@/lib/dashboard/staff-colors";
 import { getBookingsForRange } from "@/lib/db/bookings";
 import { getStaffForCalendar, getWorkingHoursForActiveStaff } from "@/lib/db/staff";
 import { formatBookingDate, formatDateRange } from "@/lib/format";
@@ -81,6 +83,10 @@ export default async function CalendarPage({ searchParams }: PageProps) {
   // Built from getStaffForCalendar's ordering, which includes inactive barbers —
   // that is what keeps a colour from shifting the day someone is deactivated.
   const staffColors = staffColorMap(staff);
+  const today = todayInZone(now, tenant.timezone);
+  // Grouped once here rather than inside the agenda, so the only place a UTC
+  // instant becomes a tenant-local day stays lib/dashboard/calendar-layout.
+  const bookingsByDate = groupByLocalDate(bookings, tenant.timezone);
 
   const grid =
     view === "week"
@@ -139,17 +145,48 @@ export default async function CalendarPage({ searchParams }: PageProps) {
         }
         previousDate={shiftCalendarDate(date, view, -1, tenant.timezone)}
         nextDate={shiftCalendarDate(date, view, 1, tenant.timezone)}
-        todayDate={todayInZone(now, tenant.timezone)}
+        todayDate={today}
         atToday={rangeContainsToday(range, now, tenant.timezone)}
       >
-        <CalendarGrid
-          grid={grid}
-          timezone={tenant.timezone}
-          staffColors={staffColors}
-          // Initials belong on a block only where the column doesn't already
-          // name the barber, which is the week view.
-          showBarber={view === "week"}
-        />
+        {view === "week" ? (
+          // The grid needs 1072px before it starts scrolling — nearly three
+          // screens on a phone. Below md the week becomes a vertical agenda
+          // instead. Both are server-rendered and one is hidden with CSS: for a
+          // small shop's week that is a few dozen extra list items, far cheaper
+          // than moving the choice to the client and needing the viewport.
+          <>
+            <div className="hidden md:block">
+              <CalendarGrid
+                grid={grid}
+                timezone={tenant.timezone}
+                staffColors={staffColors}
+                showBarber
+              />
+            </div>
+            <div className="md:hidden">
+              <WeekAgenda
+                days={dates.map((day) => ({
+                  date: day,
+                  bookings: bookingsByDate.get(day) ?? [],
+                }))}
+                timezone={tenant.timezone}
+                todayDate={today}
+                now={now}
+              />
+            </div>
+          </>
+        ) : (
+          // The day view stays the grid at every width. Its column count is the
+          // shop's barbers rather than a fixed seven, so it fits a phone at the
+          // one-to-three chairs this product is aimed at. See the Day 13 note in
+          // EXECUTION-PLAN.md for where that stops being true.
+          <CalendarGrid
+            grid={grid}
+            timezone={tenant.timezone}
+            staffColors={staffColors}
+            showBarber={false}
+          />
+        )}
       </CalendarNav>
     </div>
   );

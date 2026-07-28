@@ -12,6 +12,7 @@ import {
   buildWeekGrid,
   CALENDAR_PX_PER_HOUR,
   gridBounds,
+  groupByLocalDate,
   positionBooking,
   weekdaysOf,
   type BookingSpan,
@@ -1004,5 +1005,42 @@ describe("block geometry across durations", () => {
     // A full hour, drawn at its full height — not squeezed by the boundary.
     expect(block.heightPx).toBeCloseTo(CALENDAR_PX_PER_HOUR, 5);
     expect(block.density).toBe("full");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// groupByLocalDate
+// ---------------------------------------------------------------------------
+
+describe("groupByLocalDate", () => {
+  it("buckets bookings under the tenant's day, not the UTC one", () => {
+    // 23:30 UTC on the 27th is 01:30 Berlin on the 28th. The agenda and the week
+    // grid must agree about which day that is, which is why they share this.
+    const late = booking(utc("2026-07-27T23:30:00"), utc("2026-07-28T00:00:00"));
+    const grouped = groupByLocalDate([late], TZ);
+
+    expect([...grouped.keys()]).toEqual(["2026-07-28"]);
+  });
+
+  it("keeps each day's bookings in the order they arrived", () => {
+    const first = at(TUESDAY, "09:00", "09:30", { id: "first" });
+    const second = at(TUESDAY, "11:00", "11:30", { id: "second" });
+    const grouped = groupByLocalDate([first, second], TZ);
+
+    expect(grouped.get(TUESDAY)?.map((b) => b.id)).toEqual(["first", "second"]);
+  });
+
+  it("separates days and omits ones with nothing on them", () => {
+    const grouped = groupByLocalDate(
+      [at(TUESDAY, "09:00", "09:30"), at("2026-07-30", "10:00", "10:30")],
+      TZ,
+    );
+
+    expect([...grouped.keys()]).toEqual([TUESDAY, "2026-07-30"]);
+    expect(grouped.get("2026-07-29")).toBeUndefined();
+  });
+
+  it("returns nothing for no bookings", () => {
+    expect(groupByLocalDate([], TZ).size).toBe(0);
   });
 });

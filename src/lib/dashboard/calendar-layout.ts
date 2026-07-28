@@ -532,6 +532,36 @@ function assemble(
 }
 
 /**
+ * Bookings bucketed by the tenant-local calendar day they start on.
+ *
+ * For the mobile week agenda, which is a list rather than a grid and so needs
+ * the grouping without any of the geometry. Shares localParts with the grid
+ * builders on purpose: a booking must not be able to land under Tuesday in one
+ * view and Monday in the other because two callers each did their own UTC
+ * conversion. 23:30 UTC is 01:30 the next day in Berlin, and only one of those
+ * is the day the shop thinks it is.
+ *
+ * Insertion order is preserved per bucket, so a caller passing getBookingsForRange's
+ * output gets each day already in start-time order.
+ */
+export function groupByLocalDate(
+  bookings: DashboardBooking[],
+  timezone: string,
+): Map<string, DashboardBooking[]> {
+  const byDate = new Map<string, DashboardBooking[]>();
+
+  for (const booking of bookings) {
+    const { date } = localParts(booking.startAt, timezone);
+    const existing = byDate.get(date);
+
+    if (existing) existing.push(booking);
+    else byDate.set(date, [booking]);
+  }
+
+  return byDate;
+}
+
+/**
  * The weekday numbers, in schema.prisma's 0 = Sunday .. 6 numbering, that a set
  * of tenant-local dates falls on — for filtering WorkingHours down to the days
  * actually on screen.
