@@ -230,3 +230,26 @@ By day 7 you have a working booking loop. By day 14 — realistically closer to 
 once the two-session items above are accounted for — you have something you can put in
 front of a real barbershop owner and let them book on their own phone in front of you.
 That's the milestone that matters, not "feature complete."
+
+### Carried into Day 13
+
+Sizing questions found while building the calendar (Day 10) that were deliberately not
+answered there. Both are judgement calls about how things look at the edges of the range
+rather than bugs, and both are cheaper to settle in one pass with a real demo tenant on a
+real monitor than to guess at individually.
+
+Note this widens Day 13's design pass beyond "the public flow" as the table above has it —
+both items are dashboard-side.
+
+- **Tap targets on short calendar blocks.** A block's height is its duration: at 80px an
+  hour a 20-minute booking is 27px and a 15-minute one 20px, and anything under 13px
+  renders as a bar with no text at all. That is below a comfortable touch target, and Day
+  11 puts click-to-book on exactly these blocks. Needs either a hit area larger than the
+  visual block or a separate interaction for short appointments — decide it with a
+  finger on a phone, not from the numbers.
+- **Dashboard header inset.** The header bar in `(dashboard)/layout.tsx` is capped at
+  `max-w-5xl` while the calendar page now runs to `max-w-[120rem]`, so on a wide monitor
+  the shop name and nav sit visibly inset from the grid's edges. Every other dashboard
+  page repeats its own `max-w-5xl` wrapper, so the fix is either widening the header (which
+  affects all five pages) or accepting the inset as deliberate. Not a call the calendar
+  should make on its own, which is why it waited.

@@ -23,6 +23,24 @@ const AXIS_WIDTH = "4rem";
 const MIN_COLUMN_WIDTH = "9rem";
 
 /**
+ * How wide a column is allowed to get.
+ *
+ * The columns used to be `minmax(0, 1fr)` inside a fixed max-width page, which
+ * put the sizing on the wrong end of the problem: the container was constant
+ * while the column count swings from two barbers to a seven-day week. At seven
+ * that left ~149px a column and the grid looked cramped on a wide monitor; at
+ * two it produced 520px columns holding a 27px-tall booking block, which is not
+ * "roomy", just empty.
+ *
+ * Bounding the column instead makes it self-correcting at any staff count. A
+ * week uses the room it needs, a two-barber day stops growing and leaves honest
+ * whitespace, and the page cap only has to be large enough for the widest case
+ * (axis + seven columns) rather than tuned to a guess about how many barbers a
+ * shop has.
+ */
+const MAX_COLUMN_WIDTH = "16rem";
+
+/**
  * The chrome and text metrics each density tier is allowed, and the content it
  * renders. The thresholds that pick a tier live in lib/dashboard/calendar-layout
  * next to the geometry that produces the height; these are the other half of
@@ -89,7 +107,7 @@ export function CalendarGrid({
 }) {
   if (grid.columns.length === 0) return <CalendarEmptyState />;
 
-  const template = `${AXIS_WIDTH} repeat(${grid.columns.length}, minmax(0, 1fr))`;
+  const template = `${AXIS_WIDTH} repeat(${grid.columns.length}, minmax(${MIN_COLUMN_WIDTH}, ${MAX_COLUMN_WIDTH}))`;
 
   return (
     // No scrollbar-hide here, deliberately — see the note on that utility in
@@ -97,7 +115,14 @@ export function CalendarGrid({
     // The ‹ › controls next to this grid move it through *time*, not sideways,
     // so on a narrow screen the scrollbar is the only thing saying that Saturday
     // and Sunday exist off the right-hand edge.
-    <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white">
+    //
+    // w-fit so the card hugs the grid rather than stretching to the page. Now
+    // that columns stop at MAX_COLUMN_WIDTH, a full-width card would frame a
+    // two-barber day in half a screen of empty border — the same wasted space
+    // the column cap exists to remove, just moved outside the grid. max-w-full
+    // keeps fit-content from exceeding the viewport, which is what leaves the
+    // overflow for the scroll to handle.
+    <div className="w-fit max-w-full overflow-x-auto rounded-2xl border border-zinc-200 bg-white">
       <div
         // Below this width the columns stop shrinking and the wrapper — headers,
         // hour rules and all — grows past the viewport into the scroll above,

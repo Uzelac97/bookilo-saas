@@ -94,7 +94,14 @@ export default async function CalendarPage({ searchParams }: PageProps) {
         });
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6">
+    // Wider than the max-w-5xl the list-and-form pages use, because this one is
+    // a multi-column view whose column count scales with the shop — seven in the
+    // week view regardless. The cap is the widest the grid can actually get
+    // (a 4rem axis + 7 columns at MAX_COLUMN_WIDTH, plus this padding), not a
+    // guess: past that point the grid stops growing and the only thing a larger
+    // cap would stretch is the header row, pushing the view toggle away from the
+    // heading on an ultrawide monitor.
+    <div className="mx-auto flex w-full max-w-[120rem] flex-col gap-6 px-4 py-8 sm:px-6">
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
           Calendar
