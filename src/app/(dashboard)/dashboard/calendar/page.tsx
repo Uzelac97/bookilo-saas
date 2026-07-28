@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 
-import { CalendarGrid } from "@/components/dashboard/calendar-grid";
+import {
+  calendarCardWidth,
+  CalendarGrid,
+} from "@/components/dashboard/calendar-grid";
 import { CalendarNav } from "@/components/dashboard/calendar-nav";
 import { WeekAgenda } from "@/components/dashboard/week-agenda";
 import { getCurrentTenant } from "@/lib/auth/session";
@@ -36,6 +39,28 @@ type PageProps = {
 function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
+
+/**
+ * The three lengths bounding the calendar column, all border-box.
+ *
+ * PAGE_GUTTER is this page's own `sm:px-6`, both sides. It has to be added back
+ * because the container's max-width includes its padding, so sizing to the
+ * card's width alone would leave the card 3rem too wide for its own parent and
+ * push it into a scroll.
+ *
+ * MIN is a floor on how narrow the whole column may get. Without it a two-barber
+ * day collapses the page to ~626px, which stops reading as compact and starts
+ * reading as broken. MAX is the widest the grid can reach — a 4rem axis plus
+ * seven columns at their cap — past which a larger container would only stretch
+ * the header row, pushing the view toggle away from the heading it belongs to.
+ *
+ * The base breakpoint's `px-4` is 1rem narrower than PAGE_GUTTER, so below `sm`
+ * this over-allocates by 1rem. That never binds: MIN alone is already wider than
+ * any viewport small enough for the difference to matter.
+ */
+const PAGE_GUTTER = "3rem";
+const MIN_PAGE_WIDTH = "64rem";
+const MAX_PAGE_WIDTH = "120rem";
 
 /**
  * The owner's calendar: a day grid with one column per barber, or a week grid
@@ -105,14 +130,25 @@ export default async function CalendarPage({ searchParams }: PageProps) {
         });
 
   return (
-    // Wider than the max-w-5xl the list-and-form pages use, because this one is
-    // a multi-column view whose column count scales with the shop — seven in the
-    // week view regardless. The cap is the widest the grid can actually get
-    // (a 4rem axis + 7 columns at MAX_COLUMN_WIDTH, plus this padding), not a
-    // guess: past that point the grid stops growing and the only thing a larger
-    // cap would stretch is the header row, pushing the view toggle away from the
-    // heading on an ultrawide monitor.
-    <div className="mx-auto flex w-full max-w-[120rem] flex-col gap-6 px-4 py-8 sm:px-6">
+    // Sized to the grid rather than to the viewport, then centred.
+    //
+    // A fixed wide cap left a two-barber day as a 576px card at the left edge of
+    // a 1920px container, with the nav row's controls stretched to either end of
+    // a width the grid never used — the card and the buttons meant to drive it
+    // stopped looking like one object. Deriving the width from the column count
+    // keeps the header, the controls and the grid the same width at every staff
+    // count, and `mx-auto` centres the result.
+    //
+    // clamp rather than a plain max-width because both ends are real: the floor
+    // stops a two-barber day collapsing to something that reads as broken, and
+    // the ceiling stops an ultrawide monitor stretching the header past the
+    // widest grid that can exist.
+    <div
+      style={{
+        maxWidth: `clamp(${MIN_PAGE_WIDTH}, calc(${calendarCardWidth(grid.columns.length)} + ${PAGE_GUTTER}), ${MAX_PAGE_WIDTH})`,
+      }}
+      className="mx-auto flex w-full flex-col gap-6 px-4 py-8 sm:px-6"
+    >
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
           Calendar

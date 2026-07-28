@@ -42,6 +42,32 @@ const MIN_COLUMN_WIDTH = "9rem";
 const MAX_COLUMN_WIDTH = "16rem";
 
 /**
+ * The card's 1px border, left and right.
+ *
+ * Small and load-bearing: the border sits outside the grid's content box, so a
+ * caller sizing a container to `axis + columns` alone lands 2px short, the card
+ * hits its own `max-w-full`, and the grid gets a 2px horizontal scrollbar on a
+ * layout that is otherwise an exact fit.
+ */
+const CARD_BORDER = "2px";
+
+/**
+ * How wide this card wants to be, given its column count — border included.
+ *
+ * Exported so the page can size and centre the whole calendar column to the
+ * grid rather than leaving a wide container with a small card adrift at one end
+ * of it. It lives here because this is the file that knows the axis width, the
+ * column cap and the border, and a second copy of that arithmetic in the page
+ * would be wrong the first time any of the three changed.
+ *
+ * Returns a CSS length, not a number: the parts are rem and px and only the
+ * browser knows the root font size.
+ */
+export function calendarCardWidth(columnCount: number): string {
+  return `calc(${AXIS_WIDTH} + ${columnCount} * ${MAX_COLUMN_WIDTH} + ${CARD_BORDER})`;
+}
+
+/**
  * The chrome and text metrics each density tier is allowed, and the content it
  * renders. The thresholds that pick a tier live in lib/dashboard/calendar-layout
  * next to the geometry that produces the height; these are the other half of
@@ -146,7 +172,13 @@ export function CalendarGrid({
     // the column cap exists to remove, just moved outside the grid. max-w-full
     // keeps fit-content from exceeding the viewport, which is what leaves the
     // overflow for the scroll to handle.
-    <div className="w-fit max-w-full overflow-x-auto rounded-2xl border border-zinc-200 bg-white">
+    //
+    // mx-auto because the page's minimum width can exceed what this card wants:
+    // a two-barber day is ~578px inside a 64rem column. Left-aligned, that floor
+    // would simply put the emptiness back on the right-hand side, which is the
+    // thing it was added to avoid. Centred, the slack is split evenly and the
+    // card reads as deliberately compact instead of unfinished.
+    <div className="mx-auto w-fit max-w-full overflow-x-auto rounded-2xl border border-zinc-200 bg-white">
       <div
         // Below this width the columns stop shrinking and the wrapper — headers,
         // hour rules and all — grows past the viewport into the scroll above,
