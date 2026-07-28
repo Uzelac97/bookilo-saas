@@ -8,8 +8,9 @@ import type {
   GridColumn,
   PlacedBooking,
 } from "@/lib/dashboard/calendar-layout";
+import { staffColor } from "@/lib/dashboard/staff-colors";
 import type { DashboardBooking } from "@/lib/db/bookings";
-import { formatSlotTime, formatTimeRange } from "@/lib/format";
+import { formatSlotTime, formatTimeRange, initials } from "@/lib/format";
 
 /**
  * The three lengths the layout is built from.
@@ -58,11 +59,21 @@ const MAX_COLUMN_WIDTH = "16rem";
  * the appointment is, so the customer's name is the last thing to go.
  */
 const DENSITY_STYLES: Record<PlacedBooking["density"], string> = {
-  full: "px-1.5 py-1 text-[11px] leading-tight",
-  compact: "px-1.5 py-0.5 text-[11px] leading-tight",
-  minimal: "px-1.5 text-[10px] leading-none",
+  full: "pr-1.5 pl-2.5 py-1 text-[11px] leading-tight",
+  compact: "pr-1.5 pl-2.5 py-0.5 text-[11px] leading-tight",
+  minimal: "pr-1.5 pl-2.5 text-[10px] leading-none",
   sliver: "",
 };
+
+/**
+ * The barber's accent bar. 4px wide, which is why the tiers above use pl-2.5
+ * (10px) rather than px-1.5 — text starting at 6px would sit on top of it.
+ *
+ * Its own element rather than a `border-l-*` colour, so it cannot end up
+ * fighting the status treatment's `border-*` over the same longhand property.
+ * See the note in lib/dashboard/staff-colors.ts.
+ */
+const ACCENT_WIDTH = "w-1";
 
 /**
  * How each status reads on a block. Same semantics as today-list.tsx — CONFIRMED
@@ -101,9 +112,22 @@ const STATUS_LABELS: Record<DashboardBooking["status"], string | null> = {
 export function CalendarGrid({
   grid,
   timezone,
+  staffColors,
+  showBarber,
 }: {
   grid: CalendarGridModel;
   timezone: string;
+  /** Staff id -> accent class, from lib/dashboard/staff-colors. */
+  staffColors: Record<string, string>;
+  /**
+   * Whether a block names its barber.
+   *
+   * True for the week view, where a column is a day and the barber is otherwise
+   * only recoverable from the hover title. False for the day view, where the
+   * column header already says it and initials on every block would be noise.
+   * The accent colour renders either way — in the day view as reinforcement.
+   */
+  showBarber: boolean;
 }) {
   if (grid.columns.length === 0) return <CalendarEmptyState />;
 
@@ -175,7 +199,13 @@ export function CalendarGrid({
           </div>
 
           {grid.columns.map((column) => (
-            <ColumnBody key={column.key} column={column} timezone={timezone} />
+            <ColumnBody
+              key={column.key}
+              column={column}
+              timezone={timezone}
+              staffColors={staffColors}
+              showBarber={showBarber}
+            />
           ))}
         </div>
       </div>
@@ -224,9 +254,13 @@ function ColumnHeader({ column }: { column: GridColumn }) {
 function ColumnBody({
   column,
   timezone,
+  staffColors,
+  showBarber,
 }: {
   column: GridColumn;
   timezone: string;
+  staffColors: Record<string, string>;
+  showBarber: boolean;
 }) {
   return (
     <ol
@@ -241,6 +275,8 @@ function ColumnBody({
           key={placed.booking.id}
           placed={placed}
           timezone={timezone}
+          staffColors={staffColors}
+          showBarber={showBarber}
         />
       ))}
     </ol>
@@ -250,9 +286,13 @@ function ColumnBody({
 function BookingBlock({
   placed,
   timezone,
+  staffColors,
+  showBarber,
 }: {
   placed: PlacedBooking;
   timezone: string;
+  staffColors: Record<string, string>;
+  showBarber: boolean;
 }) {
   const { booking, lane, laneCount } = placed;
   const statusLabel = STATUS_LABELS[booking.status];
@@ -279,6 +319,24 @@ function BookingBlock({
     .filter(Boolean)
     .join(" · ");
 
+  /**
+   * The barber's initials, leading the first line in the week view.
+   *
+   * Leading rather than trailing because the line truncates from the right: put
+   * at the end, this is the first thing a long service name would eat, and it is
+   * the one datum the week view can't get from anywhere else on screen.
+   *
+   * It exists alongside the accent colour rather than instead of it. Colour is
+   * the glanceable channel and initials the reliable one — a palette of eight
+   * hues is not something to ask a colourblind owner to distinguish, and two
+   * barbers' accents can end up adjacent in a single column.
+   */
+  const barber = showBarber ? (
+    <span className="pr-1 font-semibold opacity-70">
+      {initials(booking.staff.name)}
+    </span>
+  ) : null;
+
   return (
     <li
       style={{
@@ -303,16 +361,23 @@ function BookingBlock({
         // the only thing standing between a sliver and an unidentifiable bar.
         title={description}
         className={[
-          "flex h-full flex-col overflow-hidden rounded-lg border",
+          "relative flex h-full flex-col overflow-hidden rounded-lg border",
           DENSITY_STYLES[placed.density],
           STATUS_BLOCK_STYLES[booking.status],
-          // A "Walk-in" badge like today-list's costs a whole line, and a
-          // 15-minute block has only one — the accent edge costs no vertical
-          // space at all. Decoration only, which is why `description` says it in
-          // words: nothing may depend on noticing a 3px stripe.
-          walkIn ? "border-l-4" : "",
+          // A dashed outline, now that the left edge belongs to the barber's
+          // accent. A "Walk-in" badge like today-list's costs a whole line and a
+          // 15-minute block only has one, so this stays a border treatment —
+          // decoration only, which is why `description` also says it in words.
+          walkIn ? "border-dashed" : "",
         ].join(" ")}
       >
+        {/* The barber, as colour. Absolutely positioned rather than a border so
+            it survives at `sliver` density, where the block has no padding and
+            no text and this bar is the only thing identifying whose it is. */}
+        <span
+          aria-hidden="true"
+          className={`absolute inset-y-0 left-0 ${ACCENT_WIDTH} ${staffColor(staffColors, booking.staff.id)}`}
+        />
         {/* The complete description at every density, so what a screen reader
             gets never depends on how long the appointment happens to be. The
             visible text below is hidden from it precisely because it is the
@@ -325,8 +390,11 @@ function BookingBlock({
         <span aria-hidden="true" className="contents">
           {placed.density === "full" ? (
             <>
-              <span className="truncate font-mono tabular-nums">
-                {formatTimeRange(booking.startAt, booking.endAt, timezone)}
+              <span className="truncate">
+                {barber}
+                <span className="font-mono tabular-nums">
+                  {formatTimeRange(booking.startAt, booking.endAt, timezone)}
+                </span>
               </span>
               <span className="truncate font-medium">
                 {booking.customer.name}
@@ -338,6 +406,7 @@ function BookingBlock({
           ) : placed.density === "compact" ? (
             <>
               <span className="truncate">
+                {barber}
                 <span className="font-mono tabular-nums">
                   {formatSlotTime(booking.startAt, timezone)}
                 </span>{" "}
@@ -349,12 +418,13 @@ function BookingBlock({
             </>
           ) : placed.density === "minimal" ? (
             <span className="truncate">
+              {barber}
               <span className="font-mono tabular-nums">
                 {formatSlotTime(booking.startAt, timezone)}
               </span>{" "}
               <span className="font-medium">{booking.customer.name}</span>
             </span>
-          ) : null /* sliver: the bar itself is the whole of it */}
+          ) : null /* sliver: the accent bar is the whole of it */}
         </span>
       </div>
     </li>

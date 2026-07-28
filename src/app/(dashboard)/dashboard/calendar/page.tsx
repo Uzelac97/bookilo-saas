@@ -17,6 +17,7 @@ import {
   todayInZone,
   weekDays,
 } from "@/lib/dashboard/calendar-range";
+import { staffColorMap } from "@/lib/dashboard/staff-colors";
 import { getBookingsForRange } from "@/lib/db/bookings";
 import { getStaffForCalendar, getWorkingHoursForActiveStaff } from "@/lib/db/staff";
 import { formatBookingDate, formatDateRange } from "@/lib/format";
@@ -76,6 +77,10 @@ export default async function CalendarPage({ searchParams }: PageProps) {
   const relevantHours = workingHours.filter((row) =>
     onScreen.has(row.dayOfWeek),
   );
+
+  // Built from getStaffForCalendar's ordering, which includes inactive barbers —
+  // that is what keeps a colour from shifting the day someone is deactivated.
+  const staffColors = staffColorMap(staff);
 
   const grid =
     view === "week"
@@ -137,7 +142,14 @@ export default async function CalendarPage({ searchParams }: PageProps) {
         todayDate={todayInZone(now, tenant.timezone)}
         atToday={rangeContainsToday(range, now, tenant.timezone)}
       >
-        <CalendarGrid grid={grid} timezone={tenant.timezone} />
+        <CalendarGrid
+          grid={grid}
+          timezone={tenant.timezone}
+          staffColors={staffColors}
+          // Initials belong on a block only where the column doesn't already
+          // name the barber, which is the week view.
+          showBarber={view === "week"}
+        />
       </CalendarNav>
     </div>
   );

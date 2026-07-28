@@ -120,6 +120,26 @@ export function formatDateRange(
     : `${from.toFormat("d LLL")} – ${to.toFormat("d LLL")}`;
 }
 
+/**
+ * A person's initials: "Marco Rossi" -> "MR", "Marco" -> "M".
+ *
+ * First and last, not first-two, so "Jean Luc Picard" reads JP rather than JL.
+ *
+ * Split with Array.from rather than by index, because `name[0]` on a name
+ * beginning outside the basic plane returns half a surrogate pair and renders as
+ * a replacement character — a real risk on a field a shop owner types freely.
+ */
+export function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "";
+
+  const first = Array.from(parts[0])[0] ?? "";
+  const last =
+    parts.length > 1 ? (Array.from(parts[parts.length - 1])[0] ?? "") : "";
+
+  return (first + last).toUpperCase();
+}
+
 /** The parts a date-strip cell shows: "Tue" over "28". */
 export function formatStripDay(
   date: string,
