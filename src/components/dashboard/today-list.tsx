@@ -1,22 +1,14 @@
 import Link from "next/link";
 
+import { STATUS_LABELS } from "@/lib/dashboard/booking-status";
 import type { DashboardBooking } from "@/lib/db/bookings";
 import { formatPrice, formatSlotTime, formatTimeRange } from "@/lib/format";
 
 /**
- * How each status reads on the overview.
- *
- * CONFIRMED has no label on purpose: it's the overwhelming majority of rows, and
- * badging every one of them would make the two that matter harder to spot, not
- * easier.
+ * How each status is badged here. The words are shared with the calendar via
+ * STATUS_LABELS; the styling is not, because a pill in a full-width row and a
+ * tint on a calendar block want different treatments.
  */
-const STATUS_LABELS: Record<DashboardBooking["status"], string | null> = {
-  CONFIRMED: null,
-  CANCELLED: "Cancelled",
-  COMPLETED: "Done",
-  NO_SHOW: "No-show",
-};
-
 const STATUS_BADGE_STYLES: Record<DashboardBooking["status"], string> = {
   CONFIRMED: "",
   CANCELLED: "border-zinc-200 bg-zinc-100 text-zinc-500",

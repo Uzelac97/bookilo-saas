@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { STATUS_LABELS } from "@/lib/dashboard/booking-status";
 import type {
   // Aliased because the component below owns the plain name. A type-only import
   // still binds the identifier locally, so `function CalendarGrid` next to an
@@ -8,64 +9,14 @@ import type {
   GridColumn,
   PlacedBooking,
 } from "@/lib/dashboard/calendar-layout";
+import {
+  AXIS_WIDTH,
+  MAX_COLUMN_WIDTH,
+  MIN_COLUMN_WIDTH,
+} from "@/lib/dashboard/calendar-metrics";
 import { staffColor } from "@/lib/dashboard/staff-colors";
 import type { DashboardBooking } from "@/lib/db/bookings";
 import { formatSlotTime, formatTimeRange, initials } from "@/lib/format";
-
-/**
- * The three lengths the layout is built from.
- *
- * Kept as CSS strings and fed to `calc()` rather than multiplied in JS so the
- * grid template, the wrapper's minimum width and the hour rules' left edge can
- * only ever agree — a mismatch between them is a calendar whose lines don't
- * meet its columns.
- */
-const AXIS_WIDTH = "4rem";
-const MIN_COLUMN_WIDTH = "9rem";
-
-/**
- * How wide a column is allowed to get.
- *
- * The columns used to be `minmax(0, 1fr)` inside a fixed max-width page, which
- * put the sizing on the wrong end of the problem: the container was constant
- * while the column count swings from two barbers to a seven-day week. At seven
- * that left ~149px a column and the grid looked cramped on a wide monitor; at
- * two it produced 520px columns holding a 27px-tall booking block, which is not
- * "roomy", just empty.
- *
- * Bounding the column instead makes it self-correcting at any staff count. A
- * week uses the room it needs, a two-barber day stops growing and leaves honest
- * whitespace, and the page cap only has to be large enough for the widest case
- * (axis + seven columns) rather than tuned to a guess about how many barbers a
- * shop has.
- */
-const MAX_COLUMN_WIDTH = "16rem";
-
-/**
- * The card's 1px border, left and right.
- *
- * Small and load-bearing: the border sits outside the grid's content box, so a
- * caller sizing a container to `axis + columns` alone lands 2px short, the card
- * hits its own `max-w-full`, and the grid gets a 2px horizontal scrollbar on a
- * layout that is otherwise an exact fit.
- */
-const CARD_BORDER = "2px";
-
-/**
- * How wide this card wants to be, given its column count — border included.
- *
- * Exported so the page can size and centre the whole calendar column to the
- * grid rather than leaving a wide container with a small card adrift at one end
- * of it. It lives here because this is the file that knows the axis width, the
- * column cap and the border, and a second copy of that arithmetic in the page
- * would be wrong the first time any of the three changed.
- *
- * Returns a CSS length, not a number: the parts are rem and px and only the
- * browser knows the root font size.
- */
-export function calendarCardWidth(columnCount: number): string {
-  return `calc(${AXIS_WIDTH} + ${columnCount} * ${MAX_COLUMN_WIDTH} + ${CARD_BORDER})`;
-}
 
 /**
  * The chrome and text metrics each density tier is allowed, and the content it
@@ -102,26 +53,25 @@ const DENSITY_STYLES: Record<PlacedBooking["density"], string> = {
 const ACCENT_WIDTH = "w-1";
 
 /**
- * How each status reads on a block. Same semantics as today-list.tsx — CONFIRMED
- * is the plain look because it is nearly every block, and badging all of them
- * would bury the two that need attention.
+ * How each status tints a block. Words come from STATUS_LABELS, which is shared
+ * with the overview; these are not, because a badge in a full-width row and a
+ * tint on a block that may be twenty pixels tall want different treatments.
+ *
+ * CANCELLED IS CURRENTLY UNREACHABLE HERE, and so is STATUS_LABELS.CANCELLED at
+ * this component's two lookups. The calendar page filters cancellations out
+ * before building a grid (3aa1914) — a released slot is bookable again and a
+ * block drawn there would say otherwise. The entry stays because the Record must
+ * cover every status to compile, and because the component is still correct if
+ * handed a cancelled booking directly. But nothing exercises it, so restyling it
+ * will appear to do nothing: change the page's filter first. The overview and
+ * the mobile agenda are lists rather than grids and do still render
+ * cancellations, which is why the shared labels keep theirs.
  */
 const STATUS_BLOCK_STYLES: Record<DashboardBooking["status"], string> = {
   CONFIRMED: "border-zinc-300 bg-white text-zinc-900",
   CANCELLED: "border-zinc-200 bg-zinc-50 text-zinc-500 line-through",
   COMPLETED: "border-emerald-200 bg-emerald-50 text-emerald-900",
   NO_SHOW: "border-amber-200 bg-amber-100 text-amber-900",
-};
-
-/**
- * Announced to a screen reader, not drawn. The visual difference between these
- * is colour, and colour alone is not a status.
- */
-const STATUS_LABELS: Record<DashboardBooking["status"], string | null> = {
-  CONFIRMED: null,
-  CANCELLED: "Cancelled",
-  COMPLETED: "Done",
-  NO_SHOW: "No-show",
 };
 
 /**

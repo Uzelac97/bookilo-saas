@@ -1,10 +1,7 @@
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 
-import {
-  calendarCardWidth,
-  CalendarGrid,
-} from "@/components/dashboard/calendar-grid";
+import { CalendarGrid } from "@/components/dashboard/calendar-grid";
 import { CalendarNav } from "@/components/dashboard/calendar-nav";
 import {
   CALENDAR_ASIDE_GAP,
@@ -19,6 +16,7 @@ import {
   groupByLocalDate,
   weekdaysOf,
 } from "@/lib/dashboard/calendar-layout";
+import { calendarCardWidth } from "@/lib/dashboard/calendar-metrics";
 import { staffColorMap } from "@/lib/dashboard/staff-colors";
 import { summariseDay } from "@/lib/dashboard/today-summary";
 import {

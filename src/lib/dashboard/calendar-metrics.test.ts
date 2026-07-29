@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { calendarCardWidth } from "./calendar-grid";
+import { calendarCardWidth } from "./calendar-metrics";
 
 /**
  * Resolves the `calc(...)` the component emits, at a 16px root.
