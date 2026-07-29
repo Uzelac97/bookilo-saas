@@ -60,6 +60,15 @@ ask before building it — don't silently expand scope.
 ## Practical conventions
 
 - TypeScript strict mode, no `any` without a comment explaining why.
+- **A script that ran and a test suite that passed are not evidence the types are
+  sound.** `tsx` (scratch and diagnostic scripts) and Vitest's esbuild (test files)
+  strip types rather than check them, so both accept code that `tsc` rejects. Two
+  real cases in one session: a regex `s` flag, which needs an `es2018` target, and
+  `globSync` from `node:fs`, which isn't in this project's `@types/node` — each ran
+  cleanly under one tool and failed `npm run typecheck`. Always run `npm run
+  typecheck` as its own step before trusting a script's output or a green suite,
+  and especially before trusting a subagent that reports its tests passing — it may
+  never have run `tsc` at all.
 - Zod for all input validation on server actions.
 - Luxon for all date/time math — no raw `Date` arithmetic across timezones.
 - An ESLint `no-restricted-imports` rule bans importing the Prisma client outside
