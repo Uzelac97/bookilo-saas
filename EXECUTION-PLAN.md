@@ -247,6 +247,16 @@ both items are dashboard-side.
   11 puts click-to-book on exactly these blocks. Needs either a hit area larger than the
   visual block or a separate interaction for short appointments — decide it with a
   finger on a phone, not from the numbers.
+- **Weekday names follow the runtime's locale, prices don't.** `formatStripDay` in
+  `lib/format.ts` renders "Mon"/"Tue" and the day-of-month through Luxon with no locale
+  argument, so they come out in whatever the runtime's default is. Money in the same file
+  is pinned to `de-DE` by a module constant. That inconsistency is the actual thing to
+  settle — not whether English abbreviations are acceptable. It affects two surfaces: the
+  public booking date strip (since Day 6) and the calendar's week-view column headers.
+  Vercel's Node runtime has historically defaulted to `en-US`, so this is latent rather
+  than visible today; it surfaces the first time the runtime, a locale env var, or a
+  self-hosted deployment differs. Either pin a locale next to `PRICE_LOCALE` or decide
+  deliberately that dates follow the runtime while money doesn't.
 - **Dashboard header inset.** The header bar in `(dashboard)/layout.tsx` is capped at
   `max-w-5xl` while the calendar page now runs to `max-w-[120rem]`, so on a wide monitor
   the shop name and nav sit visibly inset from the grid's edges. Every other dashboard
