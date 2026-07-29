@@ -186,8 +186,16 @@ export function CalendarGrid({
         style={{
           minWidth: `calc(${AXIS_WIDTH} + ${grid.columns.length} * ${MIN_COLUMN_WIDTH})`,
         }}
-        // Room for the first and last hour labels, which are centred on rules
-        // that sit flush against the top and bottom of the grid.
+        // Breathing room under the last hour label, which now sits fully inside
+        // the grid rather than half below it.
+        //
+        // This used to be structural. The first and last labels were centred on
+        // rules flush against the top and bottom of the body, so both hung half
+        // outside it and this padding was what kept the bottom one from being
+        // clipped. Nothing performed the equivalent job at the top, where the
+        // header's border-b sits on that same edge — which is exactly how that
+        // border came to run through the middle of the 09:00 label. labelShift
+        // clamps both ends inward now, so this is spacing and no more.
         className="pb-3"
       >
         <div
@@ -223,7 +231,7 @@ export function CalendarGrid({
               <span
                 key={mark.minute}
                 style={{ top: `${mark.topPercent}%` }}
-                className="absolute right-2 -translate-y-1/2 font-mono text-[11px] tabular-nums text-zinc-400"
+                className={`absolute right-2 font-mono text-[11px] tabular-nums text-zinc-400 ${labelShift(mark.topPercent)}`}
               >
                 {mark.label}
               </span>
@@ -485,4 +493,28 @@ function CalendarEmptyState() {
 /** Column keys are staff ids and ISO dates, both safe in an id attribute. */
 function headerId(key: string): string {
   return `calendar-column-${key}`;
+}
+
+/**
+ * How an hour label sits relative to its rule.
+ *
+ * Centred everywhere except the two ends, where centring would render half the
+ * label outside the grid body — and at the top that is not merely untidy. The
+ * body's first rule is at its very top edge, which is also exactly where the
+ * header row's `border-b` sits, so a centred first label had that border running
+ * horizontally through the middle of its glyphs. Measured in a browser: the
+ * 09:00 label occupied y 65.75–82.25 with its midpoint at 74.00, and the header's
+ * bottom border was at 74.00 — the same pixel.
+ *
+ * The hour rules were the obvious suspect and were never involved: they start at
+ * `left: AXIS_WIDTH`, which puts them 9px clear of the label's right edge.
+ *
+ * So the ends are clamped inward instead. The first label hangs below its rule,
+ * the last sits above its own, and every label in between is untouched.
+ */
+function labelShift(topPercent: number): string {
+  if (topPercent <= 0) return "translate-y-0";
+  if (topPercent >= 100) return "-translate-y-full";
+
+  return "-translate-y-1/2";
 }
