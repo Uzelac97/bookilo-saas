@@ -133,17 +133,34 @@ export default async function CalendarPage({ searchParams }: PageProps) {
   // calendar is usually not showing today.
   const summary = summariseDay(bookings, now);
 
+  // THE GRID SHOWS OCCUPIED TIME, so a cancellation does not belong in it: the
+  // slot has been released and is bookable again, and drawing a block there says
+  // the opposite. The struck-through style it would get reads as "this happened
+  // and is void" rather than "this hour is free", which is the wrong answer to
+  // the only question a calendar grid is asked.
+  //
+  // Filtered here rather than inside the builders on purpose. getBookingsForRange
+  // deliberately applies no status filter and leaves the choice to its caller,
+  // and the choice genuinely differs per surface: the mobile agenda below is a
+  // list, not a grid, so it keeps cancellations for the same reason the Today
+  // overview does — an owner needs to see the booking that fell through.
+  //
+  // NO_SHOW stays in. That appointment did occupy the chair; nobody turned up,
+  // which is a different fact and one the block's amber styling already carries.
+  const occupying = bookings.filter((booking) => booking.status !== "CANCELLED");
+  const cancelledCount = bookings.length - occupying.length;
+
   const grid =
     view === "week"
       ? buildWeekGrid({
-          bookings,
+          bookings: occupying,
           dates,
           workingHours: relevantHours,
           timezone: tenant.timezone,
           now,
         })
       : buildDayGrid({
-          bookings,
+          bookings: occupying,
           staff,
           workingHours: relevantHours,
           timezone: tenant.timezone,
@@ -193,11 +210,19 @@ export default async function CalendarPage({ searchParams }: PageProps) {
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
           Calendar
         </h1>
+        {/* Counts what the grid draws and what the sidebar totals — one
+            definition of "appointment" across all three, or the page contradicts
+            itself in two places at once. Cancellations are still reported, as a
+            separate figure that says what it is rather than being folded into a
+            number that then disagrees with the sidebar's. */}
         <p className="text-sm text-zinc-500">
-          {bookings.length === 1
-            ? "1 appointment"
-            : `${bookings.length} appointments`}{" "}
-          · {tenant.timezone}
+          {occupying.length === 0
+            ? "No appointments"
+            : occupying.length === 1
+              ? "1 appointment"
+              : `${occupying.length} appointments`}
+          {cancelledCount > 0 ? ` · ${cancelledCount} cancelled` : ""} ·{" "}
+          {tenant.timezone}
         </p>
       </header>
 

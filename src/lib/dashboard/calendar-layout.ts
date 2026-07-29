@@ -271,11 +271,16 @@ export function gridBounds(
  * The calendar cannot assume its bookings don't overlap, which is easy to get
  * backwards: the `no_overlapping_bookings` exclusion constraint only ranges over
  * CONFIRMED and COMPLETED (see OCCUPYING_STATUSES in lib/db/availability.ts).
- * CANCELLED and NO_SHOW sit outside it, so once the dashboard can mark a no-show
- * that slot reopens and a walk-in can legitimately be booked straight over it.
- * The result is two live blocks on one barber at one time, and a layout that
- * assumed uniqueness would stack them exactly on top of each other — hiding the
- * newer appointment behind the one it replaced.
+ * NO_SHOW sits outside it, so once the dashboard can mark a no-show that slot
+ * reopens and a walk-in can legitimately be booked straight over it. The result
+ * is two live blocks on one barber at one time, and a layout that assumed
+ * uniqueness would stack them exactly on top of each other — hiding the newer
+ * appointment behind the one it replaced.
+ *
+ * CANCELLED is outside the constraint too and used to be cited here, but it can
+ * no longer reach this function: the calendar page filters cancellations out
+ * before building a grid, because a released slot is not occupied time. NO_SHOW
+ * alone is what keeps this necessary.
  *
  * Lanes are counted per *cluster* of mutually overlapping bookings, not per
  * column: one 09:00 clash must not squeeze a lone 17:00 appointment into half
