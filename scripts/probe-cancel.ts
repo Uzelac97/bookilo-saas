@@ -41,15 +41,45 @@ const NOW = new Date(Date.UTC(2030, 5, 10, 12, 0, 0, 0));
 /** One barber per phase — see the note in makeBooking. */
 const PHASES = ["a", "c", "d", "e"] as const;
 
+/**
+ * How many check() calls a complete run makes — phases A to F, one each.
+ *
+ * Asserted at the end, because "no failures" is also what a run prints when it
+ * never reached half its phases. `failures === 0` cannot tell a clean run from a
+ * truncated one, and phase E is the only thing standing between an old email and
+ * a rewritten booking history — "it passed" has to mean "all of it ran".
+ *
+ * Every check() here is unconditional and outside any loop, so this is a fixed
+ * number, and it has to move when a check is added or removed. Excludes the
+ * count check itself.
+ */
+const EXPECTED_CHECKS = 6;
+
+let checksRun = 0;
 let failures = 0;
 
 function check(phase: string, passed: boolean, detail: string) {
+  checksRun += 1;
+
   if (passed) {
     console.log(`  PASS  ${phase}  ${detail}`);
   } else {
     failures += 1;
     console.error(`  FAIL  ${phase}  ${detail}`);
   }
+}
+
+/** The last check: that every other check actually ran. */
+function reportCheckCount() {
+  if (checksRun === EXPECTED_CHECKS) {
+    console.log(`\n  PASS  count  ${checksRun} of ${EXPECTED_CHECKS} checks ran`);
+    return;
+  }
+
+  failures += 1;
+  console.error(
+    `\n  FAIL  count  ${checksRun} of ${EXPECTED_CHECKS} checks ran — a phase was skipped, removed, or exited early`,
+  );
 }
 
 function minutesFromNow(minutes: number): Date {
@@ -217,6 +247,8 @@ async function main() {
     await teardown();
     await prisma.$disconnect();
   }
+
+  reportCheckCount();
 
   console.log(
     failures === 0

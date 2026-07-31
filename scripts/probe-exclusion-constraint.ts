@@ -41,15 +41,47 @@ function at(day: number, hour: number, minute = 0): Date {
   return new Date(Date.UTC(2030, 0, day, hour, minute, 0, 0));
 }
 
+/**
+ * How many check() calls a complete run makes: three "pre" guards on the
+ * constraint definition, then one each for phases A to F.
+ *
+ * Asserted at the end, because "no failures" is also what a run prints when it
+ * never reached half its phases. That matters more here than anywhere else — the
+ * whole point of this probe is that the database, not the application, is the
+ * authority on slot conflicts, and a truncated run that still says "all phases
+ * passed" is exactly the evidence someone would build availability logic on.
+ *
+ * Every check() here is unconditional and outside any loop, so this is a fixed
+ * number, and it has to move when a check is added or removed. Excludes the
+ * count check itself.
+ */
+const EXPECTED_CHECKS = 9;
+
+let checksRun = 0;
 let failures = 0;
 
 function check(phase: string, passed: boolean, detail: string) {
+  checksRun += 1;
+
   if (passed) {
     console.log(`  PASS  ${phase}  ${detail}`);
   } else {
     failures += 1;
     console.error(`  FAIL  ${phase}  ${detail}`);
   }
+}
+
+/** The last check: that every other check actually ran. */
+function reportCheckCount() {
+  if (checksRun === EXPECTED_CHECKS) {
+    console.log(`\n  PASS  count  ${checksRun} of ${EXPECTED_CHECKS} checks ran`);
+    return;
+  }
+
+  failures += 1;
+  console.error(
+    `\n  FAIL  count  ${checksRun} of ${EXPECTED_CHECKS} checks ran — a phase was skipped, removed, or exited early`,
+  );
 }
 
 type Outcome = "created" | "SLOT_TAKEN";
@@ -253,6 +285,8 @@ async function main() {
     fRebook === "SLOT_TAKEN",
     `rebook a COMPLETED booking's slot -> expected SLOT_TAKEN, got ${fRebook}`,
   );
+
+  reportCheckCount();
 
   console.log(
     failures === 0

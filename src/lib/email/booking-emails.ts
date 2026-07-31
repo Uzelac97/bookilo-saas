@@ -42,11 +42,19 @@ export function cancelUrl(slug: string, token: string): string {
  * Failures are logged and not retried inline. A retry loop here would hold the
  * customer's request open for a send they're not waiting on, and Resend's own
  * queueing is a better place for it than a serverless function about to exit.
+ *
+ * `notifyOwner` defaults to true, so the public path is unchanged. The dashboard
+ * passes false: the owner is the one who just typed the booking in, and a "new
+ * booking" alert about their own keystrokes is the kind of noise that teaches
+ * someone to ignore the alert that matters. The customer's confirmation still
+ * goes out when they gave an address — a booking taken over the phone for next
+ * week is exactly when someone wants the details and the cancel link.
  */
 export async function sendBookingEmails(
   booking: BookingByToken,
   ownerEmail: string,
   customerPhone: string,
+  options: { notifyOwner?: boolean } = {},
 ): Promise<void> {
   const { tenant } = booking;
   const url = cancelUrl(tenant.slug, booking.cancelToken);
@@ -68,14 +76,16 @@ export async function sendBookingEmails(
     });
   }
 
-  const ownerMail = renderOwnerNotification(booking, customerPhone);
-  sends.push({
-    label: "owner notification",
-    run: async () => {
-      const result = await sendEmail({ to: ownerEmail, ...ownerMail });
-      if (!result.ok) throw new Error(result.error);
-    },
-  });
+  if (options.notifyOwner ?? true) {
+    const ownerMail = renderOwnerNotification(booking, customerPhone);
+    sends.push({
+      label: "owner notification",
+      run: async () => {
+        const result = await sendEmail({ to: ownerEmail, ...ownerMail });
+        if (!result.ok) throw new Error(result.error);
+      },
+    });
+  }
 
   const outcomes = await Promise.allSettled(sends.map((send) => send.run()));
 

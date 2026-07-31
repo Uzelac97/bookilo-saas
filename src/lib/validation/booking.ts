@@ -1,6 +1,9 @@
 import { z } from "zod";
 
 import { normalizePhone, phoneDigitCount } from "./phone";
+// Moved to ./text.ts on Day 11, when the services and staff screens needed the
+// same single-line rule for the names an owner types. Same function, one home.
+import { hasControlCharacters } from "./text";
 
 /**
  * The shortest thing that can still be a real phone number, counted in digits
@@ -8,39 +11,6 @@ import { normalizePhone, phoneDigitCount } from "./phone";
  * an area code, since rejecting a reachable number is the worse failure here.
  */
 const MIN_PHONE_DIGITS = 6;
-
-/**
- * Characters a name may not contain: C0 and C1 control characters, plus the
- * Unicode line and paragraph separators.
- *
- * Rejected rather than stripped, deliberately. A name with a line break in it is
- * a different value from the same name without one — usually a paste that
- * brought a second field along with it — and quietly rewriting what someone
- * typed means the shop calls a customer by a name they never gave. Trailing
- * whitespace is the opposite case and is still trimmed: nobody means to type it.
- *
- * The concrete reason a name has to be a single line: it goes into the subject
- * header of the owner's notification email. That isn't header injection with
- * Resend — the SDK posts JSON to an HTTP API rather than writing SMTP headers,
- * so the transport encodes it — but it does produce a mangled subject, and a
- * value that can't survive being written on one line has no business here.
- */
-function hasControlCharacters(value: string): boolean {
-  for (const char of value) {
-    const code = char.codePointAt(0) ?? 0;
-
-    if (
-      code <= 0x1f || // C0: tab, newline, carriage return, NUL, …
-      (code >= 0x7f && code <= 0x9f) || // DEL and C1
-      code === 0x2028 || // line separator
-      code === 0x2029 // paragraph separator
-    ) {
-      return true;
-    }
-  }
-
-  return false;
-}
 
 /**
  * The customer-supplied half of a public booking.
@@ -57,10 +27,11 @@ function hasControlCharacters(value: string): boolean {
 export const customerDetailsSchema = z.object({
   /**
    * Trimmed, length-bounded, and required to be a single line — see
-   * hasControlCharacters above for why that last one is a rejection rather than
-   * a clean-up. The order matters: `trim` first, so a trailing newline from a
-   * paste is removed rather than reported, and the single-line check last, so an
-   * empty or over-long field gets the message that actually describes it.
+   * hasControlCharacters in ./text.ts for why that last one is a rejection
+   * rather than a clean-up. The order matters: `trim` first, so a trailing
+   * newline from a paste is removed rather than reported, and the single-line
+   * check last, so an empty or over-long field gets the message that actually
+   * describes it.
    */
   name: z
     .string()

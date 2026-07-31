@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import {
   TodayEmptyState,
@@ -44,13 +45,24 @@ export default async function DashboardPage() {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
       <div className="flex flex-col gap-6">
-        <header className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-            Today
-          </h1>
-          <p className="text-sm text-zinc-500">
-            {formatBookingDate(date, tenant.timezone)} · {tenant.timezone}
-          </p>
+        <header className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
+              Today
+            </h1>
+            <p className="text-sm text-zinc-500">
+              {formatBookingDate(date, tenant.timezone)} · {tenant.timezone}
+            </p>
+          </div>
+
+          {/* Defaults to today, which is the walk-in case this screen is open
+              for. The calendar's button carries whatever day it's showing. */}
+          <Link
+            href={`/dashboard/bookings/new?date=${date}`}
+            className="rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+          >
+            New booking
+          </Link>
         </header>
 
         <TodaySummary

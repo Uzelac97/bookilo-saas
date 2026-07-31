@@ -1,8 +1,16 @@
 import type { WorkingHoursRow } from "@/lib/availability/slots";
+import type { StaffInput } from "@/lib/validation/staff";
 
 import { prisma } from "./prisma";
 
 export type { WorkingHoursRow };
+
+/**
+ * What a write scoped by tenant reports back. Same shape and same reasoning as
+ * ServiceWriteResult in ./services.ts — "no such barber" and "another tenant's
+ * barber" are one outcome on purpose.
+ */
+export type StaffWriteResult = { ok: true } | { ok: false; reason: "NOT_FOUND" };
 
 /**
  * A staff member as the public booking flow needs them. Narrower than the Prisma
@@ -103,4 +111,209 @@ export async function getWorkingHoursForActiveStaff(
     where: { staff: { tenantId, active: true } },
     select: { dayOfWeek: true, startMinute: true, endMinute: true },
   });
+}
+
+/** A barber as the owner's staff screen needs them: the whole row plus context. */
+export type ManagedStaff = {
+  id: string;
+  name: string;
+  photoUrl: string | null;
+  active: boolean;
+  /** This barber's own hours, ordered for display. */
+  workingHours: WorkingHoursRow[];
+  /**
+   * CONFIRMED appointments still in the future.
+   *
+   * Exists so the deactivate confirmation can say "Marco has 4 upcoming
+   * appointments — they stay on the calendar" rather than asking the owner to
+   * remember. Deactivating is safe precisely because those bookings survive
+   * (`onDelete: Restrict`, and getStaffForCalendar keeps the column), but "safe"
+   * is not what it feels like without the number in front of you.
+   */
+  upcomingBookings: number;
+};
+
+/**
+ * Every barber a tenant has, with their hours and their forward booking count.
+ *
+ * The third staff read in this file, and the three differ in exactly what they
+ * filter: getActiveStaff is what a customer may be offered, getStaffForCalendar
+ * is every column the calendar must draw, and this is the owner's list — which,
+ * like the calendar's, must include retired barbers, because a screen that hides
+ * them offers no way back from an accidental deactivation.
+ *
+ * `now` is injected rather than read here for the same reason computeSlots takes
+ * it: a function that reads the clock internally can't be reasoned about from
+ * its caller, and this one is called from a page render that already has one.
+ */
+export async function getStaffForManagement(
+  tenantId: string,
+  now: Date,
+): Promise<ManagedStaff[]> {
+  const rows = await prisma.staff.findMany({
+    where: { tenantId },
+    // Active first so the working list isn't pushed below the archive, then the
+    // same createdAt ordering as everywhere else in this file.
+    orderBy: [{ active: "desc" }, { createdAt: "asc" }],
+    select: {
+      id: true,
+      name: true,
+      photoUrl: true,
+      active: true,
+      workingHours: {
+        orderBy: [{ dayOfWeek: "asc" }, { startMinute: "asc" }],
+        select: { dayOfWeek: true, startMinute: true, endMinute: true },
+      },
+      _count: {
+        select: {
+          bookings: {
+            // CONFIRMED only. A cancelled future booking holds nothing and a
+            // COMPLETED one in the future is a data error, not a commitment —
+            // this number exists to answer "what does deactivating this person
+            // strand", and only a confirmed appointment is stranded.
+            where: { status: "CONFIRMED", startAt: { gte: now } },
+          },
+        },
+      },
+    },
+  });
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    photoUrl: row.photoUrl,
+    active: row.active,
+    workingHours: row.workingHours,
+    upcomingBookings: row._count.bookings,
+  }));
+}
+
+/**
+ * One barber, scoped by tenant, for the edit screen. Null when the id belongs to
+ * nobody or to another tenant — the caller renders a 404 for both.
+ */
+export async function getStaffMember(
+  tenantId: string,
+  staffId: string,
+  now: Date,
+): Promise<ManagedStaff | null> {
+  const all = await getStaffForManagement(tenantId, now);
+
+  return all.find((member) => member.id === staffId) ?? null;
+}
+
+/**
+ * Adds a barber. `tenantId` comes from the server-side session (CLAUDE.md rule 2).
+ *
+ * DELIBERATELY CREATES NO WORKING HOURS. A new barber works nowhere until the
+ * owner says otherwise, and the reason is that opening hours are the union of
+ * what the staff work — there is no business-level hours field
+ * (EXECUTION-PLAN.md). Seeding a plausible 09:00–18:00 would therefore change
+ * what the *public page* says the shop's hours are, as a side effect of adding
+ * someone. The create flow sends the owner straight to the hours editor instead.
+ */
+export async function createStaff(
+  tenantId: string,
+  input: StaffInput,
+): Promise<{ id: string }> {
+  return prisma.staff.create({
+    data: {
+      tenantId,
+      name: input.name,
+      photoUrl: input.photoUrl ?? null,
+    },
+    select: { id: true },
+  });
+}
+
+/**
+ * Edits a barber's name or photo.
+ *
+ * `updateMany` rather than `update`, so `tenantId` sits in the same `where`
+ * clause and a guessed id from another tenant matches nothing — see the longer
+ * note on updateService in ./services.ts for why that distinction is the
+ * guardrail rather than a style preference.
+ */
+export async function updateStaff(
+  tenantId: string,
+  staffId: string,
+  input: StaffInput,
+): Promise<StaffWriteResult> {
+  const { count } = await prisma.staff.updateMany({
+    where: { id: staffId, tenantId },
+    data: { name: input.name, photoUrl: input.photoUrl ?? null },
+  });
+
+  return count === 0 ? { ok: false, reason: "NOT_FOUND" } : { ok: true };
+}
+
+/**
+ * Retires a barber, or brings one back. THIS IS WHAT "REMOVE" MEANS (CLAUDE.md),
+ * and there is deliberately no delete function here to reach for instead.
+ *
+ * `Booking.staffId` is `onDelete: Restrict`, so a real delete of anyone who has
+ * ever been booked would fail — and if it didn't, it would take the shop's
+ * history with it. Deactivating drops the barber out of getActiveStaff (the
+ * public picker and the availability query) while getStaffForCalendar keeps
+ * their column, so appointments already on the books stay visible in the time
+ * they still occupy.
+ *
+ * Their WorkingHours rows are left untouched on purpose: reactivating should
+ * restore the person as they were, not hand back a barber with an empty week.
+ * getWorkingHoursForActiveStaff already filters on `active`, so those rows stop
+ * contributing to the shop's public opening hours the moment this is set.
+ */
+export async function setStaffActive(
+  tenantId: string,
+  staffId: string,
+  active: boolean,
+): Promise<StaffWriteResult> {
+  const { count } = await prisma.staff.updateMany({
+    where: { id: staffId, tenantId },
+    data: { active },
+  });
+
+  return count === 0 ? { ok: false, reason: "NOT_FOUND" } : { ok: true };
+}
+
+/**
+ * Replaces a barber's whole week of working hours in one write.
+ *
+ * THE TENANT CHECK AT THE TOP IS LOAD-BEARING AND CANNOT BE FOLDED INTO THE
+ * WRITE. `WorkingHours` has no `tenantId` column — its only tenant scope is the
+ * `staffId` it hangs off — so unlike every other write in lib/db/**, there is no
+ * compound `where` that can state the boundary. A `deleteMany({ where: {
+ * staffId } })` with an id from another tenant would cheerfully wipe that shop's
+ * hours and close their bookings page. So the staff row is re-fetched scoped by
+ * `tenantId` first, exactly as createBooking re-verifies its foreign keys under
+ * rule 2a, and the whole thing refuses if it doesn't belong here.
+ *
+ * Replace rather than diff: the editor always posts the complete week, and a
+ * wholesale swap has no partial-application state to get wrong. Both statements
+ * run in one `$transaction`, so an interrupted save can't leave a barber with
+ * their old hours deleted and their new ones missing — which is to say, bookable
+ * nowhere and silently absent from the shop's opening hours.
+ *
+ * An empty `rows` array is valid and means "not working this week".
+ */
+export async function replaceWorkingHours(
+  tenantId: string,
+  staffId: string,
+  rows: WorkingHoursRow[],
+): Promise<StaffWriteResult> {
+  const staff = await prisma.staff.findFirst({
+    where: { id: staffId, tenantId },
+    select: { id: true },
+  });
+
+  if (!staff) return { ok: false, reason: "NOT_FOUND" };
+
+  await prisma.$transaction([
+    prisma.workingHours.deleteMany({ where: { staffId } }),
+    prisma.workingHours.createMany({
+      data: rows.map((row) => ({ staffId, ...row })),
+    }),
+  ]);
+
+  return { ok: true };
 }

@@ -16,7 +16,12 @@ import {
 } from "@/lib/dashboard/calendar-metrics";
 import { staffColor } from "@/lib/dashboard/staff-colors";
 import type { DashboardBooking } from "@/lib/db/bookings";
-import { formatSlotTime, formatTimeRange, initials } from "@/lib/format";
+import {
+  formatMinuteOfDay,
+  formatSlotTime,
+  formatTimeRange,
+  initials,
+} from "@/lib/format";
 
 /**
  * The chrome and text metrics each density tier is allowed, and the content it
@@ -90,6 +95,7 @@ export function CalendarGrid({
   timezone,
   staffColors,
   showBarber,
+  slotHref,
 }: {
   grid: CalendarGridModel;
   timezone: string;
@@ -104,6 +110,17 @@ export function CalendarGrid({
    * The accent colour renders either way — in the day view as reinforcement.
    */
   showBarber: boolean;
+  /**
+   * Builds the "new booking at this time" link for an empty patch of a column.
+   * Omitted renders no link layer at all.
+   *
+   * A builder rather than a base URL because only the caller knows what a column
+   * *is*: `key` is a staff id in the day view and an ISO date in the week view,
+   * and this component deliberately doesn't know which — see GridColumn. Passing
+   * a function is safe here because both sides are server components; nothing is
+   * serialized across a client boundary.
+   */
+  slotHref?: (columnKey: string, minute: number) => string;
 }) {
   if (grid.columns.length === 0) return <CalendarEmptyState />;
 
@@ -192,9 +209,11 @@ export function CalendarGrid({
             <ColumnBody
               key={column.key}
               column={column}
+              grid={grid}
               timezone={timezone}
               staffColors={staffColors}
               showBarber={showBarber}
+              slotHref={slotHref}
             />
           ))}
         </div>
@@ -234,42 +253,125 @@ function ColumnHeader({ column }: { column: GridColumn }) {
 }
 
 /**
- * One column's appointments. An `<ol>` because assignLanes hands them over in
+ * One column: its appointments, over a layer of "book at this time" links.
+ *
+ * The appointments are an `<ol>` because assignLanes hands them over in
  * start-time order, so the DOM order a screen reader walks is the chronological
  * one — the visual top-to-bottom order, not an accident of the query.
- *
  * `aria-labelledby` points at the header so "Marco" or "Tue 28" is announced
  * with the list rather than sitting in a separate cell that reads as unrelated.
+ *
+ * The two layers are stacked rather than interleaved, and the pointer-events
+ * pairing below is what makes that work: the list ignores the mouse so a click
+ * on empty space reaches the link underneath, and each block takes it back so
+ * its hover `title` — the only thing identifying a `sliver` — still appears.
  */
 function ColumnBody({
   column,
+  grid,
   timezone,
   staffColors,
   showBarber,
+  slotHref,
 }: {
   column: GridColumn;
+  grid: CalendarGridModel;
   timezone: string;
   staffColors: Record<string, string>;
   showBarber: boolean;
+  slotHref: ((columnKey: string, minute: number) => string) | undefined;
 }) {
   return (
-    <ol
-      aria-labelledby={headerId(column.key)}
+    <div
       className={[
         "relative border-r border-zinc-200 last:border-r-0",
         column.highlight ? "bg-zinc-50" : "",
       ].join(" ")}
     >
-      {column.bookings.map((placed) => (
-        <BookingBlock
-          key={placed.booking.id}
-          placed={placed}
-          timezone={timezone}
-          staffColors={staffColors}
-          showBarber={showBarber}
-        />
-      ))}
-    </ol>
+      {slotHref ? (
+        <SlotLinks column={column} grid={grid} slotHref={slotHref} />
+      ) : null}
+
+      <ol
+        aria-labelledby={headerId(column.key)}
+        className="pointer-events-none absolute inset-0"
+      >
+        {column.bookings.map((placed) => (
+          <BookingBlock
+            key={placed.booking.id}
+            placed={placed}
+            timezone={timezone}
+            staffColors={staffColors}
+            showBarber={showBarber}
+          />
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+/** How much time one click-to-book target covers. */
+const SLOT_TARGET_MINUTES = 30;
+
+/**
+ * An invisible ladder of links behind a column, one per half hour.
+ *
+ * Links on a fixed 30-minute ladder rather than a click handler reading the
+ * cursor's Y offset, for three reasons: it needs no client component, it is
+ * reachable by keyboard and announced by a screen reader, and it lands on a
+ * round time instead of 14:23. The owner can still type any time on the form it
+ * opens — this only has to get them close.
+ *
+ * 30 minutes rather than the 15-minute slot step: at 80px an hour a half hour is
+ * a 40px target, which is a comfortable tap, and 15 would halve that for a
+ * precision nobody needs from a shortcut.
+ *
+ * Deliberately drawn under the appointments and never over them, so this stays
+ * out of the way of the Day 13 question about interacting with short blocks —
+ * clicking a booking is still not a gesture this calendar has.
+ */
+function SlotLinks({
+  column,
+  grid,
+  slotHref,
+}: {
+  column: GridColumn;
+  grid: CalendarGridModel;
+  slotHref: (columnKey: string, minute: number) => string;
+}) {
+  const span = grid.endMinute - grid.startMinute;
+  if (span <= 0) return null;
+
+  const minutes: number[] = [];
+  for (
+    let minute = grid.startMinute;
+    minute + SLOT_TARGET_MINUTES <= grid.endMinute;
+    minute += SLOT_TARGET_MINUTES
+  ) {
+    minutes.push(minute);
+  }
+
+  return (
+    <>
+      {minutes.map((minute) => {
+        const label = formatMinuteOfDay(minute);
+
+        return (
+          <Link
+            key={minute}
+            href={slotHref(column.key, minute)}
+            // The column label is in the name because in the week view a column
+            // is a day, and "New booking at 09:30" seven times over says nothing.
+            aria-label={`New booking, ${column.label} at ${label}`}
+            style={{
+              top: `${((minute - grid.startMinute) / span) * 100}%`,
+              height: `${(SLOT_TARGET_MINUTES / span) * 100}%`,
+            }}
+            className="absolute inset-x-0 transition-colors hover:bg-zinc-100 focus-visible:bg-zinc-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-zinc-900"
+          />
+        );
+      })}
+    </>
   );
 }
 
@@ -344,7 +446,11 @@ function BookingBlock({
       // px-px on the li, borders on the box inside it: the gap between adjacent
       // lanes comes out of the block, so the lane arithmetic above stays in
       // clean percentages.
-      className="absolute px-px pb-px"
+      //
+      // pointer-events-auto takes back what the list gives up — see ColumnBody.
+      // Without it the hover `title` below never fires, which is the whole of a
+      // sliver's identity.
+      className="pointer-events-auto absolute px-px pb-px"
     >
       <div
         // Recovers on hover whatever the tier had no room to draw. Cheap, and

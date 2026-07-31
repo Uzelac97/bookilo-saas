@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import type { CSSProperties } from "react";
 
 import { CalendarGrid } from "@/components/dashboard/calendar-grid";
@@ -30,7 +31,11 @@ import {
 } from "@/lib/dashboard/calendar-range";
 import { getBookingsForRange } from "@/lib/db/bookings";
 import { getStaffForCalendar, getWorkingHoursForActiveStaff } from "@/lib/db/staff";
-import { formatBookingDate, formatDateRange } from "@/lib/format";
+import {
+  formatBookingDate,
+  formatDateRange,
+  formatMinuteOfDay,
+} from "@/lib/format";
 
 export const metadata: Metadata = {
   title: "Calendar",
@@ -148,6 +153,18 @@ export default async function CalendarPage({ searchParams }: PageProps) {
   const occupying = bookings.filter((booking) => booking.status !== "CANCELLED");
   const cancelledCount = bookings.length - occupying.length;
 
+  // Clicking empty space in the grid opens the manual booking form with the
+  // barber, day and time already chosen. The two views need different links
+  // because a column means different things in each — a staff id in the day
+  // view, an ISO date in the week view — and CalendarGrid deliberately doesn't
+  // know which, so it takes a builder rather than guessing from the key.
+  const slotHref =
+    view === "week"
+      ? (columnKey: string, minute: number) =>
+          `/dashboard/bookings/new?date=${columnKey}&time=${formatMinuteOfDay(minute)}`
+      : (columnKey: string, minute: number) =>
+          `/dashboard/bookings/new?date=${date}&staffId=${columnKey}&time=${formatMinuteOfDay(minute)}`;
+
   const grid =
     view === "week"
       ? buildWeekGrid({
@@ -204,24 +221,36 @@ export default async function CalendarPage({ searchParams }: PageProps) {
       }
       className="mx-auto flex w-full max-w-(--cal-w) flex-col gap-6 px-4 py-8 sm:px-6 2xl:max-w-(--cal-w-aside)"
     >
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-          Calendar
-        </h1>
-        {/* Counts what the grid draws and what the sidebar totals — one
-            definition of "appointment" across all three, or the page contradicts
-            itself in two places at once. Cancellations are still reported, as a
-            separate figure that says what it is rather than being folded into a
-            number that then disagrees with the sidebar's. */}
-        <p className="text-sm text-zinc-500">
-          {occupying.length === 0
-            ? "No appointments"
-            : occupying.length === 1
-              ? "1 appointment"
-              : `${occupying.length} appointments`}
-          {cancelledCount > 0 ? ` · ${cancelledCount} cancelled` : ""} ·{" "}
-          {tenant.timezone}
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
+            Calendar
+          </h1>
+          {/* Counts what the grid draws and what the sidebar totals — one
+              definition of "appointment" across all three, or the page
+              contradicts itself in two places at once. Cancellations are still
+              reported, as a separate figure that says what it is rather than
+              being folded into a number that then disagrees with the sidebar's. */}
+          <p className="text-sm text-zinc-500">
+            {occupying.length === 0
+              ? "No appointments"
+              : occupying.length === 1
+                ? "1 appointment"
+                : `${occupying.length} appointments`}
+            {cancelledCount > 0 ? ` · ${cancelledCount} cancelled` : ""} ·{" "}
+            {tenant.timezone}
+          </p>
+        </div>
+
+        {/* The guaranteed way in. Clicking empty grid space does the same thing
+            with more prefilled, but that is a shortcut to discover rather than
+            the only route — and it doesn't exist at all on the mobile agenda. */}
+        <Link
+          href={`/dashboard/bookings/new?date=${date}`}
+          className="rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+        >
+          New booking
+        </Link>
       </header>
 
       {/* Every date the nav can navigate to is resolved here, server-side, and
@@ -260,6 +289,7 @@ export default async function CalendarPage({ searchParams }: PageProps) {
                 timezone={tenant.timezone}
                 staffColors={staffColors}
                 showBarber
+                slotHref={slotHref}
               />
             </div>
             <div className="md:hidden">
@@ -291,6 +321,7 @@ export default async function CalendarPage({ searchParams }: PageProps) {
               timezone={tenant.timezone}
               staffColors={staffColors}
               showBarber={false}
+              slotHref={slotHref}
             />
 
             <aside

@@ -30,6 +30,21 @@ export function formatPrice(minorUnits: number): string {
   return priceFormatter.format(minorUnits / 100);
 }
 
+/**
+ * A price as the owner's edit field shows it: 2500 -> "25,00".
+ *
+ * The inverse of parsePriceToMinorUnits in lib/validation/service.ts, minus the
+ * currency symbol — an input with "€" sitting inside it is a character the
+ * parser then has to strip back out, and a value the owner has to type around.
+ *
+ * Comma rather than dot, to match formatPrice above: the same number must not
+ * change shape between the row that displays it and the field that edits it.
+ * The parser accepts both marks, so nothing breaks if this is ever repinned.
+ */
+export function formatPriceInput(minorUnits: number): string {
+  return (minorUnits / 100).toFixed(2).replace(".", ",");
+}
+
 /** 30 -> "30 min", 60 -> "1 h", 75 -> "1 h 15 min" */
 export function formatDuration(minutes: number): string {
   if (minutes < 60) return `${minutes} min`;

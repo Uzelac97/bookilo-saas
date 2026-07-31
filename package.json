@@ -14,7 +14,8 @@
     "reset-password": "tsx scripts/reset-password.ts",
     "probe:constraint": "tsx scripts/probe-exclusion-constraint.ts",
     "probe:rate-limit": "tsx scripts/probe-rate-limit.ts",
-    "probe:cancel": "tsx scripts/probe-cancel.ts"
+    "probe:cancel": "tsx scripts/probe-cancel.ts",
+    "probe:crud": "tsx scripts/probe-crud.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

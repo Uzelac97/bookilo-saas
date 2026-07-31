@@ -69,6 +69,18 @@ ask before building it — don't silently expand scope.
   typecheck` as its own step before trusting a script's output or a green suite,
   and especially before trusting a subagent that reports its tests passing — it may
   never have run `tsc` at all.
+- **Never read an exit code from a command you piped through `tail`, `head`, `grep`
+  or `wc`.** In bash and POSIX `sh`, `$?` reports the *last* command in a pipeline, so
+  `npm run probe:crud 2>&1 | tail -5; echo $?` prints `tail`'s status — always 0 — and
+  a failing script reads as a passing one. Verified in this repo: `(exit 3) | tail -1`
+  gives `$? = 0`, and without the pipe `3`. It has already produced one wrong claim
+  here, a deliberately broken probe reported as exiting 0 while it was really exiting 1.
+  When the exit code is the thing you care about, redirect instead of piping —
+  `cmd > out.txt 2>&1; echo $?`, then read the file — or use `${PIPESTATUS[0]}` in bash.
+  In PowerShell the hazard is narrower but the same shape: `$LASTEXITCODE` survives a
+  pipe into a cmdlet and stays the native command's code, while `$?` becomes the
+  cmdlet's and reads `True` over a failure. Read `$LASTEXITCODE` there, never `$?`.
+  This applies to the probe scripts especially — their whole contract is the exit code.
 - Zod for all input validation on server actions.
 - Luxon for all date/time math — no raw `Date` arithmetic across timezones.
 - An ESLint `no-restricted-imports` rule bans importing the Prisma client outside

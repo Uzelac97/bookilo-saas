@@ -243,10 +243,17 @@ both items are dashboard-side.
 
 - **Tap targets on short calendar blocks.** A block's height is its duration: at 80px an
   hour a 20-minute booking is 27px and a 15-minute one 20px, and anything under 13px
-  renders as a bar with no text at all. That is below a comfortable touch target, and Day
-  11 puts click-to-book on exactly these blocks. Needs either a hit area larger than the
-  visual block or a separate interaction for short appointments — decide it with a
-  finger on a phone, not from the numbers.
+  renders as a bar with no text at all. That is below a comfortable touch target, and it
+  needs either a hit area larger than the visual block or a separate interaction for short
+  appointments — decide it with a finger on a phone, not from the numbers.
+
+  **Less urgent than it looked when this was written.** The original wording said "Day 11
+  puts click-to-book on exactly these blocks", and Day 11 deliberately did not. Clicking a
+  *booking* is still not a gesture this calendar has; what shipped is a ladder of links on
+  the empty space behind the blocks, on a fixed 30-minute grid (40px targets), which is
+  what opens the manual booking form prefilled. So nothing today depends on hitting a
+  20px block. This becomes live again the moment a block gains an interaction of its own —
+  which is exactly what the deferred status actions below would do.
 - **Weekday names follow the runtime's locale, prices don't.** `formatStripDay` in
   `lib/format.ts` renders "Mon"/"Tue" and the day-of-month through Luxon with no locale
   argument, so they come out in whatever the runtime's default is. Money in the same file
@@ -263,6 +270,53 @@ both items are dashboard-side.
   page repeats its own `max-w-5xl` wrapper, so the fix is either widening the header (which
   affects all five pages) or accepting the inset as deliberate. Not a call the calendar
   should make on its own, which is why it waited.
+
+### Deferred out of Day 11
+
+Decided while building manual booking entry and the two CRUD screens, recorded here so
+each reads as a decision rather than an oversight. None is a bug; all five are choices
+that wanted a real customer or a schema change behind them.
+
+- **Editing a service's price rewrites reported history.** Nothing snapshots the price on
+  a `Booking` — `summariseDay` reads `priceMinorUnits` live off the `Service` row, so
+  changing a price moves yesterday's and last month's revenue figures with it. Flagged
+  since Day 9; Day 11 is what makes it reachable, because before this the only way to
+  change a price was the seed script. A price snapshot is a schema change (rule 3) and
+  belongs with payments, where the same column has to exist anyway. The services form says
+  so out loud in the meantime, which is the honest interim answer.
+
+  Note the neighbouring case is *not* a bug and must not be "fixed" alongside it: editing a
+  service's **duration** leaves existing bookings at the length they were booked for,
+  because `endAt` and `blockedUntil` are snapshotted at creation. The customer was told 30
+  minutes. Recomputing those would silently reshuffle a day the owner has already planned.
+
+- **A walk-in with no phone number can't be recorded.** `Customer.phone` is non-null and is
+  the tenant's identity key (`@@unique([tenantId, phone])`), so manual entry requires a
+  number exactly as the public form does. That keeps `findOrCreateCustomer` matching a
+  walk-in to the same person's online bookings, at the cost of the owner having to ask.
+  Two ways out when a real shop says this blocks them: make `phone` nullable and replace
+  the unique constraint with a partial unique index over non-null phones, or give each
+  anonymous walk-in its own customer row. The first is right and is a migration; the second
+  is cheap and pollutes the column the shop reads to phone someone. Either way it's rule 3.
+
+- **No status actions from the dashboard.** Marking a booking completed, no-show, or
+  cancelling it on the customer's behalf is not in Day 11's line in the table above, and it
+  wants a booking-detail surface that shouldn't be designed on a guess. Worth noting the
+  data model is already ready for it — `cancelBookingByToken` anticipates the owner
+  marking things complete, and `OCCUPYING_STATUSES` already handles COMPLETED correctly.
+  Revisit after watching a real owner work a day, since the end-of-day workflow is the part
+  no amount of reasoning here will get right.
+
+- **Buffer, lead time and cancellation window are still seed-time values.** Day 12's
+  settings screen, unchanged. Manual booking entry deliberately ignores `minLeadMinutes`
+  (an owner recording a walk-in is not the person that rule protects the shop from), so
+  changing it on Day 12 must not be expected to affect the dashboard's own booking form.
+
+- **Per-tenant weekday and month names still follow the runtime's locale.** Untouched by
+  Day 11 and still on the Day 13 list above. The hours editor sidesteps it by using the
+  fixed English `WEEKDAY_LABELS` that the public opening-hours table already uses, so the
+  two can't disagree — but that is one more surface pinned to English by hand rather than
+  the decision being made once.
 
 ### Deliberately not built: the day view's mobile fallback
 
