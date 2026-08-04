@@ -1,6 +1,6 @@
 /**
- * Proves the Day 11 write helpers keep the tenant boundary, and that "remove"
- * never means delete.
+ * Proves the Day 11 and 12a write helpers keep the tenant boundary, and that
+ * "remove" means `active = false` everywhere it has to.
  *
  *   npm run probe:crud
  *
@@ -9,12 +9,17 @@
  * `deleteMany` — and no unit test can reach them. What's tested here is
  * precisely what a test double would paper over.
  *
- * PHASE C IS THE ONE THAT MATTERS. `WorkingHours` has no `tenantId` column; its
- * only tenant scope is the `staffId` it hangs off. So `replaceWorkingHours`
- * cannot state the boundary in its `where` clause the way every other write in
- * lib/db/** does, and has to re-fetch the staff row scoped by tenant instead. If
- * that check is ever dropped, one shop will be able to wipe another's opening
- * hours — and nothing else in this repo would notice.
+ * PHASES C AND E ARE THE ONES THAT MATTER. Neither `WorkingHours` nor `TimeOff`
+ * has a `tenantId` column; the only tenant scope either has is the `staffId` it
+ * hangs off. So `replaceWorkingHours` and `createTimeOff` cannot state the
+ * boundary in a `where` clause the way every other write in lib/db/** does, and
+ * both re-fetch the staff row scoped by tenant instead. If either check is ever
+ * dropped, one shop will be able to wipe another's opening hours or close
+ * another's diary — and nothing else in this repo would notice.
+ *
+ * `deleteTimeOff` is the one exception in that pair: a delete takes a filter, so
+ * it scopes through the relation (`staff: { tenantId }`) in the query itself.
+ * Phase E asserts that too, since a filter is as easy to drop as a re-fetch.
  *
  * It writes real rows. Every one belongs to one of two dedicated throwaway
  * tenants that are deleted before and after the run. No bookings are created, so
@@ -30,6 +35,8 @@ import {
 } from "../src/lib/db/services";
 import {
   createStaff,
+  createTimeOff,
+  deleteTimeOff,
   getActiveStaff,
   getStaffForManagement,
   getWorkingHoursForActiveStaff,
@@ -51,6 +58,17 @@ const SPLIT_SHIFT = [
 ];
 
 /**
+ * A future absence, as instants. Phase E only cares about the tenant boundary,
+ * so these are plain instants rather than anything toTimeOffRange produced — the
+ * wall-clock conversion is unit-tested in lib/validation/time-off.test.ts, where
+ * it can be checked against DST without a database.
+ */
+const HOLIDAY = {
+  startAt: new Date(Date.UTC(2030, 5, 17, 0, 0, 0, 0)),
+  endAt: new Date(Date.UTC(2030, 5, 20, 0, 0, 0, 0)),
+};
+
+/**
  * How many check() calls a complete run makes.
  *
  * Asserted at the end, because "no failures" is also what a run prints when it
@@ -65,7 +83,7 @@ const SPLIT_SHIFT = [
  *
  * Excludes the count check itself, which is reported separately below.
  */
-const EXPECTED_CHECKS = 18;
+const EXPECTED_CHECKS = 25;
 
 let checksRun = 0;
 let failures = 0;
@@ -322,6 +340,92 @@ async function main() {
         !crossDeactivate.ok &&
         (await getActiveStaff(OURS)).length === 1,
       `cross-tenant staff writes refused, barber still active`,
+    );
+
+    console.log("\nPhase E — time off, the second write with no tenantId column");
+
+    // Same hazard as phase C and the same reason it needs a probe: TimeOff has
+    // no tenantId either, so its only scope is the staffId it hangs off. A
+    // create that trusted a foreign staffId would close another shop's diary;
+    // a delete filtered on id alone would reopen one.
+    const crossCreate = await createTimeOff(THEIRS, barber.id, {
+      startAt: HOLIDAY.startAt,
+      endAt: HOLIDAY.endAt,
+    });
+    check(
+      "E1",
+      !crossCreate.ok && crossCreate.reason === "NOT_FOUND",
+      `createTimeOff across tenants -> ${JSON.stringify(crossCreate)}`,
+    );
+    check(
+      "E2",
+      (await getStaffForManagement(OURS, NOW))[0].timeOff.length === 0,
+      "no time off was written by the refused cross-tenant create",
+    );
+
+    await createTimeOff(OURS, barber.id, {
+      startAt: HOLIDAY.startAt,
+      endAt: HOLIDAY.endAt,
+      reason: "Probe holiday",
+    });
+    const away = (await getStaffForManagement(OURS, NOW))[0].timeOff;
+    check(
+      "E3",
+      away.length === 1 &&
+        away[0].startAt.getTime() === HOLIDAY.startAt.getTime() &&
+        away[0].reason === "Probe holiday",
+      `time off round-trips: ${away[0]?.startAt.toISOString()} -> ${away[0]?.endAt.toISOString()}`,
+    );
+
+    const crossDelete = await deleteTimeOff(THEIRS, away[0].id);
+    check(
+      "E4",
+      !crossDelete.ok &&
+        (await getStaffForManagement(OURS, NOW))[0].timeOff.length === 1,
+      `cross-tenant delete refused, time off intact -> ${JSON.stringify(crossDelete)}`,
+    );
+
+    const ownDelete = await deleteTimeOff(OURS, away[0].id);
+    check(
+      "E5",
+      ownDelete.ok &&
+        (await getStaffForManagement(OURS, NOW))[0].timeOff.length === 0,
+      // A real delete, unlike staff and services: nothing references a TimeOff
+      // row, so removing one reopens the time and strands nothing.
+      "the owning tenant's delete removes the row for real",
+    );
+
+    // Past entries are filtered out of the owner's list on purpose — they affect
+    // nothing and would otherwise accumulate. Asserted so the filter isn't
+    // mistaken for a delete that didn't happen.
+    await createTimeOff(OURS, barber.id, {
+      startAt: new Date(NOW.getTime() - 3 * 24 * 60 * 60_000),
+      endAt: new Date(NOW.getTime() - 2 * 24 * 60 * 60_000),
+    });
+    const listed = (await getStaffForManagement(OURS, NOW))[0].timeOff;
+    const stored = await prisma.timeOff.count({ where: { staffId: barber.id } });
+    check(
+      "E6",
+      listed.length === 0 && stored === 1,
+      `past time off hidden from the list (${listed.length}) but still stored (${stored})`,
+    );
+
+    // THE CASE THE endAt FILTER EXISTS FOR, and the one E6 alone cannot prove.
+    // An absence that started before now but hasn't finished must stay listed —
+    // it's the one the owner is most likely to be looking for. A filter written
+    // as `startAt > now` would pass every other check in this phase and hide
+    // exactly this row, silently.
+    await createTimeOff(OURS, barber.id, {
+      startAt: new Date(NOW.getTime() - 24 * 60 * 60_000),
+      endAt: new Date(NOW.getTime() + 24 * 60 * 60_000),
+    });
+    const inProgress = (await getStaffForManagement(OURS, NOW))[0].timeOff;
+    check(
+      "E7",
+      inProgress.length === 1 &&
+        inProgress[0].startAt < NOW &&
+        inProgress[0].endAt > NOW,
+      `in-progress time off stays listed: ${inProgress.length} shown, ${inProgress[0]?.startAt.toISOString()} -> ${inProgress[0]?.endAt.toISOString()} spanning now=${NOW.toISOString()}`,
     );
   } finally {
     await teardown();

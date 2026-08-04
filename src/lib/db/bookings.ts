@@ -188,6 +188,39 @@ export async function getBookingRateForPhone(
 }
 
 /**
+ * How many confirmed appointments a barber has inside an instant range.
+ *
+ * Exists for one sentence on the staff screen: marking time off does not touch
+ * bookings already made, so the owner has to be told how many customers they now
+ * need to call. Without the number, the only sign is someone turning up.
+ *
+ * Overlap is tested against `endAt`, not `blockedUntil`. This counts people, and
+ * the buffer after an appointment is not a person — an appointment whose buffer
+ * alone reaches into a holiday is not a customer anyone has to phone.
+ *
+ * CONFIRMED only, for the same reason as getStaffForManagement's count: a
+ * cancelled booking holds nothing, and a COMPLETED one is already over.
+ */
+export async function countConfirmedBookingsInRange(
+  tenantId: string,
+  staffId: string,
+  from: Date,
+  to: Date,
+): Promise<number> {
+  return prisma.booking.count({
+    where: {
+      tenantId,
+      staffId,
+      status: "CONFIRMED",
+      // Half-open overlap, matching every other range comparison here: an
+      // appointment ending exactly when the absence starts doesn't overlap it.
+      startAt: { lt: to },
+      endAt: { gt: from },
+    },
+  });
+}
+
+/**
  * A booking as everything outside the dashboard sees it: the two token-addressed
  * pages, and the two booking emails.
  *

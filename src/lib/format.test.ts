@@ -1,8 +1,14 @@
+import { DateTime } from "luxon";
 import { describe, expect, it } from "vitest";
 
 import { MAX_DURATION_MINUTES } from "./validation/service";
 
-import { formatCancellationDeadline, formatDuration, initials } from "./format";
+import {
+  formatCancellationDeadline,
+  formatDuration,
+  formatTimeOffRange,
+  initials,
+} from "./format";
 
 describe("formatDuration", () => {
   it("keeps the shapes every existing caller depends on", () => {
@@ -54,6 +60,52 @@ describe("formatDuration", () => {
     for (let minutes = 1; minutes <= MAX_DURATION_MINUTES; minutes += 1) {
       expect(formatDuration(minutes)).not.toContain("day");
     }
+  });
+});
+
+describe("formatTimeOffRange", () => {
+  const TZ = "Europe/Berlin";
+  /** The instants toTimeOffRange would have produced for a whole local day. */
+  const day = (date: string) =>
+    DateTime.fromISO(date, { zone: TZ }).toJSDate();
+
+  it("renders a single whole day as one date", () => {
+    expect(
+      formatTimeOffRange(day("2026-08-10"), day("2026-08-11"), TZ),
+    ).toBe("10 Aug");
+  });
+
+  it("renders a multi-day range up to its last covered day", () => {
+    // The stored end is exclusive — the start of the day after the last one
+    // away — so a range ending at the 13th reads as "to the 12th".
+    expect(
+      formatTimeOffRange(day("2026-08-10"), day("2026-08-13"), TZ),
+    ).toBe("10 – 12 Aug");
+  });
+
+  it("keeps the last day right across a DST boundary", () => {
+    // 29 March is 23 hours long in Berlin. Subtracting a fixed 24 hours from the
+    // exclusive end would land inside the 29th and report the range a day short.
+    expect(
+      formatTimeOffRange(day("2026-03-28"), day("2026-03-30"), TZ),
+    ).toBe("28 – 29 Mar");
+  });
+
+  it("renders a partial day with its times", () => {
+    const start = DateTime.fromISO("2026-08-10T14:00", { zone: TZ }).toJSDate();
+    const end = DateTime.fromISO("2026-08-10T16:30", { zone: TZ }).toJSDate();
+
+    expect(formatTimeOffRange(start, end, TZ)).toBe("10 Aug, 14:00–16:30");
+  });
+
+  it("decides whole-day-ness in the shop's zone, not the runtime's", () => {
+    // The same instants are midnight in Berlin and 23:00 the day before in
+    // London — one is a whole-day absence and the other isn't.
+    const start = day("2026-08-10");
+    const end = day("2026-08-11");
+
+    expect(formatTimeOffRange(start, end, TZ)).toBe("10 Aug");
+    expect(formatTimeOffRange(start, end, "Europe/London")).toContain("23:00");
   });
 });
 

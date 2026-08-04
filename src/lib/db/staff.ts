@@ -1,9 +1,18 @@
 import type { WorkingHoursRow } from "@/lib/availability/slots";
 import type { StaffInput } from "@/lib/validation/staff";
+import type { TimeOffRange } from "@/lib/validation/time-off";
 
 import { prisma } from "./prisma";
 
 export type { WorkingHoursRow };
+
+/** One absence, as the owner's staff screen lists it. */
+export type TimeOffRow = {
+  id: string;
+  startAt: Date;
+  endAt: Date;
+  reason: string | null;
+};
 
 /**
  * What a write scoped by tenant reports back. Same shape and same reasoning as
@@ -122,6 +131,16 @@ export type ManagedStaff = {
   /** This barber's own hours, ordered for display. */
   workingHours: WorkingHoursRow[];
   /**
+   * Absences that haven't finished yet, soonest first.
+   *
+   * Past entries are deliberately excluded rather than listed and greyed out.
+   * They affect nothing — computeSlots only ever asks about a day it's
+   * computing — and a screen that accumulates last year's holidays makes the one
+   * being set this year harder to find. Nothing else in the app reads them, so
+   * hiding them costs the owner nothing they can act on.
+   */
+  timeOff: TimeOffRow[];
+  /**
    * CONFIRMED appointments still in the future.
    *
    * Exists so the deactivate confirmation can say "Marco has 4 upcoming
@@ -164,6 +183,14 @@ export async function getStaffForManagement(
         orderBy: [{ dayOfWeek: "asc" }, { startMinute: "asc" }],
         select: { dayOfWeek: true, startMinute: true, endMinute: true },
       },
+      timeOff: {
+        // Still running or still to come. `endAt > now` rather than
+        // `startAt > now`, so an absence the barber is in the middle of stays on
+        // screen — that's the one the owner is most likely to be looking for.
+        where: { endAt: { gt: now } },
+        orderBy: { startAt: "asc" },
+        select: { id: true, startAt: true, endAt: true, reason: true },
+      },
       _count: {
         select: {
           bookings: {
@@ -184,6 +211,7 @@ export async function getStaffForManagement(
     photoUrl: row.photoUrl,
     active: row.active,
     workingHours: row.workingHours,
+    timeOff: row.timeOff,
     upcomingBookings: row._count.bookings,
   }));
 }
@@ -316,4 +344,76 @@ export async function replaceWorkingHours(
   ]);
 
   return { ok: true };
+}
+
+/**
+ * Marks a barber away for a range of instants.
+ *
+ * SAME HAZARD AS replaceWorkingHours ABOVE, AND THE SAME ANSWER. `TimeOff` has
+ * no `tenantId` column either — its only tenant scope is the `staffId` it hangs
+ * off — so a create given a `staffId` from another shop would cheerfully close
+ * that shop's barber's diary, and nothing in this codebase would notice. There
+ * is no compound `where` available on a create to state the boundary in, so the
+ * staff row is re-fetched scoped by `tenantId` first and the write refuses if it
+ * doesn't belong here. That's rule 2a applied to a table that can't speak for
+ * itself.
+ *
+ * `startAt`/`endAt` are UTC instants already converted from the shop's wall
+ * clock by toTimeOffRange (lib/validation/time-off.ts). Nothing here does date
+ * math — this function stores what it's given.
+ *
+ * Deliberately does not touch existing bookings. TimeOff filters *candidate*
+ * slots in computeSlots; appointments already made stay made. Cancelling
+ * someone's haircut as a side effect of an owner marking a holiday is not a
+ * decision a form gets to take — the action reports the overlap count instead.
+ */
+export async function createTimeOff(
+  tenantId: string,
+  staffId: string,
+  range: TimeOffRange,
+): Promise<StaffWriteResult> {
+  const staff = await prisma.staff.findFirst({
+    where: { id: staffId, tenantId },
+    select: { id: true },
+  });
+
+  if (!staff) return { ok: false, reason: "NOT_FOUND" };
+
+  await prisma.timeOff.create({
+    data: {
+      staffId,
+      startAt: range.startAt,
+      endAt: range.endAt,
+      reason: range.reason ?? null,
+    },
+  });
+
+  return { ok: true };
+}
+
+/**
+ * Removes an absence, restoring the barber's availability over that range.
+ *
+ * A REAL DELETE, and the one place in lib/db/** where that's correct. The
+ * no-hard-delete rule in CLAUDE.md names `Staff` and `Service`, and it exists
+ * because `Booking` holds `onDelete: Restrict` foreign keys to both — deleting
+ * either would either fail or take the shop's history with it. Nothing
+ * references a `TimeOff` row. Removing one strands nothing and simply reopens
+ * the time, which is exactly what the owner means by it.
+ *
+ * The tenant boundary travels through the relation — `staff: { tenantId }` — so
+ * it sits in the same `where` clause as the id and a row belonging to another
+ * shop matches nothing. Unlike the create above, no separate re-fetch is needed:
+ * a delete takes a filter, so the boundary is expressible in the query itself,
+ * the same way getWorkingHoursForActiveStaff scopes through `staff`.
+ */
+export async function deleteTimeOff(
+  tenantId: string,
+  timeOffId: string,
+): Promise<StaffWriteResult> {
+  const { count } = await prisma.timeOff.deleteMany({
+    where: { id: timeOffId, staff: { tenantId } },
+  });
+
+  return count === 0 ? { ok: false, reason: "NOT_FOUND" } : { ok: true };
 }

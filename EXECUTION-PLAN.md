@@ -17,7 +17,7 @@ This is the **final** scope. Where I cut something from the earlier strategy dra
 | Booking engine  | Concurrency-safe slot booking (Postgres exclusion constraint), buffer time, minimum lead time, cancellation window                                                                                                                                    |
 | Cancellation    | Token-based cancel link, no customer account                                                                                                                                                                                                          |
 | Owner auth      | Email + password login (Auth.js v5, Credentials, JWT sessions) — one owner account per tenant                                                                                                                                                         |
-| Owner dashboard | Day/week calendar, manual booking entry (walk-ins), services CRUD, staff CRUD (including each staff member's working hours), settings (buffer, lead time, cancellation window)                                                                        |
+| Owner dashboard | Day/week calendar, manual booking entry (walk-ins), services CRUD, staff CRUD (including each staff member's working hours and their time off), settings (buffer, lead time, cancellation window)                                                     |
 | Notifications   | Email only (Resend): booking confirmation to customer, new-booking alert to owner                                                                                                                                                                     |
 | Tenancy         | Single business per tenant, generalist staff (any active barber can take any active service). Opening hours are per-staff (`WorkingHours`) — there is no separate business-level hours field; "closed Sunday" simply means no staff has Sunday hours. |
 
@@ -223,6 +223,7 @@ de-risks the project; a slightly later demo does not.
 | 10  | Calendar view (day/week, staff columns) (~2 sessions)                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | 11  | Manual booking entry (walk-ins), services + staff CRUD — staff "removal" is `active = false`, never a real delete (~2 sessions)                                                                                                                                                                                                                                                                                                                                                                 |
 | 12  | Settings screen wired to `Tenant` fields (buffer, lead time, cancellation window) — opening hours are edited per staff member on the Staff screen, not here                                                                                                                                                                                                                                                                                                                                     |
+| 12a | ~~Staff time off — the owner marks a barber away for a date range or part of a day, writing `TimeOff` rows. Inserted before Day 13 on purpose; see below~~ **Closed on Day 12a**                                                                                                                                                                                                                                                                                                                 |
 | 13  | Seed a polished demo tenant (real-looking branding, services, prices), mobile/design polish pass on the public flow                                                                                                                                                                                                                                                                                                                                                                             |
 | 14  | Full dry run as both "owner" and "customer," fix rough edges, deploy, prepare the live in-person demo script, book your first 3–5 demo meetings                                                                                                                                                                                                                                                                                                                                                 |
 
@@ -230,6 +231,54 @@ By day 7 you have a working booking loop. By day 14 — realistically closer to 
 once the two-session items above are accounted for — you have something you can put in
 front of a real barbershop owner and let them book on their own phone in front of you.
 That's the milestone that matters, not "feature complete."
+
+### Day 12a — staff time off, inserted before the polish pass (closed)
+
+**Why it's inserted at all.** `TimeOff` has been in the schema since Day 1 and honoured by
+`computeSlots` since Day 4 — the read path is complete and tested: `getStaffAvailability`
+fetches the rows overlapping a day, `computeSlots` drops any candidate slot that overlaps
+one, and manual booking entry already warns `DURING_TIME_OFF`. What was never scheduled is
+the *write* path. No day in the table above ever built a way for an owner to create a
+`TimeOff` row, so the feature exists everywhere except where someone could use it. That's
+an omission in the plan rather than a new idea, but it's still scope the table didn't
+carry, which is why it's recorded here rather than quietly absorbed into Day 13.
+
+**Why before Day 13 rather than after.** Day 13 is the design and mobile pass. A new form
+built after it would arrive unstyled into a screen that had just been polished, and would
+need its own second touch-up — the same work done twice, and the second pass done in
+isolation is exactly how a screen ends up looking assembled from two eras. Building it
+first means one pass covers both. The cost of the ordering is that Day 13 slips by however
+long this takes; the cost of the other ordering is a visible seam on the staff screen,
+which is a screen a prospect is shown.
+
+**Why it stays small.** Only the write path and its display are missing, so nothing about
+availability, the public flow or the booking rules changes. The whole feature is a
+validation schema, two `lib/db` helpers, one action and one form on the staff detail
+screen, next to the working-hours editor that already lives there.
+
+**Overlapping bookings are advisory, never blocking.** Time off filters *candidate* slots in
+`computeSlots`; it has no effect on appointments already made. So a range saved over four
+confirmed cuts always succeeds, leaves all four untouched — no auto-cancel, and no email to
+the customer — and reports the count back to the owner, who is told to call them. That is
+deliberately the same posture as Day 11's manual booking entry, which warns on a conflict
+rather than refusing: the owner is the one who knows whether a customer can be moved. It is
+also the only posture currently available, because there is still no way to cancel a booking
+from the dashboard (deferred out of Day 11) — refusing the save would strand the owner with
+no route forward.
+
+**Finished time off is hidden, not deleted.** The owner's list filters on `endAt > now`, so
+an entry drops off once it has *finished* — not once it has started. An absence the barber is
+in the middle of stays on screen, which is the one they're most likely to be looking for. The
+rows themselves are never removed: `probe:crud` E6 asserts both halves, that a finished entry
+is absent from the list and still present in the table, and E7 asserts the in-progress case
+the `endAt` choice exists for. Nothing else in the app reads them, so hiding them costs the
+owner nothing they can act on.
+
+**Numbered 12a rather than renumbering.** Days 13 and 14 are cross-referenced by name
+throughout this file — the carried-over sizing questions, the locale decision, the Day 11
+and Day 12 deferrals all point at "Day 13". Shifting those numbers to make room would
+invalidate every one of those references for no gain, and "Day" is already defined above as
+a milestone rather than a calendar day.
 
 ### Carried into Day 13
 

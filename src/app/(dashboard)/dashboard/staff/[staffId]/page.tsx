@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { StaffForm } from "@/components/dashboard/staff-form";
+import { TimeOffEditor } from "@/components/dashboard/time-off-editor";
 import { WorkingHoursEditor } from "@/components/dashboard/working-hours-editor";
 import { getCurrentTenant } from "@/lib/auth/session";
 import { getStaffMember } from "@/lib/db/staff";
@@ -91,6 +92,33 @@ export default async function StaffMemberPage({ params }: PageProps) {
         <WorkingHoursEditor
           staffId={member.id}
           workingHours={member.workingHours}
+        />
+      </section>
+
+      <section className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-sm font-semibold tracking-tight text-zinc-900">
+            Time off
+          </h2>
+          <p className="text-sm text-zinc-500">
+            Holidays, appointments, a morning off — customers can&rsquo;t book{" "}
+            {member.name} during these. Working hours above are the normal week;
+            this is what interrupts it.
+          </p>
+          {/* Both stated here rather than discovered. The first is the same
+              shape as the buffer note on the settings screen — a change that
+              deliberately doesn't reach backwards — and the second is a gap an
+              owner would otherwise read as the save having failed. */}
+          <p className="text-sm text-zinc-500">
+            Appointments already booked inside a time off stay booked, and time
+            off doesn&rsquo;t show on the calendar yet.
+          </p>
+        </div>
+        <TimeOffEditor
+          staffId={member.id}
+          staffName={member.name}
+          timeOff={member.timeOff}
+          timezone={tenant.timezone}
         />
       </section>
     </div>

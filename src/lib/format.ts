@@ -187,6 +187,47 @@ export function formatDateRange(
 }
 
 /**
+ * An absence as the staff screen lists it: "10 – 12 Aug", "29 Mar", or
+ * "10 Aug, 14:00–16:30".
+ *
+ * The stored row is two instants with nothing marking which of the two shapes
+ * the owner picked, so this recovers it: a range that begins and ends exactly on
+ * a local midnight is a whole-day one. That test has to be done in the shop's
+ * zone — the same instants are mid-afternoon somewhere else — which is why
+ * `timezone` is required here as it is on every other function below.
+ *
+ * The end instant is exclusive (start of the day after the last one away), so
+ * the last covered day is a day earlier. Subtracting a day rather than a fixed
+ * 24 hours keeps that right across DST, where a local day is 23 or 25 hours.
+ */
+export function formatTimeOffRange(
+  startAt: Date,
+  endAt: Date,
+  timezone: string,
+): string {
+  const start = DateTime.fromJSDate(startAt).setZone(timezone);
+  const end = DateTime.fromJSDate(endAt).setZone(timezone);
+
+  const wholeDays =
+    start.toMillis() === start.startOf("day").toMillis() &&
+    end.toMillis() === end.startOf("day").toMillis();
+
+  if (!wholeDays) {
+    return `${start.toFormat("d LLL")}, ${start.toFormat("HH:mm")}–${end.toFormat("HH:mm")}`;
+  }
+
+  const lastDay = end.minus({ days: 1 });
+
+  return start.hasSame(lastDay, "day")
+    ? start.toFormat("d LLL")
+    : formatDateRange(
+        start.toISODate() as string,
+        lastDay.toISODate() as string,
+        timezone,
+      );
+}
+
+/**
  * A person's initials: "Marco Rossi" -> "MR", "Marco" -> "M".
  *
  * First and last, not first-two, so "Jean Luc Picard" reads JP rather than JL.
