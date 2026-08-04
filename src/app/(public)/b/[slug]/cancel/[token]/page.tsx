@@ -111,10 +111,16 @@ export default async function CancelPage({ params }: PageProps) {
           </form>
         ) : (
           <Notice>
+            {/* Both gaps around the duration are explicit {" "} rather than a
+                plain space in the text. The literal space that used to sit after
+                the closing brace was being dropped at build time — it rendered
+                as "closes 2 hbefore an appointment" — because this text node is
+                sandwiched between two expressions and wraps across lines. An
+                explicit space is a real child and can't be trimmed. */}
             Online cancellation closes{" "}
-            {formatDuration(tenant.cancellationWindowMinutes)} before an
-            appointment, so this one is too close now. If you can&rsquo;t make
-            it, {reachTheShop} — they&rsquo;d rather know.
+            {formatDuration(tenant.cancellationWindowMinutes)}{" "}
+            before an appointment, so this one is too close now. If you
+            can&rsquo;t make it, {reachTheShop} — they&rsquo;d rather know.
           </Notice>
         )}
 

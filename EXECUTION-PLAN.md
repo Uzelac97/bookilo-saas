@@ -307,16 +307,37 @@ that wanted a real customer or a schema change behind them.
   Revisit after watching a real owner work a day, since the end-of-day workflow is the part
   no amount of reasoning here will get right.
 
-- **Buffer, lead time and cancellation window are still seed-time values.** Day 12's
-  settings screen, unchanged. Manual booking entry deliberately ignores `minLeadMinutes`
-  (an owner recording a walk-in is not the person that rule protects the shop from), so
-  changing it on Day 12 must not be expected to affect the dashboard's own booking form.
+- **Buffer, lead time and cancellation window are still seed-time values.** ~~Day 12's
+  settings screen, unchanged.~~ **Closed on Day 12** — all three are editable at
+  `/dashboard/settings`. The half of this note that still stands: manual booking entry
+  deliberately ignores `minLeadMinutes` (an owner recording a walk-in is not the person
+  that rule protects the shop from), so changing it does *not* affect the dashboard's own
+  booking form. The field's hint on the settings screen says so.
 
 - **Per-tenant weekday and month names still follow the runtime's locale.** Untouched by
   Day 11 and still on the Day 13 list above. The hours editor sidesteps it by using the
   fixed English `WEEKDAY_LABELS` that the public opening-hours table already uses, so the
   two can't disagree — but that is one more surface pinned to English by hand rather than
   the decision being made once.
+
+### Deferred out of Day 12
+
+- **The cancellation window applies retroactively, and that is the shipped behaviour.**
+  Nothing snapshots it onto a `Booking`: `getBookingByCancelToken` reads
+  `cancellationWindowMinutes` live off the tenant row, while the confirmation email quoted
+  the customer the value that was set the day they booked. So raising 2 h → 24 h can refuse
+  a cancellation someone was explicitly told they could make. This is the same shape as the
+  price-history case above, and it gets the same answer: snapshotting the window is a schema
+  change (rule 3), it belongs with the price snapshot rather than in front of it, and the
+  interim answer is to say so out loud — the settings form warns before the owner saves.
+  Lowering the window is always safe; only raising it can strand someone.
+
+- **Nothing else on `Tenant` is editable.** Name, slug, address, phone, contact email and
+  timezone are shown read-only on the settings screen and are still seed-time values. Slug
+  and timezone are the two that aren't merely unbuilt: changing a slug breaks every booking
+  link already in circulation, and changing a timezone redraws every existing booking's
+  displayed time without moving the stored instant. Both want a deliberate decision about
+  what happens to what's already out there, not a text input.
 
 ### Deliberately not built: the day view's mobile fallback
 
