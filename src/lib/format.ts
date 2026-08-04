@@ -3,9 +3,10 @@
  *
  * Pure and side-effect free — safe to call from server and client components.
  *
- * Most of this file is timezone-free by nature (money, durations, wall-clock
- * offsets). The two functions at the bottom are not: they render real instants,
- * and they take the tenant's zone explicitly for the reason spelled out there.
+ * Part of this file is timezone-free by nature (money, durations, wall-clock
+ * offsets). The rest renders real days and instants, takes the tenant's zone
+ * explicitly for the reason spelled out at each one, and renders in a pinned
+ * locale — see DATE_LOCALE below for why neither is left to the runtime.
  */
 import { DateTime } from "luxon";
 
@@ -18,6 +19,54 @@ import { DateTime } from "luxon";
  */
 const PRICE_LOCALE = "de-DE";
 const PRICE_CURRENCY = "EUR";
+
+/**
+ * The locale every date and time in this file is rendered in.
+ *
+ * PINNED, AND THAT IS THE WHOLE POINT. Until Day 13 the Luxon calls below passed
+ * no locale at all, so weekday and month names came out in whatever the runtime
+ * happened to default to, while money three lines above was pinned to de-DE. The
+ * inconsistency was the thing worth settling — not whether English abbreviations
+ * are acceptable.
+ *
+ * It is settled by pinning both, not by unpinning either. A confirmation email
+ * renders on a server and quotes a date to a customer as a promise; that string
+ * must not depend on which region a function booted in, on an LC_ALL somewhere,
+ * or on a future self-hosted box. Vercel's Node runtime has historically
+ * defaulted to en-US, which is why this was latent rather than visible — latent
+ * is not the same as decided.
+ *
+ * THE TWO VALUES DIFFER ON PURPOSE, and they answer different questions. Money
+ * is German because the money is German — these are euro prices at
+ * German-speaking shops. Prose is English because every word this product says
+ * is English, starting with WEEKDAY_LABELS in lib/availability/opening-hours.ts,
+ * which is a hand-written English list rendered by the public hours table, the
+ * staff list and the hours editor. German month names beside an English
+ * "Monday" column would be a worse inconsistency than the one this replaces.
+ *
+ * en-GB rather than en-US: the format tokens below are day-first ("d LLL"), and
+ * that is the convention en-GB names. The two produce identical output for every
+ * token used here — the ordering lives in the token strings, not the locale —
+ * so this is a statement of intent that costs nothing today and is right the day
+ * a token changes.
+ */
+const DATE_LOCALE = "en-GB";
+
+/**
+ * A UTC instant as a tenant-local DateTime, in the pinned locale.
+ *
+ * Every function below goes through this or its sibling rather than calling
+ * Luxon directly, so a new formatter cannot forget the locale — which is
+ * precisely how the old inconsistency arose one function at a time.
+ */
+function localFromInstant(instant: Date, timezone: string): DateTime {
+  return DateTime.fromJSDate(instant).setZone(timezone).setLocale(DATE_LOCALE);
+}
+
+/** The same, from the ISO date string a URL carries. */
+function localFromISODate(date: string, timezone: string): DateTime {
+  return DateTime.fromISO(date, { zone: timezone }).setLocale(DATE_LOCALE);
+}
 
 // Constructing an Intl.NumberFormat is the expensive part; reuse one.
 const priceFormatter = new Intl.NumberFormat(PRICE_LOCALE, {
@@ -130,7 +179,7 @@ export function formatMinuteOfDay(minute: number): string {
  * off. Passing the zone explicitly is what makes that impossible to forget.
  */
 export function formatSlotTime(instant: Date, timezone: string): string {
-  return DateTime.fromJSDate(instant).setZone(timezone).toFormat("HH:mm");
+  return localFromInstant(instant, timezone).toFormat("HH:mm");
 }
 
 /**
@@ -160,7 +209,7 @@ export function formatTimeRange(
  * day, since `DateTime.fromISO` would otherwise anchor it to the local one.
  */
 export function formatBookingDate(date: string, timezone: string): string {
-  return DateTime.fromISO(date, { zone: timezone }).toFormat("ccc, d LLL");
+  return localFromISODate(date, timezone).toFormat("ccc, d LLL");
 }
 
 /**
@@ -176,8 +225,8 @@ export function formatDateRange(
   toDate: string,
   timezone: string,
 ): string {
-  const from = DateTime.fromISO(fromDate, { zone: timezone });
-  const to = DateTime.fromISO(toDate, { zone: timezone });
+  const from = localFromISODate(fromDate, timezone);
+  const to = localFromISODate(toDate, timezone);
 
   const sameMonth = from.hasSame(to, "month") && from.hasSame(to, "year");
 
@@ -205,8 +254,8 @@ export function formatTimeOffRange(
   endAt: Date,
   timezone: string,
 ): string {
-  const start = DateTime.fromJSDate(startAt).setZone(timezone);
-  const end = DateTime.fromJSDate(endAt).setZone(timezone);
+  const start = localFromInstant(startAt, timezone);
+  const end = localFromInstant(endAt, timezone);
 
   const wholeDays =
     start.toMillis() === start.startOf("day").toMillis() &&
@@ -252,7 +301,7 @@ export function formatStripDay(
   date: string,
   timezone: string,
 ): { weekday: string; dayOfMonth: string } {
-  const local = DateTime.fromISO(date, { zone: timezone });
+  const local = localFromISODate(date, timezone);
 
   return {
     weekday: local.toFormat("ccc"),

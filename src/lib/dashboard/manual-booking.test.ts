@@ -1,4 +1,4 @@
-import { DateTime } from "luxon";
+import { DateTime, Settings } from "luxon";
 import { describe, expect, it } from "vitest";
 
 import type { StaffAvailability } from "@/lib/availability/slots";
@@ -300,5 +300,30 @@ describe("localInstant", () => {
     expect(localInstant(TUESDAY, "", TZ)).toBeNull();
     expect(localInstant(TUESDAY, "25:00", TZ)).toBeNull();
     expect(localInstant("not-a-date", "09:00", TZ)).toBeNull();
+  });
+
+  it("is unaffected by the runtime's locale", () => {
+    // The regression this guards is not hypothetical arithmetic: the
+    // spring-forward check used to compare `toFormat("HH:mm")` against the typed
+    // string, and Luxon renders digits in the locale's numbering system. Under
+    // ar-EG that side comes back as Arabic-Indic digits, never equals the ASCII
+    // input, and EVERY manual booking is rejected as a time that doesn't exist.
+    //
+    // Restored in a finally, because Settings is global to the process and
+    // leaking it would quietly retune every other test file in the run.
+    const original = Settings.defaultLocale;
+
+    try {
+      Settings.defaultLocale = "ar-EG";
+
+      expect(localInstant(TUESDAY, "14:30", TZ)?.toISOString()).toBe(
+        "2026-07-28T12:30:00.000Z",
+      );
+      // The DST rejection still has to work under the same locale — a check
+      // that fails open would pass the line above just as happily.
+      expect(localInstant("2026-03-29", "02:30", TZ)).toBeNull();
+    } finally {
+      Settings.defaultLocale = original;
+    }
   });
 });

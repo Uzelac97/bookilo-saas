@@ -94,7 +94,7 @@ export default async function CancelPage({ params }: PageProps) {
           </p>
         </header>
 
-        <dl className="flex flex-col gap-1.5 rounded-2xl border border-zinc-200 bg-white p-5 text-sm">
+        <dl className="flex flex-col gap-1.5 rounded-2xl border border-zinc-200 bg-white p-5 text-sm shadow-sm">
           <Row label="Service" value={service.name} />
           <Row label="Barber" value={booking.staff.name} />
           <Row
@@ -142,7 +142,7 @@ export default async function CancelPage({ params }: PageProps) {
 
         <Link
           href={`/b/${slug}`}
-          className="self-start text-sm font-medium text-zinc-900 underline underline-offset-4 hover:text-zinc-600"
+          className="inline-flex min-h-11 items-center self-start text-sm font-medium text-zinc-900 underline underline-offset-4 hover:text-zinc-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
         >
           Back to {tenant.name}
         </Link>

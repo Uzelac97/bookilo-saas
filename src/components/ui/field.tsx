@@ -60,7 +60,9 @@ export function Field({
           // how a leftover dark-mode block in globals.css once made these fields
           // near-white text on a white card. Naming both here means a future
           // change to body colour can't reach back into this input.
-          "rounded-lg border bg-white px-3 py-2 text-base text-zinc-900 outline-none focus:ring-1",
+          // py-2.5 rather than py-2: with a 16px line that is a 46px control,
+          // over the 44px touch minimum the rest of this flow now holds to.
+          "rounded-lg border bg-white px-3 py-2.5 text-base text-zinc-900 outline-none focus:ring-1",
           error
             ? "border-red-400 focus:border-red-500 focus:ring-red-500"
             : "border-zinc-300 focus:border-zinc-900 focus:ring-zinc-900",

@@ -1,11 +1,16 @@
-import { DateTime } from "luxon";
+import { DateTime, Settings } from "luxon";
 import { describe, expect, it } from "vitest";
 
 import { MAX_DURATION_MINUTES } from "./validation/service";
 
 import {
+  formatBookingDate,
   formatCancellationDeadline,
+  formatDateRange,
   formatDuration,
+  formatPrice,
+  formatSlotTime,
+  formatStripDay,
   formatTimeOffRange,
   initials,
 } from "./format";
@@ -106,6 +111,80 @@ describe("formatTimeOffRange", () => {
 
     expect(formatTimeOffRange(start, end, TZ)).toBe("10 Aug");
     expect(formatTimeOffRange(start, end, "Europe/London")).toContain("23:00");
+  });
+});
+
+describe("the pinned date locale", () => {
+  const TZ = "Europe/Berlin";
+  const day = (date: string) =>
+    DateTime.fromISO(date, { zone: TZ }).toJSDate();
+
+  /**
+   * Runs a block with Luxon's process-wide default locale set to something
+   * hostile, and puts it back afterwards whatever happens — Settings is global,
+   * and leaking it would retune every test file that runs after this one.
+   */
+  function underLocale(locale: string, run: () => void) {
+    const original = Settings.defaultLocale;
+
+    try {
+      Settings.defaultLocale = locale;
+      run();
+    } finally {
+      Settings.defaultLocale = original;
+    }
+  }
+
+  /**
+   * The decision recorded in DATE_LOCALE, as something that can fail.
+   *
+   * Before Day 13 every one of these rendered in whatever the runtime defaulted
+   * to. That was invisible on Vercel, which has historically defaulted to en-US
+   * — so the only way to hold the decision is to render under a locale that
+   * would disagree, and de-DE is the one that would actually be reached for
+   * here, given money is deliberately pinned to it two lines away.
+   */
+  it("renders the same under a different runtime default", () => {
+    const expected = {
+      bookingDate: formatBookingDate("2026-08-10", TZ),
+      dateRange: formatDateRange("2026-08-10", "2026-08-16", TZ),
+      stripDay: formatStripDay("2026-08-10", TZ),
+      timeOff: formatTimeOffRange(day("2026-03-01"), day("2026-03-04"), TZ),
+      slotTime: formatSlotTime(day("2026-08-10"), TZ),
+    };
+
+    // Sanity: the expectations above are the English ones, not just whatever
+    // the functions happen to emit. "Mo"/"Mär" would be the de-DE readings.
+    expect(expected.bookingDate).toBe("Mon, 10 Aug");
+    expect(expected.stripDay).toEqual({ weekday: "Mon", dayOfMonth: "10" });
+    expect(expected.timeOff).toBe("1 – 3 Mar");
+
+    for (const locale of ["de-DE", "fr-FR", "ar-EG"]) {
+      underLocale(locale, () => {
+        expect(formatBookingDate("2026-08-10", TZ)).toBe(expected.bookingDate);
+        expect(formatDateRange("2026-08-10", "2026-08-16", TZ)).toBe(
+          expected.dateRange,
+        );
+        expect(formatStripDay("2026-08-10", TZ)).toEqual(expected.stripDay);
+        expect(
+          formatTimeOffRange(day("2026-03-01"), day("2026-03-04"), TZ),
+        ).toBe(expected.timeOff);
+        // ar-EG is the one that matters here: Luxon draws digits from the
+        // locale's numbering system, so an unpinned "HH:mm" comes back in
+        // Arabic-Indic digits — a clock a German customer cannot read.
+        expect(formatSlotTime(day("2026-08-10"), TZ)).toBe(expected.slotTime);
+      });
+    }
+  });
+
+  it("keeps money on its own, deliberately different, pin", () => {
+    // The two locales are not an oversight to be tidied up later: prices are
+    // German, prose is English. Asserted together so a future "consistency"
+    // change to either has to come and delete this line on purpose.
+    underLocale("en-GB", () => {
+      expect(formatPrice(3200)).toBe("32,00 €");
+      expect(formatBookingDate("2026-08-10", TZ)).toBe("Mon, 10 Aug");
+    });
   });
 });
 

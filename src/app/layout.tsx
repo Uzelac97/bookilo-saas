@@ -28,7 +28,11 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      {/* font-sans is load-bearing, not decoration: it is the only thing that
+          actually applies the Geist font loaded above. See the note in
+          globals.css for what it replaced and why the class has to sit here
+          rather than in the stylesheet. */}
+      <body className="flex min-h-full flex-col font-sans">{children}</body>
     </html>
   );
 }

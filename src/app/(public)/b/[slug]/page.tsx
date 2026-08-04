@@ -77,7 +77,11 @@ export default async function BusinessPage({ params }: PageProps) {
             <p className="text-sm font-medium text-zinc-500">
               {BUSINESS_TYPE_LABELS[tenant.businessType] ?? "Appointments"}
             </p>
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-900">
+            {/* Larger than the h1 on the three transactional pages, and the
+                only place that differs. This is the shop's front door and the
+                one heading that is the shop's own name rather than a step in a
+                process. */}
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 sm:text-4xl">
               {tenant.name}
             </h1>
           </div>
@@ -85,9 +89,13 @@ export default async function BusinessPage({ params }: PageProps) {
           <div className="flex flex-col gap-1 text-sm text-zinc-600">
             {tenant.address ? <p>{tenant.address}</p> : null}
             {tenant.phone ? (
+              // The one control on this page that isn't a booking, and on a
+              // phone it is a dial button — so it gets the same 44px the Book
+              // buttons below it get, rather than being a line of text that
+              // happens to be tappable.
               <a
                 href={`tel:${tenant.phone.replace(/\s+/g, "")}`}
-                className="w-fit font-medium text-zinc-900 underline-offset-4 hover:underline"
+                className="inline-flex min-h-11 w-fit items-center font-medium text-zinc-900 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
               >
                 {tenant.phone}
               </a>
@@ -106,7 +114,7 @@ export default async function BusinessPage({ params }: PageProps) {
           <h2 className="text-lg font-semibold tracking-tight text-zinc-900">
             Opening hours
           </h2>
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
             <OpeningHours days={openingHours} />
           </div>
         </section>

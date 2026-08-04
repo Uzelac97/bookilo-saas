@@ -211,8 +211,8 @@ function overlaps(
  * jump 02:00 → 03:00, so 02:30 is not a time that happens — and Luxon does not
  * fail on it, it silently returns 03:30. Left alone, an owner typing 02:30 would
  * get a booking an hour later than they asked for, with nothing to tell them.
- * Round-tripping the formatted value back to the input is what catches it: if
- * Luxon moved the time, the string it formats no longer matches what was typed.
+ * Reading the resolved hour and minute back off the DateTime is what catches
+ * it: if Luxon moved the time, they no longer match the ones that were typed.
  *
  * The autumn ambiguity — 02:30 happening twice — is deliberately NOT rejected.
  * Both readings are real times, Luxon picks the first, and a shop can't be
@@ -227,21 +227,54 @@ export function localInstant(
   // hour, so `2026-07-28T9:05` is invalid and Luxon rejects it outright. An
   // <input type="time"> always pads, but the action also serves prefilled links
   // from the calendar, and "9:05" is what a hand-written one looks like.
-  const normalized = normalizeTime(time);
-  if (normalized === null) return null;
+  const wallClock = normalizeTime(time);
+  if (wallClock === null) return null;
 
-  const local = DateTime.fromISO(`${date}T${normalized}`, { zone: timezone });
+  const local = DateTime.fromISO(`${date}T${wallClock.text}`, {
+    zone: timezone,
+  });
 
   if (!local.isValid) return null;
-  if (local.toFormat("HH:mm") !== normalized) return null;
+
+  // Compares the numbers, NOT a formatted string. This used to read
+  // `local.toFormat("HH:mm") !== normalized`, which asked Luxon to render the
+  // time and then compared the rendering — and a rendering is locale-dependent
+  // in a way this check is not. Luxon draws digits from the locale's numbering
+  // system, so under a runtime defaulting to one that isn't Latin (ar-EG, for
+  // instance) the format side comes back as Arabic-Indic digits, never matches
+  // the ASCII input, and every manual booking is rejected as a nonexistent
+  // time. `hour` and `minute` are plain numbers with no locale anywhere near
+  // them, and they answer the actual question: did Luxon move the time we asked
+  // for? Nothing about the behaviour changes; what changes is that it can no
+  // longer be broken by an environment variable.
+  if (local.hour !== wallClock.hour || local.minute !== wallClock.minute) {
+    return null;
+  }
 
   return local.toJSDate();
 }
 
-/** "9:05" -> "09:05". Null when the value isn't a wall-clock time at all. */
-function normalizeTime(time: string): string | null {
+/**
+ * "9:05" -> `{ text: "09:05", hour: 9, minute: 5 }`. Null when the value isn't a
+ * wall-clock time at all.
+ *
+ * Hands back the numbers alongside the padded string because both callers above
+ * need a different one: the string builds the ISO input, and the numbers are
+ * what the round-trip check compares.
+ *
+ * Deliberately does not range-check — "25:00" and "09:99" pass this and are
+ * rejected by `local.isValid` immediately after, which is the one place that
+ * decides what a real time is.
+ */
+function normalizeTime(
+  time: string,
+): { text: string; hour: number; minute: number } | null {
   const match = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
   if (!match) return null;
 
-  return `${match[1].padStart(2, "0")}:${match[2]}`;
+  return {
+    text: `${match[1].padStart(2, "0")}:${match[2]}`,
+    hour: Number(match[1]),
+    minute: Number(match[2]),
+  };
 }

@@ -59,7 +59,7 @@ export function DateStrip({
               disabled={!day.bookable || pending}
               onClick={() => onSelect(day.date)}
               className={[
-                "flex min-w-13 flex-1 flex-col items-center gap-0.5 rounded-xl border px-2 py-2.5 text-sm transition-colors",
+                "flex min-h-14 min-w-13 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border px-2 py-2.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900",
                 selected
                   ? "border-zinc-900 bg-zinc-900 text-white"
                   : day.bookable
@@ -105,7 +105,7 @@ function PageButton({
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="shrink-0 rounded-lg border border-zinc-200 bg-white px-2.5 py-2 text-lg leading-none text-zinc-600 transition-colors hover:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-zinc-200"
+      className="flex min-h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white text-lg leading-none text-zinc-600 transition-colors hover:border-zinc-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-zinc-200"
     >
       {glyph}
     </button>

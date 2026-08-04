@@ -280,7 +280,7 @@ and Day 12 deferrals all point at "Day 13". Shifting those numbers to make room 
 invalidate every one of those references for no gain, and "Day" is already defined above as
 a milestone rather than a calendar day.
 
-### Carried into Day 13
+### Carried into Day 13 — all three closed on Day 13
 
 Sizing questions found while building the calendar (Day 10) that were deliberately not
 answered there. Both are judgement calls about how things look at the edges of the range
@@ -289,6 +289,9 @@ real monitor than to guess at individually.
 
 Note this widens Day 13's design pass beyond "the public flow" as the table above has it —
 both items are dashboard-side.
+
+Each carries its resolution below. One of the three was closed by deciding it needed no
+code, which is a resolution and is recorded as one.
 
 - **Tap targets on short calendar blocks.** A block's height is its duration: at 80px an
   hour a 20-minute booking is 27px and a 15-minute one 20px, and anything under 13px
@@ -303,6 +306,20 @@ both items are dashboard-side.
   what opens the manual booking form prefilled. So nothing today depends on hitting a
   20px block. This becomes live again the moment a block gains an interaction of its own —
   which is exactly what the deferred status actions below would do.
+
+  **Closed on Day 13, with no code, and that is the resolution.** Confirmed against the
+  source and against a seeded 15-minute booking: `ColumnBody` renders the link ladder under
+  a `pointer-events-none` list, each block takes back only `pointer-events-auto` for its
+  hover `title`, and no block has a click handler. There is no gesture to make bigger.
+  Building a larger hit area now would be building it for an interaction that doesn't
+  exist, and it would have to be redesigned anyway alongside whatever surface the status
+  actions eventually get.
+
+  **The residual, so it isn't rediscovered as a bug.** A block still absorbs the tap —
+  correctly, that time is taken — and `title` is hover-only, so on a touch screen a
+  `minimal` or `sliver` block cannot be read at all, and the day view has no mobile agenda
+  to fall back to. That is a booking-detail problem, not a tap-target one. It is now
+  attached to the status-actions deferral below, which is what will surface it.
 - **Weekday names follow the runtime's locale, prices don't.** `formatStripDay` in
   `lib/format.ts` renders "Mon"/"Tue" and the day-of-month through Luxon with no locale
   argument, so they come out in whatever the runtime's default is. Money in the same file
@@ -313,12 +330,47 @@ both items are dashboard-side.
   than visible today; it surfaces the first time the runtime, a locale env var, or a
   self-hosted deployment differs. Either pin a locale next to `PRICE_LOCALE` or decide
   deliberately that dates follow the runtime while money doesn't.
+
+  **Closed on Day 13: both are pinned, neither follows the runtime.** `DATE_LOCALE =
+  "en-GB"` sits next to `PRICE_LOCALE` in `lib/format.ts`, and every Luxon call in that
+  file now goes through one of two helpers that apply it, so a new formatter cannot forget
+  it — which is how the inconsistency arose one function at a time. That covers more than
+  the two surfaces named above: `formatBookingDate` also renders in both booking emails,
+  which is the case that decided it, since an email quotes a date to a customer as a
+  promise and must not depend on which region a serverless function booted in.
+
+  **The two locales stay different, on purpose.** Money is German because the money is
+  German; prose is English because every word this product says is English, starting with
+  the hand-written `WEEKDAY_LABELS`. German month names beside an English "Monday" column
+  would be a worse inconsistency than the one being fixed. `en-GB` over `en-US` because the
+  tokens are day-first; they render identically today. A test renders every affected
+  function under `de-DE`, `fr-FR` and `ar-EG` and asserts the output doesn't move — it
+  fails if the pin is removed.
+
+  **One caller was not a display bug.** `localInstant` in `lib/dashboard/manual-booking.ts`
+  detected the spring-forward gap by comparing `toFormat("HH:mm")` against the typed
+  string. Luxon draws digits from the locale's numbering system, so under a runtime
+  defaulting to `ar-EG` that comparison could never match and *every* manual booking would
+  be rejected as a nonexistent time. Fixed by comparing `local.hour`/`local.minute`
+  numerically rather than by pinning a locale there: this is an internal validation check,
+  not something rendered to a human, and it should not depend on a display decision at all.
+  Guarded by a test that fails against the old implementation.
 - **Dashboard header inset.** The header bar in `(dashboard)/layout.tsx` is capped at
   `max-w-5xl` while the calendar page now runs to `max-w-[120rem]`, so on a wide monitor
   the shop name and nav sit visibly inset from the grid's edges. Every other dashboard
   page repeats its own `max-w-5xl` wrapper, so the fix is either widening the header (which
   affects all five pages) or accepting the inset as deliberate. Not a call the calendar
   should make on its own, which is why it waited.
+
+  **Closed on Day 13: the header is full-bleed and the alignment is abandoned on purpose.**
+  The cap is gone from `(dashboard)/layout.tsx` — one file; the five page wrappers are
+  untouched and keep their `max-w-5xl`. Both alignment-preserving options were rejected:
+  matching the header to the calendar breaks it on the other four pages instead, and
+  widening all five pages puts settings forms and the services list on a 120rem line, which
+  is worse to read than any misalignment. The header is now app chrome that lines up with
+  nothing at every width on every page — a rule, rather than a coincidence that only held
+  below 64rem. The cost, stated rather than discovered later: on an ultrawide monitor the
+  shop name and Sign out sit at opposite edges of the screen.
 
 ### Deferred out of Day 11
 
@@ -363,11 +415,11 @@ that wanted a real customer or a schema change behind them.
   that rule protects the shop from), so changing it does *not* affect the dashboard's own
   booking form. The field's hint on the settings screen says so.
 
-- **Per-tenant weekday and month names still follow the runtime's locale.** Untouched by
-  Day 11 and still on the Day 13 list above. The hours editor sidesteps it by using the
-  fixed English `WEEKDAY_LABELS` that the public opening-hours table already uses, so the
-  two can't disagree — but that is one more surface pinned to English by hand rather than
-  the decision being made once.
+- ~~**Per-tenant weekday and month names still follow the runtime's locale.** Untouched by
+  Day 11 and still on the Day 13 list above.~~ **Closed on Day 13** — pinned to `en-GB` in
+  `lib/format.ts`; see the locale item above. The hours editor's use of the fixed English
+  `WEEKDAY_LABELS` is no longer a surface pinned by hand against a drifting default: the
+  two now agree because both are English by decision rather than by coincidence.
 
 ### Deferred out of Day 12
 

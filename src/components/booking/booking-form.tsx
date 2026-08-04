@@ -133,7 +133,7 @@ export function BookingForm({
         name="startAt"
         value={slot.startAt.toISOString()}
       />
-      <dl className="flex flex-col gap-1.5 rounded-2xl border border-zinc-200 bg-white p-4 text-sm">
+      <dl className="flex flex-col gap-1.5 rounded-2xl border border-zinc-200 bg-white p-5 text-sm shadow-sm">
         <SummaryRow label="Service" value={service.name} />
         <SummaryRow
           label="When"
@@ -188,7 +188,9 @@ export function BookingForm({
       <button
         type="submit"
         disabled={pending}
-        className="mt-1 rounded-lg bg-zinc-900 px-4 py-2.5 text-base font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+        // Taller than the 44px minimum the rest of the flow holds to: this is
+        // the one button the whole page exists to get pressed.
+        className="mt-1 inline-flex min-h-12 items-center justify-center rounded-lg bg-zinc-900 px-4 text-base font-medium text-white transition-colors hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 disabled:cursor-not-allowed disabled:bg-zinc-400"
       >
         {pending ? "Confirming…" : "Confirm booking"}
       </button>

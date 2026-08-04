@@ -66,7 +66,7 @@ export function SlotGrid({
           <div
             role="group"
             aria-label={`${group.label} times`}
-            className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-1.5"
+            className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-2"
           >
             {group.slots.map((slot) => {
               const selected =
@@ -81,7 +81,12 @@ export function SlotGrid({
                   disabled={pending}
                   onClick={() => onSelect(slot)}
                   className={[
-                    "rounded-lg border px-2 py-2 text-sm font-medium tabular-nums transition-colors disabled:cursor-not-allowed",
+                    // min-h-11 (44px) rather than the py-2 that produced ~36px.
+                    // These are the densest tap targets in the product — a
+                    // 09:00–18:00 shift is thirty-odd of them side by side on a
+                    // phone — so they are the ones where an undersized target
+                    // actually costs a mis-tap.
+                    "flex min-h-11 items-center justify-center rounded-lg border px-2 text-sm font-medium tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 disabled:cursor-not-allowed",
                     selected
                       ? "border-zinc-900 bg-zinc-900 text-white"
                       : "border-zinc-200 bg-white text-zinc-900 hover:border-zinc-400",

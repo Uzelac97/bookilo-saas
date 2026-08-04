@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import type { LostSlotState } from "@/app/(public)/b/[slug]/book/actions";
 import type {
@@ -76,6 +76,45 @@ export function BookingFlow({
   const [selectedStartAt, setSelectedStartAt] = useState<number | null>(null);
   const selectedSlot =
     slots.find((slot) => slot.startAt.getTime() === selectedStartAt) ?? null;
+
+  /**
+   * Brings "Your details" into view when a time is first chosen.
+   *
+   * On a phone the form is entirely below the fold — the date strip, the barber
+   * chips and a shift's worth of slot buttons sit above it — so tapping a time
+   * produced no visible change at all, and the next thing the customer does is
+   * tap the same slot again. This is the one piece of behaviour in the mobile
+   * pass rather than styling, and it is here because the form's existence is
+   * this component's state, not the form's.
+   *
+   * Keyed on `selectedStartAt`, the number, not on `selectedSlot`, which is
+   * re-derived into a new object on every render and would re-fire this
+   * endlessly.
+   *
+   * `block: "nearest"` scrolls the least it can, so a desktop viewport that
+   * already shows the form doesn't jump. The reduced-motion check is the same
+   * courtesy: an animated scroll nobody asked for is exactly what that
+   * preference is set to avoid.
+   */
+  const detailsRef = useRef<HTMLElement | null>(null);
+  const hadSelection = useRef(false);
+
+  useEffect(() => {
+    const selecting = selectedStartAt !== null;
+
+    if (selecting && !hadSelection.current) {
+      const reduced = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+
+      detailsRef.current?.scrollIntoView({
+        behavior: reduced ? "auto" : "smooth",
+        block: "nearest",
+      });
+    }
+
+    hadSelection.current = selecting;
+  }, [selectedStartAt]);
 
   // A rejected submission is reported here rather than inside the form, and this
   // is the reason: `selectedSlot` above is *derived* from the server's slot list,
@@ -175,7 +214,7 @@ export function BookingFlow({
       </section>
 
       {selectedSlot ? (
-        <section className="flex flex-col gap-3">
+        <section ref={detailsRef} className="flex flex-col gap-3">
           <h2 className="text-lg font-semibold tracking-tight text-zinc-900">
             Your details
           </h2>

@@ -44,24 +44,41 @@ export function ServiceList({
             {group.services.map((service) => (
               <li
                 key={service.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm"
+                className="flex items-center justify-between gap-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm"
               >
+                {/* min-w-0 is what lets the name truncate instead of pushing
+                    the price and the button off a narrow screen. The row no
+                    longer wraps: a wrapped button used to jump to its own line
+                    at around 380px, which put a full-width black bar under
+                    every service on a phone. */}
                 <div className="flex min-w-0 flex-col gap-0.5">
-                  <span className="font-medium text-zinc-900">
+                  <span className="truncate font-medium text-zinc-900">
                     {service.name}
                   </span>
                   <span className="text-sm text-zinc-500">
-                    {formatDuration(service.durationMinutes)} ·{" "}
-                    {formatPrice(service.priceMinorUnits)}
+                    {formatDuration(service.durationMinutes)}
                   </span>
                 </div>
 
-                <Link
-                  href={`/b/${slug}/book?service=${service.id}`}
-                  className="shrink-0 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
-                >
-                  Book
-                </Link>
+                {/* Price out of the muted line and next to the button, because
+                    it is the second thing anyone reads on a barbershop's menu
+                    and the first thing they compare between two of them. */}
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className="text-sm font-medium tabular-nums text-zinc-900">
+                    {formatPrice(service.priceMinorUnits)}
+                  </span>
+                  {/* min-h-11 is 44px, the smallest comfortable touch target.
+                      This was py-2 on a text-sm line — about 36px — which is
+                      the size it renders at on a phone, where every one of
+                      these is tapped with a thumb. inline-flex, because a
+                      min-height on an inline <a> does nothing. */}
+                  <Link
+                    href={`/b/${slug}/book?service=${service.id}`}
+                    className="inline-flex min-h-11 items-center rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
+                  >
+                    Book
+                  </Link>
+                </div>
               </li>
             ))}
           </ul>
