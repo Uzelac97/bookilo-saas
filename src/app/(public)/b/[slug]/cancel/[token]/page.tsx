@@ -63,6 +63,22 @@ export default async function CancelPage({ params }: PageProps) {
     ? `call the shop on ${tenant.phone}`
     : "get in touch with the shop directly";
 
+  /**
+   * Why online cancellation is closed for this booking.
+   *
+   * Deliberately not formatCancellationDeadline: that renders the deadline a
+   * customer still has ("up to 2 h before"), and this states the rule that has
+   * already passed. But it needs the same care about a window of 0 — with no
+   * window at all, cancellation stays open until the appointment starts, and
+   * "closes 0 min before an appointment" tells the customer the exact opposite
+   * of the setting. This branch is only reachable for a still-CONFIRMED booking
+   * whose start has gone by, which is precisely when that sentence would be read.
+   */
+  const closedReason =
+    tenant.cancellationWindowMinutes === 0
+      ? "Online cancellation closes once an appointment starts, so this one is too late now."
+      : `Online cancellation closes ${formatDuration(tenant.cancellationWindowMinutes)} before an appointment, so this one is too close now.`;
+
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 px-4 py-10 sm:py-16">
       <main className="mx-auto flex w-full max-w-2xl flex-col gap-8">
@@ -111,16 +127,16 @@ export default async function CancelPage({ params }: PageProps) {
           </form>
         ) : (
           <Notice>
-            {/* Both gaps around the duration are explicit {" "} rather than a
-                plain space in the text. The literal space that used to sit after
-                the closing brace was being dropped at build time — it rendered
-                as "closes 2 hbefore an appointment" — because this text node is
-                sandwiched between two expressions and wraps across lines. An
-                explicit space is a real child and can't be trimmed. */}
-            Online cancellation closes{" "}
-            {formatDuration(tenant.cancellationWindowMinutes)}{" "}
-            before an appointment, so this one is too close now. If you
-            can&rsquo;t make it, {reachTheShop} — they&rsquo;d rather know.
+            {/* The gaps between these expressions are explicit {" "} rather than
+                plain spaces in the text. A literal space after a closing brace
+                was silently dropped at build time here once already — it
+                rendered as "closes 2 hbefore an appointment" — because a text
+                node sandwiched between two expressions and wrapped across lines
+                gets its leading space trimmed. An explicit space is a real
+                child and can't be. */}
+            {closedReason}{" "}
+            If you can&rsquo;t make it, {reachTheShop} — they&rsquo;d rather
+            know.
           </Notice>
         )}
 

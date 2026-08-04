@@ -1,5 +1,10 @@
 import type { BookingByToken } from "@/lib/db/bookings";
-import { formatDuration, formatPrice, formatSlotTime } from "@/lib/format";
+import {
+  formatCancellationDeadline,
+  formatDuration,
+  formatPrice,
+  formatSlotTime,
+} from "@/lib/format";
 
 import { renderHtml, renderText, type EmailContent } from "./shell";
 import { localDate } from "./when";
@@ -53,7 +58,10 @@ export function renderBookingConfirmation(
     action: {
       label: "Cancel this booking",
       url: cancelUrl,
-      hint: `You can cancel online up to ${formatDuration(tenant.cancellationWindowMinutes)} before your appointment.`,
+      // This sentence is the promise the shop is held to: it's what a customer
+      // reads weeks later when they need to cancel, and the window can have been
+      // changed since (it's read live, not snapshotted — see lib/db/tenant.ts).
+      hint: `You can cancel online ${formatCancellationDeadline(tenant.cancellationWindowMinutes)} your appointment.`,
     },
     footerLines,
   };

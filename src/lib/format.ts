@@ -45,14 +45,65 @@ export function formatPriceInput(minorUnits: number): string {
   return (minorUnits / 100).toFixed(2).replace(".", ",");
 }
 
-/** 30 -> "30 min", 60 -> "1 h", 75 -> "1 h 15 min" */
+const MINUTES_PER_HOUR = 60;
+const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
+
+/**
+ * 30 -> "30 min", 75 -> "1 h 15 min", 1440 -> "1 day", 10080 -> "7 days"
+ *
+ * THE DAYS TIER EXISTS FOR THE CANCELLATION WINDOW, not for service lengths. A
+ * service is capped at 480 minutes by serviceInputSchema, so nothing on a
+ * booking, a menu or an email can reach a day — that tier is unreachable from
+ * every caller except `Tenant.cancellationWindowMinutes`, which Day 12 made
+ * owner-settable up to a week. Before that it was a seed-time 120 and always
+ * read "2 h"; the moment an owner could type 10080 this started rendering
+ * "168 h" at customers.
+ *
+ * Builds from the largest unit down and drops empty parts, so nothing is ever
+ * rounded away: 1441 is "1 day 1 min", not "1 day". A window an owner set is a
+ * promise made to a customer, so the two must not disagree by a minute.
+ *
+ * "day"/"days" is spelled out and pluralised while h/min stay as abbreviations —
+ * they're unit symbols, which don't take a plural, and "1 days" is the kind of
+ * detail that makes a shop's confirmation email look automated.
+ */
 export function formatDuration(minutes: number): string {
-  if (minutes < 60) return `${minutes} min`;
+  const days = Math.floor(minutes / MINUTES_PER_DAY);
+  const hours = Math.floor((minutes % MINUTES_PER_DAY) / MINUTES_PER_HOUR);
+  const remainder = minutes % MINUTES_PER_HOUR;
 
-  const hours = Math.floor(minutes / 60);
-  const remainder = minutes % 60;
+  const parts: string[] = [];
+  if (days > 0) parts.push(days === 1 ? "1 day" : `${days} days`);
+  if (hours > 0) parts.push(`${hours} h`);
+  if (remainder > 0) parts.push(`${remainder} min`);
 
-  return remainder === 0 ? `${hours} h` : `${hours} h ${remainder} min`;
+  // Zero is the one value with no non-empty part. It reaches here from a
+  // cancellation window of 0, and every caller that can pass one has its own
+  // wording for it (formatCancellationDeadline below) — this is the fallback, so
+  // a new caller gets something honest rather than an empty string.
+  return parts.length > 0 ? parts.join(" ") : "0 min";
+}
+
+/**
+ * How long before an appointment a customer can still cancel, as the phrase that
+ * slots into "You can cancel online ___ your appointment."
+ *
+ * A WINDOW OF 0 GETS ITS OWN WORDING, and this is the whole reason the function
+ * exists. `formatDuration(0)` is "0 min", so composing it into that sentence
+ * produced "You can cancel online up to 0 min before your appointment" — which
+ * reads as a deadline so tight it's effectively no cancellation at all, when the
+ * setting means the exact opposite: cancel whenever you like, right up to the
+ * start. That's not awkward phrasing, it's the wrong information, and 0 is a
+ * value the settings screen deliberately accepts.
+ *
+ * Shared by all three surfaces that quote the window — the confirmation email,
+ * the confirmation page and the cancel page — so they cannot drift into telling
+ * one customer something different from another.
+ */
+export function formatCancellationDeadline(windowMinutes: number): string {
+  return windowMinutes === 0
+    ? "any time before"
+    : `up to ${formatDuration(windowMinutes)} before`;
 }
 
 /**

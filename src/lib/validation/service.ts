@@ -14,7 +14,14 @@ import { hasControlCharacters } from "./text";
  * actually sells — is valid and computes correctly.
  */
 const MIN_DURATION_MINUTES = 5;
-const MAX_DURATION_MINUTES = 480;
+/**
+ * Exported so format.test.ts can assert against the real ceiling rather than a
+ * copy of the number: formatDuration grew a days tier for the cancellation
+ * window, and the claim that no service can ever reach it is only true while
+ * this stays under a day. If it's ever raised past 1440, that test fails and
+ * says so — which is the point.
+ */
+export const MAX_DURATION_MINUTES = 480;
 
 /** A price ceiling, in cents, that no barbershop service will reach honestly. */
 const MAX_PRICE_MINOR_UNITS = 100_000;

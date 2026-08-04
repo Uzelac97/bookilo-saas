@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { getBookingByCancelToken } from "@/lib/db/bookings";
 import {
   formatBookingDate,
+  formatCancellationDeadline,
   formatDuration,
   formatPrice,
   formatSlotTime,
@@ -81,7 +82,7 @@ export default async function BookedPage({ params }: PageProps) {
             >
               cancel this booking
             </Link>{" "}
-            up to {formatDuration(tenant.cancellationWindowMinutes)} before your
+            {formatCancellationDeadline(tenant.cancellationWindowMinutes)} your
             appointment. The confirmation email carries the same link.
           </p>
         )}
