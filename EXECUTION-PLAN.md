@@ -30,7 +30,12 @@ This is the **final** scope. Where I cut something from the earlier strategy dra
 
 ### What's excluded entirely for now
 
-Staff login, SMS/WhatsApp reminders, deposits/payments, multi-location, analytics dashboard, customer accounts, i18n, recurring/subscription bookings, reviews or any marketplace surface, POS/inventory, granular permissions beyond Owner/Staff.
+Staff login, SMS/WhatsApp reminders, deposits/payments, multi-location,
+analytics dashboard, customer accounts, i18n, recurring/subscription
+bookings, reviews or any marketplace surface, POS/inventory, granular
+permissions beyond Owner/Staff, `Resource`/rooms/bays/equipment, any
+vertical beyond barber shops and hair salons, custom domains, wildcard
+subdomains.
 
 ### Standing boundary: per-tenant customization vs. custom development
 
@@ -43,6 +48,38 @@ Decided early, deliberately, so it's not renegotiated live under pressure from a
 **The line that must not move: every tenant renders through the same components and the same layout, always.** Bounded content and branding variation, yes. Structural variation — a different arrangement of sections, a new section type invented per customer, custom CSS — no. If a real prospect's actual ask is custom layout, that's a signal they're outside this product's target customer (independent shops with no website today, not design-opinionated clients), not a feature gap to close. The moment layout varies per tenant, this stops being a flat-fee SaaS product with zero marginal cost per customer and becomes a web design agency with a booking feature bolted on.
 
 If bounded optional sections (About, Gallery, Testimonials, Team) are ever built, they're a fixed menu of block _types_ a tenant can toggle on/off and fill with content — never an open-ended page builder.
+
+### Standing boundary: which industries this product serves
+
+Decided after drafting — and rejecting — an architecture for a generic
+multi-vertical platform (barbers, beauty, auto repair, dental, physio, pet
+grooming, etc.). Recorded here because the pull toward it is strong and
+recurring, and because the reasoning against it isn't obvious.
+
+**The target is barber shops and hair salons. Nothing else.** They share the
+workflow this product is built around: staff with individual calendars,
+service-duration slots, walk-ins, regulars, no resource booking, no
+inventory. Serving both costs nothing — the data model is already identical.
+
+**What differs between them is terminology, branding and seed data. Never
+structure.** A `vertical` field on `Tenant` plus a label map is the entire
+mechanism. Internal names stay generic (`Staff`, `Service`, `Booking`);
+only owner-facing strings change.
+
+**Why the generic platform was rejected.** The differentiator over Fresha and
+Shore is that this product is _not_ generic — that is the entire wedge.
+Every incumbent already owns the "any appointment business" position with
+far more resources. More concretely: the verticals that look like a config
+change aren't one. Auto repair and beauty need a `Resource` entity (bays,
+treatment rooms), which reopens the exclusion constraint — the most
+correctness-dense thing in the codebase. Dental and physio are regulated
+health data under GDPR, which is a liability decision rather than a seed
+file. The "one codebase, config only" thesis holds for terminology and
+breaks exactly where each vertical's actual value lives.
+
+**What would make this live again:** a paying barber or salon customer, and
+evidence from real conversations that an adjacent vertical wants the same
+product. Not a hypothesis about market size.
 
 ---
 
@@ -209,23 +246,28 @@ aren't one-day tasks even with Claude Code doing the typing. If something has to
 protect Day 7 and let Days 10–13 absorb the slack — a working booking loop is what actually
 de-risks the project; a slightly later demo does not.
 
-| Day | Deliverable                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Next.js project init (TS strict, Tailwind, ESLint incl. the `no-restricted-imports` rule banning Prisma outside `lib/db/**`), Vercel linked, Neon DB provisioned, Prisma initialized, first migration. Also start Resend domain DNS verification now — propagation takes time and shouldn't block Day 8                                                                                                                                                                                         |
-| 2   | Auth.js v5, split into `auth.config.ts` (dependency-free, used by `proxy.ts`) and `auth.ts` (Prisma-backed Credentials `authorize`, Node runtime only) — get this split right now, not after `proxy.ts` breaks on import. Login page, route protection, seed script creating one demo tenant + owner. Also write a small CLI script to manually reset an owner's password hash — no in-app reset flow is in MVP scope, but a forgotten password shouldn't be able to kill a live customer trial |
-| 3   | Exclusion-constraint migration (raw SQL, ranging over `blockedUntil`, status `IN ('CONFIRMED','COMPLETED')`), `cancelToken` via `crypto.randomUUID()`. Probe script asserts **both** directions: concurrent overlapping bookings → one rejected, genuinely back-to-back bookings (buffer = 0) → both accepted                                                                                                                                                                                   |
-| 4   | `lib/availability/slots.ts` — working hours + time-off + existing bookings + buffer/lead time → open slots, unit tested (~2 sessions)                                                                                                                                                                                                                                                                                                                                                           |
-| 5   | Public business page (`/b/[slug]`) — info + service list                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| 6   | Booking flow UI — date/slot picker, service selection (delegate build to Claude Code once the flow is agreed)                                                                                                                                                                                                                                                                                                                                                                                   |
-| 7   | Booking submission server action (re-verifying staff/service/customer belong to the tenant before insert), `SLOT_TAKEN` handling, confirmation screen — **core loop works end-to-end today, even if ugly**                                                                                                                                                                                                                                                                                      |
-| 8   | Resend integration — confirmation email, owner notification, `/cancel/[token]` flow, per-phone rate limiting on the public submission (per-IP deferred — see `CLAUDE.md`)                                                                                                                                                                                                                                                                                                                       |
-| 9   | Dashboard shell — layout, nav, auth guard, "today" overview pulling real data                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| 10  | Calendar view (day/week, staff columns) (~2 sessions)                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| 11  | Manual booking entry (walk-ins), services + staff CRUD — staff "removal" is `active = false`, never a real delete (~2 sessions)                                                                                                                                                                                                                                                                                                                                                                 |
-| 12  | Settings screen wired to `Tenant` fields (buffer, lead time, cancellation window) — opening hours are edited per staff member on the Staff screen, not here                                                                                                                                                                                                                                                                                                                                     |
-| 12a | ~~Staff time off — the owner marks a barber away for a date range or part of a day, writing `TimeOff` rows. Inserted before Day 13 on purpose; see below~~ **Closed on Day 12a**                                                                                                                                                                                                                                                                                                                 |
-| 13  | Seed a polished demo tenant (real-looking branding, services, prices), mobile/design polish pass on the public flow                                                                                                                                                                                                                                                                                                                                                                             |
-| 14  | Full dry run as both "owner" and "customer," fix rough edges, deploy, prepare the live in-person demo script, book your first 3–5 demo meetings                                                                                                                                                                                                                                                                                                                                                 |
+| Day  | Deliverable                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Next.js project init (TS strict, Tailwind, ESLint incl. the `no-restricted-imports` rule banning Prisma outside `lib/db/**`), Vercel linked, Neon DB provisioned, Prisma initialized, first migration. Also start Resend domain DNS verification now — propagation takes time and shouldn't block Day 8                                                                                                                                                                                         |
+| 2    | Auth.js v5, split into `auth.config.ts` (dependency-free, used by `proxy.ts`) and `auth.ts` (Prisma-backed Credentials `authorize`, Node runtime only) — get this split right now, not after `proxy.ts` breaks on import. Login page, route protection, seed script creating one demo tenant + owner. Also write a small CLI script to manually reset an owner's password hash — no in-app reset flow is in MVP scope, but a forgotten password shouldn't be able to kill a live customer trial |
+| 3    | Exclusion-constraint migration (raw SQL, ranging over `blockedUntil`, status `IN ('CONFIRMED','COMPLETED')`), `cancelToken` via `crypto.randomUUID()`. Probe script asserts **both** directions: concurrent overlapping bookings → one rejected, genuinely back-to-back bookings (buffer = 0) → both accepted                                                                                                                                                                                   |
+| 4    | `lib/availability/slots.ts` — working hours + time-off + existing bookings + buffer/lead time → open slots, unit tested (~2 sessions)                                                                                                                                                                                                                                                                                                                                                           |
+| 5    | Public business page (`/b/[slug]`) — info + service list                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 6    | Booking flow UI — date/slot picker, service selection (delegate build to Claude Code once the flow is agreed)                                                                                                                                                                                                                                                                                                                                                                                   |
+| 7    | Booking submission server action (re-verifying staff/service/customer belong to the tenant before insert), `SLOT_TAKEN` handling, confirmation screen — **core loop works end-to-end today, even if ugly**                                                                                                                                                                                                                                                                                      |
+| 8    | Resend integration — confirmation email, owner notification, `/cancel/[token]` flow, per-phone rate limiting on the public submission (per-IP deferred — see `CLAUDE.md`)                                                                                                                                                                                                                                                                                                                       |
+| 9    | Dashboard shell — layout, nav, auth guard, "today" overview pulling real data                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| 10   | Calendar view (day/week, staff columns) (~2 sessions)                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 11   | Manual booking entry (walk-ins), services + staff CRUD — staff "removal" is `active = false`, never a real delete (~2 sessions)                                                                                                                                                                                                                                                                                                                                                                 |
+| 12   | Settings screen wired to `Tenant` fields (buffer, lead time, cancellation window) — opening hours are edited per staff member on the Staff screen, not here                                                                                                                                                                                                                                                                                                                                     |
+| 12a  | ~~Staff time off — the owner marks a barber away for a date range or part of a day, writing `TimeOff` rows. Inserted before Day 13 on purpose; see below~~ **Closed on Day 12a**                                                                                                                                                                                                                                                                                                                |
+| 13   | Seed a polished demo tenant (real-looking branding, services, prices), mobile/design polish pass on the public flow                                                                                                                                                                                                                                                                                                                                                                             |
+| 14.1 | Env prep: new Resend API key into `.env`, grep out the dead hardcoded owner address, `from` display name, full inventory of env vars the app reads                                                                                                                                                                                                                                                                                                                                              |
+| 14.2 | First-ever Vercel import, env vars set in the dashboard, new Neon branch for production, first `prisma migrate deploy` against it, demo tenant seeded on prod                                                                                                                                                                                                                                                                                                                                   |
+| 14.3 | Prod verification: exclusion constraint re-proven under Neon pooled connections, Auth.js edge/Node split on real Vercel runtime, root-URL fix, full owner + customer click-through on the live URL from a phone                                                                                                                                                                                                                                                                                 |
+| 15   | Security and tenant-isolation audit — the only pre-launch review that runs. Narrow accessibility pass on the public booking page only                                                                                                                                                                                                                                                                                                                                                           |
+| 16   | `Tenant.vertical` + terminology map, salon demo tenant seed, `DEMO.md`                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 17   | Code quality pass — **runs after the first 3–5 real demos, not before**                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 By day 7 you have a working booking loop. By day 14 — realistically closer to day ~18–20
 once the two-session items above are accounted for — you have something you can put in
@@ -238,7 +280,7 @@ That's the milestone that matters, not "feature complete."
 `computeSlots` since Day 4 — the read path is complete and tested: `getStaffAvailability`
 fetches the rows overlapping a day, `computeSlots` drops any candidate slot that overlaps
 one, and manual booking entry already warns `DURING_TIME_OFF`. What was never scheduled is
-the *write* path. No day in the table above ever built a way for an owner to create a
+the _write_ path. No day in the table above ever built a way for an owner to create a
 `TimeOff` row, so the feature exists everywhere except where someone could use it. That's
 an omission in the plan rather than a new idea, but it's still scope the table didn't
 carry, which is why it's recorded here rather than quietly absorbed into Day 13.
@@ -256,7 +298,7 @@ availability, the public flow or the booking rules changes. The whole feature is
 validation schema, two `lib/db` helpers, one action and one form on the staff detail
 screen, next to the working-hours editor that already lives there.
 
-**Overlapping bookings are advisory, never blocking.** Time off filters *candidate* slots in
+**Overlapping bookings are advisory, never blocking.** Time off filters _candidate_ slots in
 `computeSlots`; it has no effect on appointments already made. So a range saved over four
 confirmed cuts always succeeds, leaves all four untouched — no auto-cancel, and no email to
 the customer — and reports the count back to the owner, who is told to call them. That is
@@ -267,7 +309,7 @@ from the dashboard (deferred out of Day 11) — refusing the save would strand t
 no route forward.
 
 **Finished time off is hidden, not deleted.** The owner's list filters on `endAt > now`, so
-an entry drops off once it has *finished* — not once it has started. An absence the barber is
+an entry drops off once it has _finished_ — not once it has started. An absence the barber is
 in the middle of stays on screen, which is the one they're most likely to be looking for. The
 rows themselves are never removed: `probe:crud` E6 asserts both halves, that a finished entry
 is absent from the list and still present in the table, and E7 asserts the in-progress case
@@ -301,7 +343,7 @@ code, which is a resolution and is recorded as one.
 
   **Less urgent than it looked when this was written.** The original wording said "Day 11
   puts click-to-book on exactly these blocks", and Day 11 deliberately did not. Clicking a
-  *booking* is still not a gesture this calendar has; what shipped is a ladder of links on
+  _booking_ is still not a gesture this calendar has; what shipped is a ladder of links on
   the empty space behind the blocks, on a fixed 30-minute grid (40px targets), which is
   what opens the manual booking form prefilled. So nothing today depends on hitting a
   20px block. This becomes live again the moment a block gains an interaction of its own —
@@ -320,6 +362,7 @@ code, which is a resolution and is recorded as one.
   `minimal` or `sliver` block cannot be read at all, and the day view has no mobile agenda
   to fall back to. That is a booking-detail problem, not a tap-target one. It is now
   attached to the status-actions deferral below, which is what will surface it.
+
 - **Weekday names follow the runtime's locale, prices don't.** `formatStripDay` in
   `lib/format.ts` renders "Mon"/"Tue" and the day-of-month through Luxon with no locale
   argument, so they come out in whatever the runtime's default is. Money in the same file
@@ -332,7 +375,7 @@ code, which is a resolution and is recorded as one.
   deliberately that dates follow the runtime while money doesn't.
 
   **Closed on Day 13: both are pinned, neither follows the runtime.** `DATE_LOCALE =
-  "en-GB"` sits next to `PRICE_LOCALE` in `lib/format.ts`, and every Luxon call in that
+"en-GB"` sits next to `PRICE_LOCALE` in `lib/format.ts`, and every Luxon call in that
   file now goes through one of two helpers that apply it, so a new formatter cannot forget
   it — which is how the inconsistency arose one function at a time. That covers more than
   the two surfaces named above: `formatBookingDate` also renders in both booking emails,
@@ -350,11 +393,12 @@ code, which is a resolution and is recorded as one.
   **One caller was not a display bug.** `localInstant` in `lib/dashboard/manual-booking.ts`
   detected the spring-forward gap by comparing `toFormat("HH:mm")` against the typed
   string. Luxon draws digits from the locale's numbering system, so under a runtime
-  defaulting to `ar-EG` that comparison could never match and *every* manual booking would
+  defaulting to `ar-EG` that comparison could never match and _every_ manual booking would
   be rejected as a nonexistent time. Fixed by comparing `local.hour`/`local.minute`
   numerically rather than by pinning a locale there: this is an internal validation check,
   not something rendered to a human, and it should not depend on a display decision at all.
   Guarded by a test that fails against the old implementation.
+
 - **Dashboard header inset.** The header bar in `(dashboard)/layout.tsx` is capped at
   `max-w-5xl` while the calendar page now runs to `max-w-[120rem]`, so on a wide monitor
   the shop name and nav sit visibly inset from the grid's edges. Every other dashboard
@@ -386,7 +430,7 @@ that wanted a real customer or a schema change behind them.
   belongs with payments, where the same column has to exist anyway. The services form says
   so out loud in the meantime, which is the honest interim answer.
 
-  Note the neighbouring case is *not* a bug and must not be "fixed" alongside it: editing a
+  Note the neighbouring case is _not_ a bug and must not be "fixed" alongside it: editing a
   service's **duration** leaves existing bookings at the length they were booked for,
   because `endAt` and `blockedUntil` are snapshotted at creation. The customer was told 30
   minutes. Recomputing those would silently reshuffle a day the owner has already planned.
@@ -412,7 +456,7 @@ that wanted a real customer or a schema change behind them.
   settings screen, unchanged.~~ **Closed on Day 12** — all three are editable at
   `/dashboard/settings`. The half of this note that still stands: manual booking entry
   deliberately ignores `minLeadMinutes` (an owner recording a walk-in is not the person
-  that rule protects the shop from), so changing it does *not* affect the dashboard's own
+  that rule protects the shop from), so changing it does _not_ affect the dashboard's own
   booking form. The field's hint on the settings screen says so.
 
 - ~~**Per-tenant weekday and month names still follow the runtime's locale.** Untouched by
@@ -462,3 +506,54 @@ that breaks first.
 axis, and no assumption that there are seven of anything. A day view fallback is the same
 component passed a single-entry array, plus the same `hidden md:block` / `md:hidden` swap
 already in `dashboard/calendar/page.tsx`. Do not write a second agenda component for it.
+
+### Two Day 1 deliverables that were never actually done
+
+Found on Day 14, thirteen days after the fact. Recorded rather than silently
+corrected, because a plan that quietly rewrites its own history is worth less
+than one that admits what slipped.
+
+**"Vercel linked" never happened.** The repo was never imported into a Vercel
+project — confirmed by the Import button still showing for `barber-saas` in
+Vercel's repository list. Nothing downstream depended on it until Day 14, so
+it went unnoticed for the entire build. The consequence is that Day 14 is a
+_first_ production deploy, not a redeploy: first-time env var configuration,
+a production Neon branch that doesn't exist yet, and a `prisma migrate
+deploy` that has never run outside a local machine.
+
+**"Start Resend domain DNS verification now" never happened either**, and the
+stated reason for putting it on Day 1 — that propagation takes time and
+shouldn't block Day 8 — turned out to be exactly right in a way the plan
+didn't anticipate. No domain was ever bought. Day 8's email work was built
+and tested entirely against Resend's sandbox, which delivers only to the
+account owner's own address. That limitation was invisible during
+development, because the developer's address is the one it delivers to.
+
+### Deferred out of Day 14
+
+- **The full production-readiness review was cut down to security only.** The
+  original ask covered seventeen categories — clean code, duplication, dead
+  code, naming, performance, UI consistency, accessibility, and so on. What
+  runs before launch is tenant scoping, auth coverage, secrets in the client
+  bundle, cancel-token entropy, rate limiting on the public endpoint, and
+  migration integrity. Those are the failures that leak or lose data and
+  can't be walked back. The rest is real work that no barbershop owner will
+  ever say no because of, and half of it would be rewritten once real usage
+  shows which parts of the codebase actually matter. It runs as Day 17,
+  after the demos.
+
+  The one exception carved out: a keyboard-navigation and contrast pass on
+  the **public booking page only**. It's the single surface whose audience
+  isn't chosen.
+
+- **No verified sending domain, so the demo cannot use a prospect's email.**
+  Resend is in sandbox mode: outbound mail reaches exactly one address, the
+  account owner's. A prospect typing their own address into the booking form
+  during a demo gets nothing, and the booking still succeeds — the send
+  failure is caught so bookings don't break, which is correct behaviour and
+  also why it's silent. The demo works by booking as the customer using the
+  account's own address, in front of the owner. `DEMO.md` states this at the
+  top rather than in a footnote, because it is the most likely way a demo
+  breaks in front of a real person. Resolved by buying a domain and
+  verifying DNS — roughly €10–15/year, worth doing the moment a prospect
+  wants a trial, not before.
