@@ -1,4 +1,6 @@
-# barber-saas — v1 Launch Plan
+# Bookilo — v1 Launch Plan
+
+**Product name:** Bookilo. Sending domain `bookilo.de`, verified in Resend. The repo, Vercel project, and database keep the name `barber-saas` — none of it is user-facing and renaming it buys nothing but a broken git remote. Earlier name candidates are dropped and should not reappear anywhere.
 
 **Decision recorded:** single codebase, single architecture. Target = barber shops + hair salons only. Differentiation is terminology, branding, and demo seed data. No new domain entities (`Resource`, `Room`, `Equipment` all deferred).
 
@@ -23,17 +25,36 @@ Do not reorder. Phase 17 before demos is the trap.
 
 Everything here is a hard blocker. The project has never been imported to Vercel.
 
-### 14.1 — Env & config prep (local)
+### 14.1 — Env & config prep (local) — **closed**
 
-- New `RESEND_API_KEY` (fresh `chairlyy` Resend account) in local `.env`
-- Grep and replace hardcoded `milan.uzelac1997@gmail.com` — owner notifications will silently fail otherwise, since sandbox now only permits `chairlyy@gmail.com`
-- Resend `from` → display name format
-- Inventory every env var the app reads, so nothing is missing in Vercel
+- New `RESEND_API_KEY` (fresh `chairlyy` Resend account) in local `.env` — done. The account email stays `chairlyy@gmail.com`; it is an internal account detail and not the product name.
+- `bookilo.de` verified in Resend, so sending is no longer sandboxed. `EMAIL_FROM` is `Bookilo <noreply@bookilo.de>` in local `.env`, read from the environment by `lib/email/resend.ts` — no sender is hardcoded anywhere.
+- Grep for hardcoded `milan.uzelac1997@gmail.com`: **zero occurrences in code.** The only mentions were in this document's own prose. The owner address comes from `Tenant.owner`, and the seed reads `SEED_OWNER_EMAIL` (default `owner@demo.test`), which is left as it is.
+- Resend `from` → display name format: already correct, and correct by construction rather than by luck — it's one env var read per call.
+- Product name applied to everything user-facing: root and dashboard metadata, the login screen, and a `Sent by Bookilo` sign-off on both emails. `Tenant.name` is untouched — that's the individual shop's name and must never be swept into a brand rename.
+- Env inventory below.
+
+**Env var inventory** — everything the app or its tooling reads. All server-only; there is no `NEXT_PUBLIC_*` variable in this codebase, so nothing here reaches the client bundle.
+
+| Var | Required | Read by | Notes |
+|---|---|---|---|
+| `DATABASE_URL` | **yes** | `schema.prisma`, runtime | Pooled (pgbouncer) connection |
+| `DIRECT_URL` | **yes** | `schema.prisma`, Prisma CLI | Non-pooled; migrations need it |
+| `AUTH_SECRET` | **yes** | Auth.js, implicitly | Must be set in Vercel before deploy |
+| `APP_URL` | **yes in prod** | `lib/email/booking-emails.ts` | See 14.2 — the silent one |
+| `RESEND_API_KEY` | yes in prod | `lib/email/resend.ts` | Blank locally = log instead of send |
+| `EMAIL_FROM` | yes in prod | `lib/email/resend.ts` | `Bookilo <noreply@bookilo.de>` |
+| `SEED_OWNER_EMAIL` | no | `prisma/seed.ts` | Defaults to `owner@demo.test` |
+| `SEED_OWNER_PASSWORD` | no | `prisma/seed.ts` | Defaults to `demo-password-123` |
+| `NODE_ENV` | set by platform | `lib/db/prisma.ts`, probe script | Not something to configure |
+
+`.env.example` now documents all of these, including the two seed vars, which it previously didn't mention at all.
 
 ### 14.2 — Vercel project creation
 
 - Import `barber-saas` (never imported — the Import button in the Vercel UI confirms this)
-- Set env vars for Production
+- Set env vars for Production, per the 14.1 inventory
+- **`APP_URL` is required in Production, and it is the one that fails silently.** It falls back to `http://localhost:3000` instead of throwing, so a deploy without it succeeds, serves normally, logs nothing — and every confirmation email carries a cancel link pointing at the customer's own machine. Nothing surfaces this except a customer clicking a dead link. Treat it as a hard prerequisite alongside `AUTH_SECRET`, not as optional polish.
 - Watch for `AUTH_URL` / `NEXTAUTH_URL` — Auth.js v5 commonly breaks in prod on this alone
 
 ### 14.3 — Production database
@@ -53,7 +74,7 @@ These are things that pass locally and can fail in prod:
 
 - **Exclusion constraint under Neon pooled connections.** You proved double-booking prevention under real concurrency locally. Serverless + pgBouncer is a different execution environment. Re-prove it in prod.
 - **Auth.js edge/Node split on real Vercel edge runtime**
-- **Root URL** currently renders "Shop not found" — a customer-facing error at the bare domain. Cheap fix, do it now.
+- **First real email from a verified domain.** Everything before now went through Resend's sandbox. A verified domain changes the failure mode rather than removing it: sends can still be rejected per-recipient, and Resend reports that in the response body instead of throwing. Send one booking on prod and confirm it arrives — and whether it lands in inbox or spam, since `bookilo.de` has no sending reputation yet.
 
 ---
 
@@ -78,7 +99,7 @@ Also worth a narrow pass: **accessibility on the public booking page only.** Key
 - Second seed file: salon demo tenant with authentic services and staff names
 - `DEMO.md` in the repo
 
-**DEMO.md must explicitly state:** during a demo, book using *your own* email (`chairlyy@gmail.com`). Never the prospect's. Resend is in sandbox mode without a verified domain — a prospect's address will silently fail. This is the single most likely way the demo breaks in front of a real person.
+**DEMO.md and email during a demo.** The sandbox restriction is gone — `bookilo.de` is verified, so a prospect's own address will actually receive mail, and booking with their address is now the stronger demo. What remains true and belongs in DEMO.md: a new domain has no sending reputation, so the first emails can land in spam. Check where a test send lands before a meeting, and if it's spam, book with your own address in front of them instead of gambling on their inbox.
 
 DEMO.md should also carry: the exact walkthrough order, what to say at each screen, the reset-before-meeting command, and honest answers to known rough edges (no payments, no SMS, no POS).
 
@@ -96,22 +117,26 @@ Categories to review when you get here: duplicated code, dead code, unnecessary 
 
 Run these one phase at a time. Review each plan before approving. Manual-approve mode for anything touching writes, schema, auth, or tenant boundaries.
 
-### Prompt 14.1 — Env prep
+### Prompt 14.1 — Env prep — **run, closed**
+
+Kept for the record. Two of its premises changed while it was being run: the
+sending domain was bought and verified, so the sandbox constraint and the
+`onboarding@resend.dev` sender it asked for are both obsolete, and the product
+was named Bookilo. The findings are folded into 14.1 above.
 
 ```
 Day 14, step 1 of the production deploy. Local changes only — no deploy yet.
 
 Context: I created a new Resend account under chairlyy@gmail.com. The old
-account (milan.uzelac1997@gmail.com) and its API key are dead. The new account
-has no verified domain, so it is in sandbox mode: outbound email can ONLY be
-delivered to chairlyy@gmail.com.
+account (milan.uzelac1997@gmail.com) and its API key are dead. bookilo.de is
+now verified on the new account, so sending is not sandboxed.
 
 Tasks:
 1. Grep the entire repo for milan.uzelac1997@gmail.com — including seed files,
    env examples, test fixtures, and any hardcoded owner-notification address.
    Report every occurrence with file and line before changing anything.
-2. Change the Resend `from` field to use a display name while keeping the
-   address as onboarding@resend.dev (domain is not verified).
+2. Confirm the Resend `from` field is read from EMAIL_FROM rather than
+   hardcoded, and that it uses the display-name format.
 3. Produce a complete inventory of every environment variable this app reads
    at build time and at runtime, with which are required vs optional, and
    which are server-only vs public. I need this list to configure Vercel.
@@ -160,9 +185,6 @@ Two things passed locally that I do not trust in production until re-proven:
 
 2. The Auth.js edge/Node split on the real Vercel edge runtime.
 
-Also: the root URL currently renders "Shop not found", a customer-facing
-error page at the bare domain. Propose a fix (landing page or redirect).
-
 Give me a manual verification checklist — exact click-throughs to perform on
 the live URL as both owner and customer, and what correct behaviour looks
 like for each.
@@ -205,9 +227,10 @@ no new domain entities. Resource, Room, and Equipment are explicitly deferred.
 3. DEMO.md in the repo.
 
 DEMO.md must include, prominently:
-- Resend is in sandbox mode (no verified domain). During a demo I must book
-  using MY OWN email (chairlyy@gmail.com). A prospect's address will silently
-  fail. This is a known demo risk and must be stated at the top.
+- Email deliverability. bookilo.de is verified, so a prospect's address does
+  receive mail — but the domain has no sending reputation yet, so the first
+  sends may go to spam. State how to check before a meeting and what to do
+  if it's landing in spam.
 - The exact walkthrough order and what to say at each screen.
 - The reset-before-meeting command.
 - Honest answers for known gaps: no payments, no SMS reminders, no POS.
@@ -243,7 +266,7 @@ ignore the second.
 
 Claude Code cannot confirm any of these. Do them yourself:
 
-- A confirmation email actually landing in `chairlyy@gmail.com` — **and whether it lands in inbox or spam.** `onboarding@resend.dev` with no verified domain is frequently filtered. If it goes to spam, that is a demo risk to write into DEMO.md.
+- A confirmation email from `noreply@bookilo.de` actually arriving — **and whether it lands in inbox or spam.** Verification fixes authentication, not reputation: a domain that has never sent mail is still frequently filtered. Test to an address you control and to one you don't (a second provider). If it goes to spam, that is a demo risk to write into DEMO.md.
 - The live Vercel URL loading and working on your **phone**, on mobile data, not just your laptop
 - The full owner + customer click-through in a real browser
 - Raw output of the prod concurrency test

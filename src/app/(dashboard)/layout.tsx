@@ -1,9 +1,19 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
 import { getCurrentTenant, requireSession } from "@/lib/auth/session";
 
 import { signOutAction } from "./actions";
+
+/**
+ * The brand suffix lives on this layout rather than the root one so it applies
+ * to the owner-facing subtree only. The public shop pages under (public)/b/
+ * keep titles that are purely the shop's name — see the note in app/layout.tsx.
+ */
+export const metadata: Metadata = {
+  title: { default: "Bookilo", template: "%s · Bookilo" },
+};
 
 /**
  * The owner dashboard's shell: auth guard, header, nav.

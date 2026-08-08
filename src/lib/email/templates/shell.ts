@@ -46,6 +46,17 @@ export function escapeHtml(value: string): string {
 const FONT =
   "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
+/**
+ * The product sign-off, on every email, below the shop's own footer lines.
+ *
+ * Kept here rather than passed in by each template so there is exactly one
+ * place the brand is spelled — and so a new email can't ship without it. It
+ * sits last and small on purpose: the sender a customer cares about is the
+ * shop, and an email that leads with the software's name instead of the
+ * barber's reads like spam. This is attribution, not a header.
+ */
+const SIGN_OFF = "Sent by Bookilo";
+
 export function renderHtml(content: EmailContent): string {
   const rows = content.rows
     .map(
@@ -85,6 +96,7 @@ export function renderHtml(content: EmailContent): string {
     </table>
     ${action}
     ${footer}
+    <p style="margin:20px 0 0;padding-top:14px;border-top:1px solid #f4f4f5;color:#a1a1aa;font-size:12px;">${escapeHtml(SIGN_OFF)}</p>
   </div>
 </div>`;
 }
@@ -113,6 +125,8 @@ export function renderText(content: EmailContent): string {
   if (content.footerLines.length) {
     parts.push("", ...content.footerLines);
   }
+
+  parts.push("", SIGN_OFF);
 
   return `${parts.join("\n")}\n`;
 }

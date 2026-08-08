@@ -1,36 +1,71 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Bookilo
 
-## Getting Started
+Online booking for barbershops and hair salons. Each shop gets a public booking
+page at `/b/{slug}` that its customers use without an account, and an owner
+dashboard at `/dashboard` for the calendar, staff, services, and settings.
 
-First, run the development server:
+`barber-saas` is the repository, Vercel project, and database name. It predates
+the product name and is deliberately left alone — none of it is user-facing, and
+renaming it would break the git remote for nothing.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Stack
+
+- Next.js (App Router) with Server Actions — no separate API layer
+- Postgres on Neon, via Prisma 6
+- Auth.js v5, credentials provider, owner accounts only
+- Luxon for all date/time math
+- Resend for transactional email
+- Tailwind CSS
+- Vitest
+
+## Getting started
+
+```
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Copy `.env.example` to `.env` and fill it in. `DATABASE_URL`, `DIRECT_URL`, and
+`AUTH_SECRET` are the three you cannot start without. Leave `RESEND_API_KEY` and
+`EMAIL_FROM` blank locally — the booking flow then logs each email it would have
+sent instead of sending it, so the whole flow works end to end with no
+credentials on the machine.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+npx prisma migrate dev
+npm run db:seed
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The seed creates one demo tenant, `kastanien-barbershop`, with staff, services,
+and working hours. Sign in with `SEED_OWNER_EMAIL` / `SEED_OWNER_PASSWORD`
+(defaults in `.env.example`).
 
-## Learn More
+- Public booking page: http://localhost:3000/b/kastanien-barbershop
+- Owner dashboard: http://localhost:3000/login
 
-To learn more about Next.js, take a look at the following resources:
+## Checks
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+npm run typecheck
+npm run lint
+npm test
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+`npm run typecheck` is not optional and not implied by the other two. Vitest
+strips types rather than checking them, so a green suite says nothing about
+whether `tsc` accepts the code.
 
-## Deploy on Vercel
+## Working on this codebase
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Read `CLAUDE.md` first — it holds the non-negotiable rules, chiefly that every
+tenant-owned query goes through `lib/db/*` with an explicit `tenantId`. Scope
+lives in `EXECUTION-PLAN.md`; the path to launch is in `V1-LAUNCH-PLAN.md`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Two things that are easy to break without noticing:
+
+- `prisma db push` must never be run here. The double-booking guarantee is a
+  hand-written Postgres exclusion constraint that Prisma's schema language
+  can't express, so `db push` sees it as unrecognized drift and drops it.
+  Always `prisma migrate dev` / `prisma migrate deploy`.
+- Every `DateTime` column is a UTC instant. Convert with Luxon against
+  `tenant.timezone` only at the boundary — parsing input, and rendering output.

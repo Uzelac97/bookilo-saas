@@ -12,10 +12,18 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Overridden per shop by generateMetadata in (public)/b/[slug].
+/**
+ * The product's own metadata, and only a fallback.
+ *
+ * Deliberately no `title.template` here. A template on the root layout would
+ * cascade into (public)/b/[slug], where the title is the shop's name — and a
+ * customer booking a haircut is a customer of the shop, not of Bookilo. The
+ * owner-facing subtree gets the brand suffix from (dashboard)/layout.tsx
+ * instead, which is the only place it belongs.
+ */
 export const metadata: Metadata = {
-  title: "Book an appointment",
-  description: "Online booking for barbershops.",
+  title: "Bookilo",
+  description: "Online booking for barbershops and hair salons.",
 };
 
 export default function RootLayout({

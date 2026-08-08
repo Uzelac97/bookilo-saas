@@ -40,6 +40,21 @@ describe("escapeHtml", () => {
   });
 });
 
+describe("the shared shell", () => {
+  it("signs both emails off with the product name, in HTML and text", () => {
+    // One place spells the brand (shell.ts), so this asserts on both templates
+    // rather than on the constant — the thing that could regress is a new email
+    // rendering without it, not the string itself.
+    const confirmation = renderBookingConfirmation(booking(), CANCEL_URL);
+    const notification = renderOwnerNotification(booking(), "+491761234567");
+
+    for (const mail of [confirmation, notification]) {
+      expect(mail.html).toContain("Sent by Bookilo");
+      expect(mail.text).toContain("Sent by Bookilo");
+    }
+  });
+});
+
 describe("renderBookingConfirmation", () => {
   it("renders the appointment in the shop's timezone, not the server's", () => {
     // 12:30 UTC is 14:30 in Berlin. A confirmation an hour out is the single

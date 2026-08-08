@@ -1,7 +1,11 @@
-# Execution Plan — Barbershop Booking SaaS (MVP)
+# Execution Plan — Bookilo (MVP)
 
-Solo developer, Claude Code-assisted, Next.js/TypeScript/Prisma/PostgreSQL/Tailwind/Vercel.
-Companion files: `schema.prisma`, `CLAUDE.md`.
+Booking for barbershops and hair salons. Solo developer, Claude Code-assisted,
+Next.js/TypeScript/Prisma/PostgreSQL/Tailwind/Vercel.
+Companion files: `schema.prisma`, `CLAUDE.md`, `V1-LAUNCH-PLAN.md`.
+
+The repo, Vercel project, and database are named `barber-saas`, which predates the
+product name. That stays — none of it is user-facing.
 
 This is the **final** scope. Where I cut something from the earlier strategy draft, I've said so and why — the instruction was to be critical, so I went back and removed a few things that didn't earn their place yet.
 
@@ -529,6 +533,11 @@ and tested entirely against Resend's sandbox, which delivers only to the
 account owner's own address. That limitation was invisible during
 development, because the developer's address is the one it delivers to.
 
+Closed 8 Aug 2026 in 14.1, thirteen days late: `bookilo.de` is bought and
+verified. The Day 1 reasoning was sound and the cost of ignoring it was paid in
+full — every email in the product was written and tested against a delivery
+path that no real customer would ever use.
+
 ### Deferred out of Day 14
 
 - **The full production-readiness review was cut down to security only.** The
@@ -557,3 +566,58 @@ development, because the developer's address is the one it delivers to.
   breaks in front of a real person. Resolved by buying a domain and
   verifying DNS — roughly €10–15/year, worth doing the moment a prospect
   wants a trial, not before.
+
+  **Closed 8 Aug 2026, during 14.1.** The item above is left as written rather
+  than edited into agreement with the present, per the convention two sections
+  up. What it said: sending was sandbox-limited to one address, a prospect's
+  address would silently fail, and `DEMO.md` had to lead with that warning.
+  What changed: `bookilo.de` was bought and verified in Resend the same day, so
+  none of it holds any more. `EMAIL_FROM` is now
+  `Bookilo <noreply@bookilo.de>`, a prospect's own address receives mail, and
+  booking with their address is the better demo. The "book with your own
+  address" instruction is withdrawn from the Phase 16 plan, because a stale
+  warning read mid-demo is worse than no warning.
+
+  Two things the item got right that survive it. Its cost estimate was
+  accurate — the domain came in inside the €10–15/year it predicted, which
+  makes "worth doing the moment a prospect wants a trial" look conservative in
+  hindsight; it was worth doing on Day 1, as originally planned and skipped.
+  And its diagnosis of *why* the failure was silent was correct and still is:
+  the send failure is caught so bookings don't break. Verification removed one
+  cause of silent non-delivery, not the silence itself — see the next item,
+  which is that same silence with a different trigger.
+
+  What verification does not buy is reputation. A domain that has never sent
+  mail is routinely filtered, so "does it arrive, and does it arrive in the
+  inbox" stays a manual pre-demo check rather than a settled question.
+
+- **A send that never happens still reports success, and nothing in the app
+  can tell.** `sendEmail` returns `{ ok: true, skipped: true }` when
+  `RESEND_API_KEY` or `EMAIL_FROM` is absent, logging at `console.info` and
+  sending nothing. That is exactly right locally — it's what lets the booking
+  flow work end to end with no credentials on a laptop — and it is the wrong
+  shape in production, because a Vercel environment missing either variable
+  produces bookings that look completely healthy and confirmations that never
+  existed. `ok: true` is the same value a real send returns, so no caller can
+  distinguish them, and the one trace is an info line in a serverless log
+  nobody reads.
+
+  `APP_URL` has the same shape and is worse, because it fails while
+  configured-looking: absent, it falls back to `http://localhost:3000`, and
+  every confirmation ships a cancel link to the customer's own machine. The
+  email sends, arrives, and is broken.
+
+  Not fixed now because the correct fix is a decision, not a patch, and it
+  wants one pass over all three variables rather than three ad-hoc guards.
+  The options, for when it's taken: fail the build on a missing required var
+  in production; or keep the tolerant runtime path but promote the skip from
+  `info` to `error` when `NODE_ENV === "production"`, so the log line is at a
+  level that gets noticed. The first is a real guarantee; the second is
+  cheap and doesn't risk a boot loop on a deploy. Either way the deciding
+  constraint is that a booking must still never fail because email is
+  misconfigured — that part of the current behaviour is correct and stays.
+
+  Mitigated in the meantime by documentation only: `.env.example` and
+  V1-LAUNCH-PLAN 14.2 both now state that `APP_URL` is required in production
+  and why its failure is invisible. Documentation is not a control, which is
+  why this stays on the list.
