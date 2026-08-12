@@ -111,6 +111,12 @@ Deferred deliberately. None of these are why a barber says no, and half of what 
 
 Categories to review when you get here: duplicated code, dead code, unnecessary complexity, naming consistency, architecture boundaries, TypeScript strictness gaps, React/Next.js patterns, Prisma query efficiency (N+1s), performance, UI consistency.
 
+Specific items found and deferred:
+
+- The "Shop not found" error page is shown both when a shop slug is genuinely invalid *and* when the shop is real but the cancel token is invalid or tampered with (found during 14.3's C7 tamper test). The message is accurate in both cases but slightly misleading in the second — the shop was found; the token wasn't. Low priority.
+
+- **`SEED_OWNER_EMAIL` on a production re-seed — not a Phase 17 item, recorded here so it isn't lost. Read this before the next `db:seed` against prod.** Production's owner is `chairlyy@gmail.com`; `prisma/seed.ts` defaults `SEED_OWNER_EMAIL` to `owner@demo.test`. `upsertOwner` upserts *by email*, so a bare re-seed finds no match and **creates a second OWNER user on production** with the documented default password `demo-password-123` — and `upsertTenant` rewrites `Tenant.contactEmail` to the same default, silently redirecting owner-notification email away from the real address. Neither failure is visible in the seed's own output. Always run it as `$env:SEED_OWNER_EMAIL = 'chairlyy@gmail.com'` first, and read back `user.count()` and `tenant.contactEmail` afterwards to confirm they didn't move. The real fix, when Phase 17 arrives, is for the seed to resolve the existing owner off the tenant rather than off an env-var default.
+
 ---
 
 ## Claude Code prompts
