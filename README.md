@@ -4,9 +4,10 @@ Online booking for barbershops and hair salons. Each shop gets a public booking
 page at `/b/{slug}` that its customers use without an account, and an owner
 dashboard at `/dashboard` for the calendar, staff, services, and settings.
 
-`barber-saas` is the repository, Vercel project, and database name. It predates
-the product name and is deliberately left alone — none of it is user-facing, and
-renaming it would break the git remote for nothing.
+`bookilo-saas` is both the repository and the Vercel project name. Production data
+lives in the Neon project `bookilo-prod`, separate from the development one. None
+of it is user-facing. An earlier decision kept the original `barber-saas` name;
+that was reversed, and the correction is recorded in `EXECUTION-PLAN.md`.
 
 ## Stack
 

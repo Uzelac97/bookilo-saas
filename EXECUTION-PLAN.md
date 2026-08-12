@@ -4,8 +4,11 @@ Booking for barbershops and hair salons. Solo developer, Claude Code-assisted,
 Next.js/TypeScript/Prisma/PostgreSQL/Tailwind/Vercel.
 Companion files: `schema.prisma`, `CLAUDE.md`, `V1-LAUNCH-PLAN.md`.
 
-The repo, Vercel project, and database are named `barber-saas`, which predates the
-product name. That stays — none of it is user-facing.
+The repository and the Vercel project are both named `bookilo-saas`; production data
+lives in the Neon project `bookilo-prod`, separate from the development one. None of
+it is user-facing. This reverses the original "keep the `barber-saas` name" decision —
+recorded as a correction under "A naming decision that was reversed outside the plan"
+below rather than silently updated.
 
 This is the **final** scope. Where I cut something from the earlier strategy draft, I've said so and why — the instruction was to be critical, so I went back and removed a few things that didn't earn their place yet.
 
@@ -538,7 +541,38 @@ verified. The Day 1 reasoning was sound and the cost of ignoring it was paid in
 full — every email in the product was written and tested against a delivery
 path that no real customer would ever use.
 
-### Deferred out of Day 14
+### A naming decision that was reversed outside the plan
+
+Found 12 Aug 2026, during 14.3. Recorded here for the same reason as the two
+above: the decision was made, written down with its cost stated, and then
+reversed by something that never went through the plan. Overwriting the old text
+would leave three documents quietly agreeing with a history that didn't happen.
+
+**The decision was to keep `barber-saas` everywhere.** Stated in
+`V1-LAUNCH-PLAN.md` as: none of it is user-facing, and renaming "buys nothing but
+a broken git remote." The reasoning was sound and the predicted cost was the right
+one to predict.
+
+**The repo was renamed to `bookilo-saas` on GitHub anyway.** Outside any
+deliberate process recorded here; cause unconfirmed. The predicted cost was then
+paid exactly as written — `origin` still pointed at `barber-saas.git`, and pushes
+kept working only on GitHub's rename-redirect courtesy, which is not a guarantee
+and expires if the old name is ever reclaimed. That went unnoticed until a push on
+12 Aug 2026 printed the redirect notice; `origin` was repointed the same day.
+
+**A second, older error surfaced with it.** The line above claimed the *Vercel
+project* was named `barber-saas` too. It never was: `bookilo-saas` was typed
+deliberately at import during 14.2, so that clause was already false from 14.2
+onward, independent of the GitHub rename. It survived because nothing reads a
+Vercel project's name to do its job — the same reason "Vercel linked" went
+unnoticed for thirteen days.
+
+**What remains unverified:** whether the GitHub rename desynced Vercel's Git link.
+A rename normally propagates, because the integration stores the numeric
+repository ID rather than `owner/name` — but that is the general behaviour, not a
+check that was run. It could not be checked from the development machine: no
+`.vercel/` directory, no Vercel CLI, no `VERCEL_TOKEN`, and `gh` unauthenticated.
+The decisive test is whether commit `5ab1aab` produced a deployment.
 
 - **The full production-readiness review was cut down to security only.** The
   original ask covered seventeen categories — clean code, duplication, dead

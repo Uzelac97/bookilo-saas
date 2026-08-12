@@ -1,6 +1,8 @@
 # Bookilo — v1 Launch Plan
 
-**Product name:** Bookilo. Sending domain `bookilo.de`, verified in Resend. The repo, Vercel project, and database keep the name `barber-saas` — none of it is user-facing and renaming it buys nothing but a broken git remote. Earlier name candidates are dropped and should not reappear anywhere.
+**Product name:** Bookilo. Sending domain `bookilo.de`, verified in Resend. The repo and the Vercel project are both `bookilo-saas`; production data is the Neon project `bookilo-prod`, separate from dev. Earlier name candidates are dropped and should not reappear anywhere.
+
+**Correction — the "keep it named `barber-saas`" decision was reversed, not revisited.** This line used to say the repo, Vercel project, and database all keep the name `barber-saas`, on the grounds that none of it is user-facing and renaming "buys nothing but a broken git remote." That reasoning still holds; it simply lost. The repo was renamed on GitHub outside any process recorded here (cause unconfirmed), and the predicted cost was paid in full — `origin` went stale, pushes survived only on GitHub's redirect courtesy, and nobody noticed until a push on 12 Aug 2026 printed the redirect notice. The Vercel half of the old claim was never true: `bookilo-saas` was typed deliberately at import during 14.2. Kept as a correction rather than a silent edit, consistent with the Day 1 Vercel-link and domain-verification corrections in `EXECUTION-PLAN.md`, where the fuller record lives.
 
 **Decision recorded:** single codebase, single architecture. Target = barber shops + hair salons only. Differentiation is terminology, branding, and demo seed data. No new domain entities (`Resource`, `Room`, `Equipment` all deferred).
 
