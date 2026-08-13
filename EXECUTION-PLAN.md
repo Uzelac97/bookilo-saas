@@ -38,11 +38,20 @@ This is the **final** scope. Where I cut something from the earlier strategy dra
 ### What's excluded entirely for now
 
 Staff login, SMS/WhatsApp reminders, deposits/payments, multi-location,
-analytics dashboard, customer accounts, i18n, recurring/subscription
+analytics dashboard, customer accounts, ~~i18n~~, recurring/subscription
 bookings, reviews or any marketplace surface, POS/inventory, granular
 permissions beyond Owner/Staff, `Resource`/rooms/bays/equipment, any
 vertical beyond barber shops and hair salons, custom domains, wildcard
 subdomains.
+
+**Correction — `i18n` was reversed on 13 Aug 2026 and is now near-term rather
+than excluded.** Struck in place rather than deleted, same as the Day 1
+corrections and the `barber-saas` → `bookilo-saas` rename further down: this
+entry was wrong about the product's actual market, and a list that quietly drops
+its own mistakes stops being a record of what was decided. It now runs as Phase
+15a, immediately after the security audit and *before* the salon vertical. The
+full entry, with the cost it accepts, is in "Decisions recorded after 14.3"
+below. Everything else on this list stands unchanged.
 
 ### Standing boundary: per-tenant customization vs. custom development
 
@@ -273,7 +282,9 @@ de-risks the project; a slightly later demo does not.
 | 14.2 | First-ever Vercel import, env vars set in the dashboard, new Neon branch for production, first `prisma migrate deploy` against it, demo tenant seeded on prod                                                                                                                                                                                                                                                                                                                                   |
 | 14.3 | Prod verification: exclusion constraint re-proven under Neon pooled connections, Auth.js edge/Node split on real Vercel runtime, root-URL fix, full owner + customer click-through on the live URL from a phone                                                                                                                                                                                                                                                                                 |
 | 15   | Security and tenant-isolation audit — the only pre-launch review that runs. Narrow accessibility pass on the public booking page only                                                                                                                                                                                                                                                                                                                                                           |
+| 15a  | i18n (German default, English toggle) + light/dark mode toggle + drag-to-select booking on the calendar. Inserted 13 Aug 2026; i18n is a reversal of an exclusion, the other two are new. See "Decisions recorded after 14.3"                                                                                                                                                                                                                                                                    |
 | 16   | `Tenant.vertical` + terminology map, salon demo tenant seed, `DEMO.md`                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 16a  | Landing page — deliberately last, and deliberately not an SEO surface                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | 17   | Code quality pass — **runs after the first 3–5 real demos, not before**                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 By day 7 you have a working booking loop. By day 14 — realistically closer to day ~18–20
@@ -567,12 +578,95 @@ onward, independent of the GitHub rename. It survived because nothing reads a
 Vercel project's name to do its job — the same reason "Vercel linked" went
 unnoticed for thirteen days.
 
-**What remains unverified:** whether the GitHub rename desynced Vercel's Git link.
+**What remains unverified — naming:** whether the GitHub rename desynced Vercel's Git link.
 A rename normally propagates, because the integration stores the numeric
 repository ID rather than `owner/name` — but that is the general behaviour, not a
 check that was run. It could not be checked from the development machine: no
 `.vercel/` directory, no Vercel CLI, no `VERCEL_TOKEN`, and `gh` unauthenticated.
 The decisive test is whether commit `5ab1aab` produced a deployment.
+
+### Decisions recorded after 14.3
+
+Recorded 13 Aug 2026, from decisions taken during and after the production
+verification. Same posture as the standing boundaries above: each states what was
+decided, what it costs, and why the cost is worth paying. A decision recorded
+without its price is a preference, and gets renegotiated the first time it is
+inconvenient.
+
+Inserted as `15a` and `16a` rather than by renumbering. The `a` suffix is the
+convention this plan already uses for a phase slotted in after the fact (Day
+12a), and renumbering would silently invalidate every "Phase 16" and "Phase 17"
+reference in this file, in `V1-LAUNCH-PLAN.md`, and in the commit history.
+
+**1. i18n — German default, English toggle. Reversed from "excluded entirely" to
+the next thing built after Phase 15.** The original exclusion treated i18n as a
+future-market concern, which is the one thing it is not. The demo is conducted in
+person, in Germany, to German shop owners: an English-only interface is a live
+objection in the actual meeting, raised by the actual prospect, not a hypothetical
+cost of expanding later. Secondary and real, but not the reason: an English toggle
+gives the codebase portfolio value in English-language job interviews, which is a
+genuine second audience for this work.
+
+*Cost:* translation and locale plumbing land before the salon vertical, pushing
+Phase 16 and the landing page later by however long it takes. Every user-facing
+string in the product becomes two strings, and every screen added after this costs
+more to build than one added before it. This is the largest single scope addition
+since the MVP was fixed, and it touches every screen in the app. Accepted because
+a demo the prospect cannot read is not a demo. *Scope limit:* a default locale
+plus a toggle. Not locale-routed URLs, not per-tenant language settings, not a
+translation-management service — those stay excluded and would need their own
+decision.
+
+**2. Light/dark mode toggle — new deliberate addition, Phase 15a.** Not a
+reversal: dark mode has never been excluded in writing anywhere in this plan, in
+`V1-LAUNCH-PLAN.md`, or in `CLAUDE.md`, so it is recorded as a plain new decision
+rather than dressed up as a correction. Motivation is demo polish — the kind of
+thing a prospect notices in thirty seconds and reads as "this is a real product."
+
+The implementation constraints are already on record in the code and are
+referenced rather than restated: `globals.css:71-74` (a dark theme needs the whole
+palette, not two variables), `globals.css:13` (`color-scheme: light` must change,
+or browser-painted chrome — scrollbars, autofill shading, the date/time picker
+panel, the caret — stays locked light against a dark page), and `field.tsx:60`
+(the Tailwind v4 preflight regression that produced white-on-white form text the
+last time a `prefers-color-scheme` block existed here; the new theme has to be
+tested against exactly that case).
+
+*Cost:* doubles the surface needing visual QA before the demo — every screen, in
+both themes, including the ones nobody looks at twice. The failure mode is not a
+missing feature but one unreviewed screen rendering unreadably in front of a
+prospect, which is worse than having no dark mode at all.
+
+**3. Drag-to-select booking on the calendar — new deliberate addition, Phase
+15a.** Also not a reversal; no prior exclusion exists. Outlook/Google
+Calendar-style range selection: drag across a time range to open a booking
+prefilled with it. On touch, selection begins with a **long press, not a plain
+drag** — plain drag on a touch device collides with the scroll gesture, and the
+calendar is a scrolling surface on exactly the screens where this matters most.
+
+*Reason:* ergonomics for daily use. The calendar is the screen a shop owner opens
+many times a day, and it is currently the slowest path in the product for the most
+common action. This is the one item of the three that pays off after the demo
+rather than during it.
+
+*Cost:* real implementation complexity, not a UI toggle. Pointer event handling
+across mouse and touch, a selection state that survives re-render, and hit-testing
+against the existing lane layout in `calendar-layout.ts`. This is the item most
+likely to overrun its estimate, and the first to cut if Phase 15a threatens the
+demo date.
+
+**4. Landing page — confirmed deliberately last, after items 1–3 and after Phase
+16.** Its purpose is a link to leave with a shop owner after an in-person pitch,
+so they can find the product again and show a partner. It is not an SEO or
+organic-discovery surface and it is not the top of a funnel.
+
+*Cost:* no organic discovery at all until it exists, and no URL to hand over in the
+meantime beyond the demo tenant's booking page. Accepted, because the acquisition
+channel for the first customers is walking into shops in Stuttgart, not search. A
+landing page built before the features that make the demo credible would be a page
+describing a product the prospect had just watched fall short.
+
+### Deferred out of Day 14
 
 - **The full production-readiness review was cut down to security only.** The
   original ask covered seventeen categories — clean code, duplication, dead

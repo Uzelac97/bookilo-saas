@@ -16,10 +16,21 @@
 |---|---|---|
 | **14** | First production deploy | Blocks everything — you cannot demo from localhost |
 | **15** | Security & tenant-isolation audit | Blocks real customer data |
+| **15a** | i18n (DE default, EN toggle) + light/dark mode + drag-to-select booking | Blocks the German in-person demo |
 | **16** | Salon vertical + DEMO.md | Blocks salon demos |
+| **16a** | Landing page | Blocks nothing — deliberately last |
 | **17** | Code quality pass | **After** first 3–5 demos |
 
 Do not reorder. Phase 17 before demos is the trap.
+
+**15a and 16a were inserted on 13 Aug 2026**, after the 14.3 production
+verification. Lettered rather than renumbered, so every existing "Phase 16" and
+"Phase 17" reference stays valid — the same convention as Day 12a. i18n moving
+here is a **reversal** of its "excluded entirely" entry in `EXECUTION-PLAN.md`,
+struck in place there rather than deleted; dark mode and drag-to-select were never
+excluded anywhere and are recorded as plain new decisions. The reasoning and the
+cost each one accepts live in "Decisions recorded after 14.3" in
+`EXECUTION-PLAN.md`; what follows here is what actually gets built.
 
 ---
 
@@ -95,6 +106,56 @@ Also worth a narrow pass: **accessibility on the public booking page only.** Key
 
 ---
 
+## Phase 15a — i18n, dark mode, drag-to-select
+
+Three items grouped because they share one gate: all of them are things a
+Stuttgart shop owner sees during the pitch. Ordered within the phase by what the
+demo actually depends on.
+
+**i18n — German default, English toggle.** The demo is in person, in Germany, in
+German. English-only is an objection the prospect raises in the room, which is
+what moved this off the excluded list. Ship a default locale plus a toggle —
+**not** locale-routed URLs, per-tenant language settings, or a translation
+service; those remain out of scope and would need their own decision.
+
+The cost is that every user-facing string becomes two, and it lands before the
+salon vertical rather than after, so Phase 16 and the landing page both move
+later. Worth checking before starting: the seeded demo tenant's service names,
+staff names and categories are German already, so the translation surface is the
+app chrome, not the demo content.
+
+**Light/dark mode toggle.** Demo polish, and the fastest-read signal that this is
+a finished product rather than a prototype. Three constraints are already written
+into the code and should be read before starting rather than rediscovered:
+
+- `globals.css:71-74` — a dark theme needs the whole palette, not two variables
+- `globals.css:13` — `color-scheme: light` has to change, or browser-painted UI
+  (scrollbars, autofill shading, the date/time picker panel, the caret) stays
+  locked light against a dark page
+- `field.tsx:60` — the Tailwind v4 preflight regression that produced
+  white-on-white form text the last time a `prefers-color-scheme` block lived in
+  this app. Test the new theme against exactly that case
+
+The cost is QA surface: every screen, in both themes, before the demo. One
+unreviewed screen rendering unreadably in front of a prospect is worse than
+having no dark mode at all.
+
+**Drag-to-select booking on the calendar.** Outlook/Google Calendar-style range
+selection — drag across a time range, get a booking form prefilled with it. On
+touch, selection starts with a **long press, never a plain drag**: plain drag
+collides with the scroll gesture, and the calendar scrolls on exactly the devices
+where this matters most.
+
+This is ergonomics for daily use rather than demo polish — the calendar is opened
+many times a day and is currently the slowest path to the most common action. It
+is also the only item here with real engineering risk: pointer events across mouse
+and touch, selection state that survives re-render, and hit-testing against the
+existing lane layout in `calendar-layout.ts`. **If this phase threatens the demo
+date, cut this item first** — the other two are visible in the first thirty
+seconds of a pitch and this one is not.
+
+---
+
 ## Phase 16 — Salon vertical + demo material
 
 - `Tenant.vertical` enum (`BARBER | SALON`) + terminology map (`staffLabel`, `serviceLabel`, etc.)
@@ -107,6 +168,24 @@ DEMO.md should also carry: the exact walkthrough order, what to say at each scre
 
 ---
 
+## Phase 16a — Landing page
+
+Deliberately last, and the ordering is the decision — not an oversight to correct
+later.
+
+Its job is to be **a link you leave behind after an in-person pitch**: somewhere
+the owner can find the product again the next day and show a business partner. It
+is not an SEO surface, not an organic-discovery funnel, and nothing about it needs
+to precede the features that make the demo credible.
+
+The cost accepted: zero organic discovery until it exists, and no URL to hand over
+in the meantime beyond the demo tenant's own booking page. That is the right trade
+while the acquisition channel is walking into shops in Stuttgart. A landing page
+shipped before Phase 15a would describe a product the prospect had just watched
+fall short in the room.
+
+---
+
 ## Phase 17 — Code quality pass (AFTER first demos)
 
 Deferred deliberately. None of these are why a barber says no, and half of what you'd "fix" now gets rewritten once real usage tells you what's actually wrong.
@@ -115,7 +194,7 @@ Categories to review when you get here: duplicated code, dead code, unnecessary 
 
 Specific items found and deferred:
 
-- The "Shop not found" error page is shown both when a shop slug is genuinely invalid *and* when the shop is real but the cancel token is invalid or tampered with (found during 14.3's C7 tamper test). The message is accurate in both cases but slightly misleading in the second — the shop was found; the token wasn't. Low priority.
+- **The "Shop not found" error copy is misleading and should distinguish the two cases.** It fires both when a shop slug is genuinely invalid *and* when the shop is real but the cancel token is invalid or tampered with (found during 14.3's C7 tamper test). In the second case the shop *was* found — it was the token that failed — so a customer whose link got mangled in transit is told their barbershop doesn't exist. Split it into two messages. Low priority: it is reached by a broken or tampered link, not by any normal path.
 
 - **`SEED_OWNER_EMAIL` on a production re-seed — not a Phase 17 item, recorded here so it isn't lost. Read this before the next `db:seed` against prod.** Production's owner is `chairlyy@gmail.com`; `prisma/seed.ts` defaults `SEED_OWNER_EMAIL` to `owner@demo.test`. `upsertOwner` upserts *by email*, so a bare re-seed finds no match and **creates a second OWNER user on production** with the documented default password `demo-password-123` — and `upsertTenant` rewrites `Tenant.contactEmail` to the same default, silently redirecting owner-notification email away from the real address. Neither failure is visible in the seed's own output. Always run it as `$env:SEED_OWNER_EMAIL = 'chairlyy@gmail.com'` first, and read back `user.count()` and `tenant.contactEmail` afterwards to confirm they didn't move. The real fix, when Phase 17 arrives, is for the seed to resolve the existing owner off the tenant rather than off an env-var default.
 
