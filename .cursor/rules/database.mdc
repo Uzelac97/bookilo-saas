@@ -1,0 +1,112 @@
+---
+description: Database, Prisma, and tenant-scoped data access rules
+globs: prisma/**, src/lib/db/**
+alwaysApply: false
+---
+
+# Database & tenant scoping
+
+1. **Every tenant-owned query goes through `lib/db/*`.** Never call `prisma.<model>.findMany`
+   (or any Prisma method) directly from a component, server action, or route handler for
+   `Booking`, `Staff`, `Service`, `Customer`, or `User`. Always go through the scoped
+   helper functions, and always pass `tenantId` explicitly. If a helper doesn't exist yet
+   for what you need, add one to `lib/db/*` rather than reaching for `prisma` directly.
+
+2. **Dashboard mutations resolve `tenantId` from the server-side session, never from
+   client input.** If you're writing a server action for an authenticated route, get the
+   tenant from `getCurrentTenant()` / the session — do not accept a `tenantId` field from
+   the request body or form data.
+
+2a. **Every write to `Booking` re-verifies its foreign keys before inserting.** A Prisma
+    foreign key only checks that a `staffId`/`serviceId`/`customerId` row exists somewhere —
+    not that it belongs to the tenant making the request. Before creating a `Booking`, the
+    write helper in `lib/db/bookings.ts` must re-fetch the staff/service/customer scoped by
+    `tenantId` and fail if any of them don't belong to that tenant. This is the only thing
+    standing between a bug and one tenant's booking pointing at another tenant's staff.
+
+3. **Any change to `prisma/schema.prisma` or any migration file requires a plan first,
+   in plain language, before you write it.** Explain what's changing and why. Wait for
+   approval. This includes adding fields, not just new models.
+
+**Tenant resolution, two paths, never mixed:**
+
+- Public routes (`/b/[slug]`) resolve the tenant from the URL slug, server-side, on every request.
+- Dashboard routes resolve the tenant from the authenticated session (`session.tenantId`). A dashboard mutation must never accept a client-supplied `tenantId` — it always comes from the server-side session.
+
+**Tenant-scoped data access layer:** every query that touches tenant-owned data goes through `lib/db/*`, where each function requires `tenantId` as a parameter and bakes it into the `where` clause. Components and server actions never call `prisma.booking.findMany(...)` directly — they call the real helper, e.g. `getBookingsForDay(tenantId, { date, timezone })` or `getBookingsForRange(tenantId, { fromDate, toDate, timezone })`. This is the single structural guardrail against cross-tenant data leaks, and it's cheap to enforce if you do it from day one and expensive to retrofit later.
+
+- An ESLint `no-restricted-imports` rule bans importing the Prisma client outside
+  `lib/db/**`. If you hit that lint error, add a helper in `lib/db/*` — don't work around it.
+- There is no hard-delete for `Staff` or `Service`. "Removing" either always means setting
+  `active = false`. Both are `onDelete: Restrict` on `Booking` — existing bookings must not break.
+- Every `DateTime` column stores a UTC instant with no timezone attached (Prisma's default
+  Postgres mapping for `DateTime` is `timestamp` without timezone — this schema relies on
+  that). Never write local wall-clock time directly into `startAt`/`endAt`/`blockedUntil`.
+  Convert with Luxon using `tenant.timezone` only at the boundary — when parsing user input
+  and when rendering for display. If a column is ever changed to `@db.Timestamptz`, the
+  exclusion constraint's `tsrange` must change to `tstzrange` to match.
+- Luxon for all date/time math — no raw `Date` arithmetic across timezones.
+- `Booking.cancelToken` is a bearer secret, not an identifier. Generate it with a
+  cryptographically secure random source (e.g. `crypto.randomUUID()`) — never `cuid()`,
+  `nanoid()` defaults, or anything else not designed to be unguessable.
+- Never run `prisma db push` in this project — always `prisma migrate dev` / `deploy`.
+  `db push` has no record of the hand-written exclusion constraint (Prisma can't express it
+  in schema language) and will silently drop it as unrecognized drift.
+- Prisma is pinned to v6 (`prisma@6`, `@prisma/client@6`). Prisma 7 requires driver adapters
+  and moves connection config out of `schema.prisma` into `prisma.config.ts` — a real
+  migration, not a bump. Don't let a dependency update carry it forward silently; revisit
+  deliberately, later, once the MVP is stable.
+
+## Overlap-prevention exclusion constraint
+
+The one piece Prisma can't express natively: the **overlap-prevention exclusion constraint** on `Booking`. It is installed, as raw SQL in a migration, and is the database's own guarantee against double-booking. Because Prisma can't express it in schema language, `prisma db push` sees it as unrecognized drift and silently drops it — which is why this project only ever uses `migrate dev` / `migrate deploy`. See the note at the bottom of `schema.prisma`.
+
+```
+ALTER TABLE "Booking"
+ADD CONSTRAINT no_overlapping_bookings
+EXCLUDE USING gist (
+  "staffId" WITH =,
+  tsrange("startAt", "blockedUntil") WITH &&
+) WHERE (status IN ('CONFIRMED', 'COMPLETED'));
+```
+
+Two details that are easy to get wrong:
+
+- Range is over blockedUntil, not endAt, so bufferMinutes is
+  actually enforced under concurrency, not just in slots.ts.
+- Status list includes COMPLETED, not just CONFIRMED — otherwise
+  marking a booking complete silently reopens its own time slot.
+  The availability query in slots.ts must treat the identical
+  status set as "occupied," or you get ghost slots that look
+  open in the UI and fail at submit.
+
+This is what actually prevents double-booking under concurrent
+requests. Prisma does not surface it as a typed error — it arrives
+as a `PrismaClientUnknownRequestError` with SQLSTATE `23P01`, which
+`isSlotTakenError` in `lib/db/bookings.ts` translates into the
+`SLOT_TAKEN` result the booking form renders as "someone got there
+first."
+
+**The probe script exists: `scripts/probe-exclusion-constraint.ts`, run with
+`npm run probe:constraint`.** It asserts both directions — two concurrent
+bookings for the same staff and slot leave exactly one created and one
+`SLOT_TAKEN`, *and* two genuinely back-to-back bookings (10:00–10:30 then
+10:30–11:00, buffer 0) both succeed, because `tsrange` is half-open and
+adjacency is legal. Testing only the rejection direction hides an off-by-one
+that would block every consecutive booking. It also checks that the range is
+over `blockedUntil` rather than `endAt`, that the `WHERE` clause covers
+`COMPLETED`, and that the constraint is keyed by `staffId`.
+
+It has been run against production over Neon's pooled connection, not just
+locally — 9 of 9 checks passed. The expected output is recorded verbatim as a
+diff baseline in `docs/14.3-prod-verification.md`, along with the failure
+signatures worth recognising. Re-run it after any migration that touches
+`Booking`.
+
+**Availability computation:** existing bookings with status `CONFIRMED` or `COMPLETED` (the identical set the exclusion constraint protects — see `schema.prisma`).
+
+**Editing a service's duration must not recompute existing bookings.** `endAt`
+and `blockedUntil` are snapshotted at creation, so a booking keeps the length it
+was booked for even after the service definition changes. This is deliberate and
+is not a bug to fix: the customer was told 30 minutes, and recomputing would
+silently reshuffle a day the owner has already planned.
