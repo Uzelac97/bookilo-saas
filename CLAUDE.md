@@ -9,6 +9,11 @@ toward a large-team-scale architecture. Source of truth for scope: `EXECUTION-PL
 `prisma/schema.prisma`. If a request seems to go beyond what's in those files, say so and
 ask before building it — don't silently expand scope.
 
+Single codebase, single architecture. The target is barber shops and hair salons —
+nothing else. What differs between them is terminology, branding, and demo seed data,
+never a second code path: no new domain entities (`Resource`, `Room`, `Equipment` are
+all deferred).
+
 ## Non-negotiable rules
 
 1. **Every tenant-owned query goes through `lib/db/*`.** Never call `prisma.<model>.findMany`
@@ -16,11 +21,21 @@ ask before building it — don't silently expand scope.
    `Booking`, `Staff`, `Service`, `Customer`, or `User`. Always go through the scoped
    helper functions, and always pass `tenantId` explicitly. If a helper doesn't exist yet
    for what you need, add one to `lib/db/*` rather than reaching for `prisma` directly.
+   Each helper takes `tenantId` as a parameter and bakes it into the `where` clause, so
+   the scoping cannot be forgotten at a call site: read a day with
+   `getBookingsForDay(tenantId, { date, timezone })` or a span with
+   `getBookingsForRange(tenantId, { fromDate, toDate, timezone })` — never
+   `prisma.booking.findMany`.
 
 2. **Dashboard mutations resolve `tenantId` from the server-side session, never from
    client input.** If you're writing a server action for an authenticated route, get the
    tenant from `getCurrentTenant()` / the session — do not accept a `tenantId` field from
    the request body or form data.
+   **The two resolution paths are never mixed.** Public routes (`/b/[slug]`) resolve the
+   tenant from the URL slug, server-side, on every request. Dashboard routes resolve it
+   from the authenticated session (`session.tenantId`). A public route must not reach for
+   the session to establish identity, and a dashboard mutation must never accept a
+   client-supplied `tenantId`.
 
 2a. **Every write to `Booking` re-verifies its foreign keys before inserting.** A Prisma
     foreign key only checks that a `staffId`/`serviceId`/`customerId` row exists somewhere —
@@ -36,9 +51,91 @@ ask before building it — don't silently expand scope.
 4. **Do not add a new npm dependency without asking first**, including "small" ones. State
    what it's for and what the alternative would be without it.
 
-5. **Do not build anything listed as excluded in `EXECUTION-PLAN.md`** (staff login,
-   SMS/WhatsApp, payments, multi-location, analytics, customer accounts, i18n, marketplace
-   features, POS/inventory) unless explicitly asked to start that phase.
+5. **Do not build anything listed as excluded in `EXECUTION-PLAN.md`**: staff login,
+   SMS/WhatsApp reminders, deposits/payments, multi-location, analytics dashboard,
+   customer accounts, ~~i18n~~, recurring/subscription bookings, reviews or any
+   marketplace surface, POS/inventory, granular permissions beyond Owner/Staff,
+   `Resource`/rooms/bays/equipment, any vertical beyond barber shops and hair salons,
+   custom domains, wildcard subdomains — unless explicitly asked to start that phase.
+
+   `i18n` is struck because it was **reversed**, not dropped: it moved to Phase 15a on
+   13 Aug 2026 in commit `f1d73e9`. Struck rather than deleted, matching
+   `EXECUTION-PLAN.md` — a list that quietly removes its own reversals stops being a
+   record of what was decided. Everything else above still stands.
+
+## Planned next — in scope, do not re-add as exclusions
+
+**Phase 15a**, after the Phase 15 security audit and before the salon vertical:
+
+- **i18n** — German default with an English toggle. A default locale plus a toggle only:
+  *not* locale-routed URLs, per-tenant language settings, or a translation-management
+  service. Those three remain excluded.
+- **Light/dark mode toggle** — the constraints are already recorded in the code and
+  should be read before starting: `globals.css:71-74` (a dark theme needs the whole
+  palette, not two variables), `globals.css:13` (`color-scheme: light` must change, or
+  browser-painted chrome — scrollbars, autofill, the date/time picker, the caret —
+  stays locked light), and `field.tsx:60` (the Tailwind v4 preflight regression that
+  produced white-on-white form text last time a `prefers-color-scheme` block existed).
+- **Drag-to-select booking on the calendar** — Outlook/Google Calendar-style range
+  selection. On touch it must begin with a long press, never a plain drag: plain drag
+  collides with the scroll gesture, and the calendar scrolls on exactly those devices.
+
+**Phase 16a** — the landing page, deliberately last. It is a link to leave behind after
+an in-person pitch, not an SEO or organic-discovery surface.
+
+**"No dark mode" and "No drag-to-select" were never project decisions.** An earlier
+session invented both as exclusions; neither phrase ever appeared in
+`EXECUTION-PLAN.md`, `V1-LAUNCH-PLAN.md`, or this file. Do not re-add them. The
+authoritative records are "Decisions recorded after 14.3" in `EXECUTION-PLAN.md` and
+the Phase 15a/16a sections in `V1-LAUNCH-PLAN.md`.
+
+## The overlap-prevention exclusion constraint
+
+The one invariant Prisma cannot express, so it lives in a migration as raw SQL. It is
+the database's own guarantee against double-booking, and it is the reason `prisma db
+push` is banned here: `db push` has no record of it and silently drops it as
+unrecognized drift.
+
+```sql
+ALTER TABLE "Booking"
+ADD CONSTRAINT no_overlapping_bookings
+EXCLUDE USING gist (
+  "staffId" WITH =,
+  tsrange("startAt", "blockedUntil") WITH &&
+) WHERE (status IN ('CONFIRMED', 'COMPLETED'));
+```
+
+Two details are easy to get wrong, and both only misbehave under concurrency:
+
+- **The range is over `blockedUntil`, not `endAt`**, so `bufferMinutes` is enforced by
+  the database rather than merely by `slots.ts`.
+- **The status list includes `COMPLETED`, not just `CONFIRMED`** — otherwise marking a
+  booking complete silently reopens its own slot. `slots.ts` must treat the identical
+  status set as occupied, or you get ghost slots that look free in the UI and fail at
+  submit.
+
+**The error path.** Prisma does not surface a violation as a typed error — it arrives as
+a `PrismaClientUnknownRequestError` carrying SQLSTATE `23P01`, and `isSlotTakenError` in
+`lib/db/bookings.ts` translates that into the `SLOT_TAKEN` result the booking form shows
+as "someone got there first." If that matcher ever stops matching, the customer sees a
+generic error instead, which is why it is probed rather than assumed.
+
+**The probe.** `scripts/probe-exclusion-constraint.ts`, run with `npm run
+probe:constraint`. It asserts both directions: two concurrent bookings for the same
+staff and slot leave exactly one created and one `SLOT_TAKEN`, *and* two genuinely
+back-to-back bookings (10:00–10:30 then 10:30–11:00, buffer 0) both succeed, because
+`tsrange` is half-open and adjacency is legal. Testing only the rejection direction
+hides an off-by-one that would block every consecutive booking. It also checks that the
+range is over `blockedUntil`, that the `WHERE` clause covers `COMPLETED`, and that the
+constraint is keyed by `staffId`. It has passed against production over Neon's pooled
+connection, 9 of 9 checks; the expected output is recorded as a verbatim diff baseline
+in `docs/14.3-prod-verification.md`. Re-run it after any migration touching `Booking`.
+
+**Editing a service's duration must not recompute existing bookings.** `endAt` and
+`blockedUntil` are snapshotted at creation, so a booking keeps the length it was booked
+for even after the service definition changes. This is deliberate, not a bug: the
+customer was told 30 minutes, and recomputing would silently reshuffle a day the owner
+has already planned.
 
 ## Avoid overengineering — specifically
 
@@ -108,6 +205,10 @@ ask before building it — don't silently expand scope.
   `useActionState` initial-state constant exported from a booking action module. To confirm a
   suspect export, check `.next/**/server-reference-manifest.json` — anything listed there
   with a non-function `exportedName` is being shipped as a reference.
+- Gaps between JSX expressions use an explicit `{" "}`, never a literal space in the
+  text. A text node sandwiched between two expressions and wrapped across lines has its
+  leading space trimmed at build time — it shipped once as "closes 2 hbefore an
+  appointment". An explicit `{" "}` is a real child and cannot be dropped.
 - Auth.js v5 config is split: `auth.config.ts` holds only dependency-free config and is what
   `proxy.ts` imports; `auth.ts` holds the Prisma-backed Credentials `authorize`
   callback and only ever runs in the Node runtime. Never import the Prisma-backed config

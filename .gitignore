@@ -45,3 +45,6 @@ next-env.d.ts
 # claude code — .claude/settings.json is shared and tracked on purpose,
 # settings.local.json is personal overrides and stays out of the repo
 .claude/settings.local.json
+
+# cursor — no longer used on this repo; rules live in CLAUDE.md
+.cursor/
