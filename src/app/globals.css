@@ -21,6 +21,49 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* ------------------------------------------------------------------
+     The shop's palette — Kastanien Barbershop's marketing page only.
+
+     PURELY ADDITIVE. Nothing above is redefined and no existing utility
+     changes meaning: the dashboard and the booking flow keep picking explicit
+     Tailwind colours (bg-white, bg-zinc-50, text-zinc-900) and never name a
+     `shop-*` token. Prefixed for exactly that reason — these are one page's
+     palette, not the product's, and Phase 16a's landing page should not
+     inherit a barbershop's browns by accident.
+
+     Warm neutrals rather than the app's cool zinc, because this page is the
+     shop's front door and not a tool. `brass` is the single accent and stays
+     rationed: CTAs, section eyebrows, and the placeholder frames. Washing it
+     across a surface is what makes an accent stop being one.
+
+     THIS IS NOT A DARK THEME and does not start one. `color-scheme: light`
+     above stays as it is — it governs browser-painted chrome (scrollbars,
+     autofill, pickers, the caret), and this page has no form controls for it
+     to reach. Nothing here responds to prefers-color-scheme; the dark surfaces
+     are painted by this page's own classes. Phase 15a's light/dark toggle is
+     untouched by it.
+     ------------------------------------------------------------------ */
+  --color-shop-ink: #17130f; /* deep espresso — the page ground */
+  --color-shop-walnut: #271f17; /* raised surfaces: cards, placeholder fill */
+  --color-shop-bone: #f1e8da; /* warm off-white — body text on the ink */
+  --color-shop-muted: #9b8a78; /* muted warm grey — secondary text */
+  /* Copper. #b5652b was the chosen value and measured 4.28:1 against the ink
+     above — below AA for the small text it carries (12-16px eyebrows, the
+     service numbering, the 14px CTA label), in both directions, since the
+     button is ink-on-copper. Lifted the minimum needed to clear 4.5:1 while
+     staying the same hue and saturation: #bb682c is the literal floor at
+     4.513:1, and this is one channel-step past it for margin. */
+  --color-shop-brass: #bc6a2d; /* copper — the primary accent, 4.61:1 on ink */
+
+  /* SECONDARY ACCENT, DIVIDERS AND BORDERS ONLY. Never a CTA fill and never
+     text: against the ink it measures 2.14:1, which is fine for a hairline
+     edge and nowhere near legible for type. Brass stays the accent that
+     carries buttons, the quote mark and the service numbering. */
+  --color-shop-leather: #6b4226;
+
+  --font-display: var(--font-fraunces);
+  --font-hero: var(--font-abril);
 }
 
 /* Hides the scrollbar on a horizontally scrolling strip while leaving the
@@ -90,4 +133,24 @@
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+/* Smooth anchor scrolling, the marketing page only.
+
+   scroll-behavior has to sit on the scrolling element — html — so scoping it
+   to one route group means matching on what the page contains rather than
+   nesting a rule inside it. `[data-marketing]` is set on the wrapper in
+   (marketing)/layout.tsx. The dashboard and the booking flow keep instant
+   jumps: a marketing polish has no business changing how a form-heavy app
+   moves under someone mid-booking.
+
+   GUARDED BY prefers-reduced-motion, deliberately. Smooth scrolling is a
+   documented vestibular trigger, and the one anchor this affects eases across
+   a full viewport height. Browsers without :has() fall back to an instant
+   jump, which is exactly today's behaviour — so the failure mode is "no
+   enhancement", not "broken". */
+@media (prefers-reduced-motion: no-preference) {
+  html:has([data-marketing]) {
+    scroll-behavior: smooth;
+  }
 }
