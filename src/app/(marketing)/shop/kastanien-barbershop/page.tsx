@@ -43,12 +43,6 @@ import { formatDuration, formatMinuteOfDay, formatPrice } from "@/lib/format";
  * that is not a database value. If a `Tenant.about` field ever lands, this is
  * the one block that moves.
  *
- * THAT COPY SAYS "STUTTGART" WHILE THE ADDRESS RENDERED FROM THE DATABASE SAYS
- * BERLIN. This is not a bug and has been raised and kept — do not "correct" it
- * to match tenant.address. It is the one place the hand-written text and the
- * live data disagree, which is precisely why the exception above is worth
- * keeping to a single block.
- *
  * The two photographs are likewise real files under public/kastanien/, not
  * anything the schema knows about.
  */
@@ -159,7 +153,7 @@ export default async function KastanienBarbershopPage() {
     : null;
 
   // wa.me takes digits only — no plus, no spaces. \D strips both in one pass,
-  // so "+49 30 44012789" becomes "493044012789". Built from the tenant's real
+  // so "+49 711 4401278" becomes "497114401278". Built from the tenant's real
   // number, so this link genuinely reaches the shop.
   const whatsappHref = tenant.phone
     ? `https://wa.me/${tenant.phone.replace(/\D/g, "")}`

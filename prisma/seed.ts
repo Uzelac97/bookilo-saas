@@ -151,8 +151,8 @@ type ServiceKey =
   | "works";
 
 /**
- * A real shop's menu: nine services, three categories, prices in EUR cents at
- * Berlin rates.
+ * A real shop's menu: nine services, three categories, prices in EUR cents.
+ * Illustrative demo prices, not calibrated to any specific local market.
  *
  * The durations are chosen to span the calendar's density tiers, which is the
  * only way to see them behave: at 80px an hour, "Line-up" (15 min) renders at
@@ -400,8 +400,8 @@ async function upsertTenant() {
   const display = {
     slug: SLUG,
     name: "Kastanien Barbershop",
-    address: "Kastanienallee 12, 10435 Berlin",
-    phone: "+49 30 44012789",
+    address: "Königstraße 12, 70173 Stuttgart",
+    phone: "+49 711 4401278",
     contactEmail: OWNER_EMAIL,
   };
 
