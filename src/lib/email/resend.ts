@@ -31,8 +31,10 @@ export async function sendEmail(email: OutgoingEmail): Promise<SendResult> {
   const from = process.env.EMAIL_FROM;
 
   if (!apiKey || !from) {
+    // The body is never logged: it can contain a booking's cancelToken, a
+    // bearer secret, embedded in the cancel link.
     console.info(
-      `[email] not configured (${!apiKey ? "RESEND_API_KEY" : "EMAIL_FROM"} missing) — would have sent to ${email.to}: ${email.subject}\n${email.text}`,
+      `[email] not configured (${!apiKey ? "RESEND_API_KEY" : "EMAIL_FROM"} missing) — would have sent to ${email.to}: ${email.subject}`,
     );
 
     return { ok: true, skipped: true };
