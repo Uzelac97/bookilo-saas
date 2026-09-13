@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type { Booking, BookingSource, BookingStatus } from "@prisma/client";
 
-import { canCancel } from "@/lib/availability/cancellation";
+import { canCancel, canResolveCancelToken } from "@/lib/availability/cancellation";
 import { localDayWindowUtc } from "@/lib/availability/slots";
 
 import { prisma } from "./prisma";
@@ -265,11 +265,18 @@ export type BookingByToken = {
  *
  * Callers must treat "not found" and "wrong token" as the same outcome. Never
  * echo the token back into an error message or a log line.
+ *
+ * Stops resolving once canResolveCancelToken (lib/availability/cancellation.ts)
+ * says the grace period past the booking's end has elapsed. `now` is a
+ * parameter rather than read inside the function so this stays deterministic
+ * in tests. The expiry check happens after the fetch rather than as a WHERE
+ * clause so the boundary logic itself lives in one pure, DB-free function.
  */
 export async function getBookingByCancelToken(
   cancelToken: string,
+  now: Date,
 ): Promise<BookingByToken | null> {
-  return prisma.booking.findUnique({
+  const booking = await prisma.booking.findUnique({
     where: { cancelToken },
     select: {
       id: true,
@@ -300,6 +307,10 @@ export async function getBookingByCancelToken(
       },
     },
   });
+
+  if (!booking || !canResolveCancelToken(booking.endAt, now)) return null;
+
+  return booking;
 }
 
 export type CancelBookingResult =

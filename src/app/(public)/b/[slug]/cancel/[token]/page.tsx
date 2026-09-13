@@ -42,7 +42,7 @@ export default async function CancelPage({ params }: PageProps) {
   // The token authorizes; the slug is checked against the booking's own tenant
   // so one shop's URL can never render another's booking. A bad token and a
   // mismatched slug produce the identical 404 — nothing distinguishes them.
-  const booking = await getBookingByCancelToken(token);
+  const booking = await getBookingByCancelToken(token, new Date());
   if (!booking || booking.tenant.slug !== slug) notFound();
 
   const { tenant, service } = booking;

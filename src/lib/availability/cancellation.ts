@@ -35,3 +35,32 @@ export function canCancel(opts: {
 
   return remainingMs >= opts.windowMinutes * 60_000;
 }
+
+/**
+ * How long a cancel token keeps resolving after the booking it points at
+ * ends. Bounds how long the token can be *read* (the confirmation and cancel
+ * pages, and the "too late to cancel" explanation on the latter) — not how
+ * long it can be used to cancel, which canCancel() above already closes off
+ * the moment the appointment's start time passes, independent of this window.
+ * `Booking.cancelToken` is a bearer secret riding in the URL path, so it
+ * shows up in Vercel access logs and browser history; there's no reason for
+ * it to keep working forever.
+ */
+export const CANCEL_TOKEN_GRACE_PERIOD_DAYS = 7;
+
+/**
+ * Whether a cancel token for a booking that ended at `endAt` should still
+ * resolve to that booking, given the current instant `now`.
+ *
+ * Instant arithmetic, deliberately without Luxon — same reasoning as
+ * canCancel above: this measures the gap between two instants, which is the
+ * same number of milliseconds in every zone.
+ *
+ * Inclusive at the boundary: exactly CANCEL_TOKEN_GRACE_PERIOD_DAYS after
+ * endAt still resolves; one millisecond later it doesn't.
+ */
+export function canResolveCancelToken(endAt: Date, now: Date): boolean {
+  const elapsedMs = now.getTime() - endAt.getTime();
+
+  return elapsedMs <= CANCEL_TOKEN_GRACE_PERIOD_DAYS * 24 * 60 * 60_000;
+}

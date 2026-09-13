@@ -140,7 +140,7 @@ export async function createManualBooking(
   // notifyOwner: false — the owner just typed this in. Their own keystrokes are
   // not news, and an alert that's usually noise is an alert that gets ignored.
   try {
-    const committed = await getBookingByCancelToken(token);
+    const committed = await getBookingByCancelToken(token, new Date());
     if (committed) {
       await sendBookingEmails(committed, tenant.contactEmail, customer.phone, {
         notifyOwner: false,

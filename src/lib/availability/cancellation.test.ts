@@ -1,7 +1,11 @@
 import { DateTime } from "luxon";
 import { describe, expect, it } from "vitest";
 
-import { canCancel } from "./cancellation";
+import {
+  canCancel,
+  CANCEL_TOKEN_GRACE_PERIOD_DAYS,
+  canResolveCancelToken,
+} from "./cancellation";
 
 const WINDOW = 120;
 
@@ -103,5 +107,38 @@ describe("canCancel", () => {
 
     expect(startAt.getTime() - now.getTime()).toBe(3 * 60 * 60_000);
     expect(canCancel({ startAt, now, windowMinutes: WINDOW })).toBe(true);
+  });
+});
+
+describe("canResolveCancelToken", () => {
+  const GRACE_MS = CANCEL_TOKEN_GRACE_PERIOD_DAYS * 24 * 60 * 60_000;
+  const endAt = utc("2026-08-04T14:00:00");
+
+  it("resolves while the appointment is still in the future", () => {
+    expect(canResolveCancelToken(endAt, utc("2026-08-03T09:00:00"))).toBe(
+      true,
+    );
+  });
+
+  it("resolves a few hours after the appointment has ended", () => {
+    expect(canResolveCancelToken(endAt, utc("2026-08-04T18:00:00"))).toBe(
+      true,
+    );
+  });
+
+  it("stops resolving once the grace period has elapsed", () => {
+    const now = new Date(endAt.getTime() + GRACE_MS + 24 * 60 * 60_000);
+
+    expect(canResolveCancelToken(endAt, now)).toBe(false);
+  });
+
+  it("is inclusive at the exact boundary, and expired one millisecond later", () => {
+    expect(canResolveCancelToken(endAt, new Date(endAt.getTime() + GRACE_MS))).toBe(
+      true,
+    );
+
+    expect(
+      canResolveCancelToken(endAt, new Date(endAt.getTime() + GRACE_MS + 1)),
+    ).toBe(false);
   });
 });

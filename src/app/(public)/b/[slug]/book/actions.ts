@@ -306,7 +306,7 @@ export async function submitBooking(
   //    owner's address isn't the booking's, and the phone is what was just
   //    validated.
   try {
-    const committed = await getBookingByCancelToken(token);
+    const committed = await getBookingByCancelToken(token, new Date());
     if (committed) {
       await sendBookingEmails(committed, tenant.contactEmail, customer.phone);
     }
