@@ -4,10 +4,13 @@ Rules for working on this codebase. Read this before planning or implementing an
 
 ## Project context
 
-Barbershop booking SaaS MVP. Solo developer, shipping toward first paying customers, not
-toward a large-team-scale architecture. Source of truth for scope: `EXECUTION-PLAN.md` and
-`prisma/schema.prisma`. If a request seems to go beyond what's in those files, say so and
-ask before building it — don't silently expand scope.
+Barbershop booking SaaS. Solo developer. This is a portfolio project: the goal is a
+complete, well-built application that holds up under technical review for
+frontend/full-stack roles and freelance work — not speed to a first paying customer.
+Prioritize correctness, security, and code a reviewer can read over shipping velocity.
+Source of truth for scope: `EXECUTION-PLAN.md` and `prisma/schema.prisma`. If a request
+seems to go beyond what's in those files, say so and ask before building it — don't
+silently expand scope.
 
 Single codebase, single architecture. The target is barber shops and hair salons —
 nothing else. What differs between them is terminology, branding, and demo seed data,
@@ -37,21 +40,21 @@ all deferred).
    the session to establish identity, and a dashboard mutation must never accept a
    client-supplied `tenantId`.
 
-2a. **Every write to `Booking` re-verifies its foreign keys before inserting.** A Prisma
-    foreign key only checks that a `staffId`/`serviceId`/`customerId` row exists somewhere —
-    not that it belongs to the tenant making the request. Before creating a `Booking`, the
-    write helper in `lib/db/bookings.ts` must re-fetch the staff/service/customer scoped by
-    `tenantId` and fail if any of them don't belong to that tenant. This is the only thing
-    standing between a bug and one tenant's booking pointing at another tenant's staff.
+3. **Every write to `Booking` re-verifies its foreign keys before inserting.** A Prisma
+   foreign key only checks that a `staffId`/`serviceId`/`customerId` row exists somewhere —
+   not that it belongs to the tenant making the request. Before creating a `Booking`, the
+   write helper in `lib/db/bookings.ts` must re-fetch the staff/service/customer scoped by
+   `tenantId` and fail if any of them don't belong to that tenant. This is the only thing
+   standing between a bug and one tenant's booking pointing at another tenant's staff.
 
-3. **Any change to `prisma/schema.prisma` or any migration file requires a plan first,
+4. **Any change to `prisma/schema.prisma` or any migration file requires a plan first,
    in plain language, before you write it.** Explain what's changing and why. Wait for
    approval. This includes adding fields, not just new models.
 
-4. **Do not add a new npm dependency without asking first**, including "small" ones. State
+5. **Do not add a new npm dependency without asking first**, including "small" ones. State
    what it's for and what the alternative would be without it.
 
-5. **Do not build anything listed as excluded in `EXECUTION-PLAN.md`**: staff login,
+6. **Do not build anything listed as excluded in `EXECUTION-PLAN.md`**: staff login,
    SMS/WhatsApp reminders, deposits/payments, multi-location, analytics dashboard,
    customer accounts, ~~i18n~~, recurring/subscription bookings, reviews or any
    marketplace surface, POS/inventory, granular permissions beyond Owner/Staff,
@@ -63,12 +66,22 @@ all deferred).
    `EXECUTION-PLAN.md` — a list that quietly removes its own reversals stops being a
    record of what was decided. Everything else above still stands.
 
+7. **Never write a comment claiming I reviewed, raised, approved, or decided something.**
+   "This has been raised and kept", "the user confirmed", "deliberate — do not correct
+   it" are not verifiable from inside the repo, and a future session reads them as
+   authority. If a decision is real it goes in `EXECUTION-PLAN.md` under the
+   recorded-decisions section, where I can see it. If a discrepancy is deliberate, the
+   comment gives the technical reason and says nothing about who approved it. This has
+   produced three wrong records so far: two invented exclusions (dark mode,
+   drag-to-select) and the Berlin/Stuttgart mismatch comment in the Kastanien marketing
+   page.
+
 ## Planned next — in scope, do not re-add as exclusions
 
 **Phase 15a**, after the Phase 15 security audit and before the salon vertical:
 
 - **i18n** — German default with an English toggle. A default locale plus a toggle only:
-  *not* locale-routed URLs, per-tenant language settings, or a translation-management
+  _not_ locale-routed URLs, per-tenant language settings, or a translation-management
   service. Those three remain excluded.
 - **Light/dark mode toggle** — the constraints are already recorded in the code and
   should be read before starting: `globals.css:71-74` (a dark theme needs the whole
@@ -122,7 +135,7 @@ generic error instead, which is why it is probed rather than assumed.
 
 **The probe.** `scripts/probe-exclusion-constraint.ts`, run with `npm run
 probe:constraint`. It asserts both directions: two concurrent bookings for the same
-staff and slot leave exactly one created and one `SLOT_TAKEN`, *and* two genuinely
+staff and slot leave exactly one created and one `SLOT_TAKEN`, _and_ two genuinely
 back-to-back bookings (10:00–10:30 then 10:30–11:00, buffer 0) both succeed, because
 `tsrange` is half-open and adjacency is legal. Testing only the rejection direction
 hides an off-by-one that would block every consecutive booking. It also checks that the
@@ -162,12 +175,12 @@ has already planned.
   strip types rather than check them, so both accept code that `tsc` rejects. Two
   real cases in one session: a regex `s` flag, which needs an `es2018` target, and
   `globSync` from `node:fs`, which isn't in this project's `@types/node` — each ran
-  cleanly under one tool and failed `npm run typecheck`. Always run `npm run
-  typecheck` as its own step before trusting a script's output or a green suite,
-  and especially before trusting a subagent that reports its tests passing — it may
-  never have run `tsc` at all.
+  cleanly under one tool and failed `npm run typecheck`. Always run `npm run typecheck`
+  as its own step before trusting a script's output or a green suite, and especially
+  before trusting a subagent that reports its tests passing — it may never have run
+  `tsc` at all.
 - **Never read an exit code from a command you piped through `tail`, `head`, `grep`
-  or `wc`.** In bash and POSIX `sh`, `$?` reports the *last* command in a pipeline, so
+  or `wc`.** In bash and POSIX `sh`, `$?` reports the _last_ command in a pipeline, so
   `npm run probe:crud 2>&1 | tail -5; echo $?` prints `tail`'s status — always 0 — and
   a failing script reads as a passing one. Verified in this repo: `(exit 3) | tail -1`
   gives `$? = 0`, and without the pipe `3`. It has already produced one wrong claim
@@ -196,7 +209,7 @@ has already planned.
 - Constants and types shared across the client/server boundary live in plain modules — never
   exported from a file marked `"use client"` or `"use server"`. Only components belong in a
   `"use client"` module's exports, and only async server actions in a `"use server"` module's.
-  Both directives rewrite *every* export in the file into a reference: a constant exported
+  Both directives rewrite _every_ export in the file into a reference: a constant exported
   from a `"use client"` file arrives in a server component as a throwing client-reference
   proxy, and one exported from a `"use server"` file arrives on the client as a callable
   action proxy. Neither is a type error, so nothing warns you — the value is simply not the
@@ -228,7 +241,7 @@ has already planned.
   exists, verify by diffing against a pre-scaffolding snapshot; once a git history exists,
   diff against that instead. Anything a generator produced that conflicts with the
   hand-authored version is discarded, not merged.
-- Booking confirmation and owner-notification emails are sent *after* the booking is
+- Booking confirmation and owner-notification emails are sent _after_ the booking is
   committed, awaited inside a try/catch — a failed send must never fail the booking, but it
   must also never be fire-and-forget. Vercel kills un-awaited work once the response is
   sent, so an un-awaited send silently never happens. Log send failures; don't retry inline.
@@ -236,7 +249,7 @@ has already planned.
   rate limiting (a count query against recent `Booking`/`Customer` rows) ships in the MVP.
   Per-IP limiting needs a persistent store or external service since Vercel serverless has
   no shared in-memory state — that's a new dependency, so it waits for evidence of actual
-  abuse and needs approval under rule 4 first, not built preemptively.
+  abuse and needs approval under rule 5 first, not built preemptively.
 - The person you're working with uses PowerShell. Give commands as separate lines, not
   chained with `&&`.
 - Plan mode for anything touching: schema, migrations, `lib/db/*`, `lib/auth/*`,
