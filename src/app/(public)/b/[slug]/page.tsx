@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 
 import { OpeningHours } from "@/components/booking/opening-hours";
@@ -63,6 +64,32 @@ export default async function BusinessPage({ params }: PageProps) {
   return (
     <div className="flex flex-1 flex-col bg-canvas px-4 py-10 sm:py-16">
       <main className="mx-auto flex w-full max-w-2xl flex-col gap-10">
+        {tenant.heroImageUrl ? (
+          // Inside the column, not full-bleed like the Kastanien marketing
+          // hero: no text sits on this photograph, so it needs no scrim and no
+          // viewport-height section, just a card that matches the page's other
+          // rounded-2xl surfaces.
+          //
+          // `sizes` is the whole upscaling guard. The box can never be wider
+          // than the 672px column (max-w-2xl) or the viewport less the px-4
+          // gutters, so at 3x DPR the largest request is ~2016px — below any
+          // photo wide enough to be a hero. No width cap is needed the way the
+          // Kastanien page needs one for a 100vw image.
+          //
+          // alt="" because the h1 directly below names the shop; describing
+          // the photo as "Salon X" would only repeat it to a screen reader.
+          <div className="relative aspect-video overflow-hidden rounded-2xl sm:aspect-21/9">
+            <Image
+              src={tenant.heroImageUrl}
+              alt=""
+              fill
+              priority
+              sizes="(min-width: 704px) 672px, calc(100vw - 2rem)"
+              className="object-cover"
+            />
+          </div>
+        ) : null}
+
         <header className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium text-fg-muted">

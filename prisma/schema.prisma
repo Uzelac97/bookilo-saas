@@ -57,6 +57,12 @@ model Tenant {
   contactEmail String
   phone        String?
 
+  // A path under /public (e.g. "/salon-linde/hero.jpg"), rendered with
+  // next/image above the shop name on /b/[slug]. Null renders no hero. Local
+  // paths only: next.config.ts declares no images.remotePatterns, so an
+  // absolute remote URL would throw at render.
+  heroImageUrl String?
+
   // Booking rules
   bufferMinutes             Int @default(0)
   minLeadMinutes            Int @default(60)

@@ -350,6 +350,7 @@ run(() =>
       name: "Salon Linde",
       address: "Tübinger Straße 41, 70178 Stuttgart",
       phone: "+49 711 6072214",
+      heroImageUrl: "/salon-linde/hero.jpg",
     },
     owner: { email: OWNER_EMAIL, password: OWNER_PASSWORD },
     staff: STAFF,

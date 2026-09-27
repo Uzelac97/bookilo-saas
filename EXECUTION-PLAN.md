@@ -860,6 +860,29 @@ both in the dashboard service form. The validation rejects `categoryEn` without 
 *Cost:* a menu can be half-translated. A service with no `nameEn` shows German inside
 an English page. Nothing flags a missing English value to the owner.
 
+**19. `Tenant.heroImageUrl`: an optional hero photo on `/b/[slug]`.** The migration
+`add_tenant_hero_image` adds one nullable text column. It has no backfill and doesn't
+touch `Booking`. When it's set, the shop page renders the photo above the shop name as a
+rounded card inside the page column. When it's null, the page is unchanged. This is the
+"logo, brand colours, photo gallery" tier of the per-tenant customization boundary
+(§1): one nullable `Tenant` column, rendered in one fixed spot in the shared template.
+It is not a per-tenant layout.
+
+- **A platform field, not a Salon Linde special case.** Salon Linde has no marketing
+  page of its own, so its generic shop page is its front door. The column lets any
+  tenant have a photo there without a second code path.
+- **Kastanien stays null.** Its hero lives on its dedicated marketing page, outside
+  `/b/`.
+- **Local paths only.** The value is a path under `/public`. `next.config.ts` declares
+  no `images.remotePatterns`, so an absolute remote URL would throw at render.
+- **Set by the seeds only.** No dashboard screen edits it. The seed writes `null` for a
+  spec without one, so a re-seed clears a stray value.
+
+*Cost:* it was built for a demo tenant, not because a paying customer asked, which is
+earlier than §1 says to build this tier. An owner can't set or change the photo
+themselves. Doing that needs an upload flow and storage, and that would be a new
+dependency (rule 5), not just a text field.
+
 ### Deferred out of Day 14
 
 - **The full production-readiness review was cut down to security only.** The

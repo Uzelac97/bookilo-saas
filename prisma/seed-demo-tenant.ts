@@ -124,7 +124,11 @@ export type DemoTenantSpec<StaffKey extends string, ServiceKey extends string> =
   /** Set on create only, like the timezone. Omitted means the schema default. */
   bufferMinutes?: number;
   businessType: Vertical;
-  display: { name: string; address: string; phone: string };
+  /**
+   * `heroImageUrl` is a path under /public. Omitted means no hero — and an
+   * omitted value is written as null on update too, so a re-seed clears one.
+   */
+  display: { name: string; address: string; phone: string; heroImageUrl?: string };
   owner: { email: string; password: string };
   staff: { key: StaffKey; name: string }[];
   /**
@@ -249,6 +253,9 @@ async function upsertTenant(spec: DemoTenantSpec<string, string>) {
   const display = {
     slug: spec.slug,
     ...spec.display,
+    // Explicit null, not undefined: Prisma reads undefined as "leave the
+    // column alone", which would let a stray value survive a re-seed.
+    heroImageUrl: spec.display.heroImageUrl ?? null,
     businessType: spec.businessType,
     contactEmail: spec.owner.email,
   };
