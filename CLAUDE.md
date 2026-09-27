@@ -83,15 +83,15 @@ all deferred).
 - **i18n** — German default with an English toggle. A default locale plus a toggle only:
   _not_ locale-routed URLs, per-tenant language settings, or a translation-management
   service. Those three remain excluded.
-- **Light/dark mode toggle** — the constraints are already recorded in the code and
-  should be read before starting: `globals.css:71-74` (a dark theme needs the whole
-  palette, not two variables), `globals.css:13` (`color-scheme: light` must change, or
-  browser-painted chrome — scrollbars, autofill, the date/time picker, the caret —
-  stays locked light), and `field.tsx:60` (the Tailwind v4 preflight regression that
-  produced white-on-white form text last time a `prefers-color-scheme` block existed).
-- **Drag-to-select booking on the calendar** — Outlook/Google Calendar-style range
-  selection. On touch it must begin with a long press, never a plain drag: plain drag
-  collides with the scroll gesture, and the calendar scrolls on exactly those devices.
+- **Light/dark mode toggle** — the constraints are recorded in the code and should be
+  read before changing any colour: in `globals.css`, the "THEME: ONE PROPERTY DECIDES
+  IT" block (line 4 — `color-scheme` drives both the browser-painted chrome and every
+  `light-dark()` token, so the two cannot disagree), the "THE PRODUCT PALETTE" block
+  (line 36 — the whole palette, not two variables, and the contrast rules each tier is
+  held to), and the preflight note above `body` (line 204); and `field.tsx:56` (the
+  Tailwind v4 preflight regression that produced white-on-white form text the last
+  time a `prefers-color-scheme` block existed). `src/app/theme-tokens.test.ts`
+  enforces the last one.
 
 **Phase 16a** — the landing page, deliberately last. It is a link to leave behind after
 an in-person pitch, not an SEO or organic-discovery surface.
@@ -99,8 +99,15 @@ an in-person pitch, not an SEO or organic-discovery surface.
 **"No dark mode" and "No drag-to-select" were never project decisions.** An earlier
 session invented both as exclusions; neither phrase ever appeared in
 `EXECUTION-PLAN.md`, `V1-LAUNCH-PLAN.md`, or this file. Do not re-add them. The
-authoritative records are "Decisions recorded after 14.3" in `EXECUTION-PLAN.md` and
-the Phase 15a/16a sections in `V1-LAUNCH-PLAN.md`.
+authoritative records are "Decisions recorded after 14.3" and "Recorded during Phase
+15a" in `EXECUTION-PLAN.md`, and the Phase 15a/16a sections in `V1-LAUNCH-PLAN.md`.
+
+**Drag-to-select was later cut from Phase 15a — cut, not excluded.** Decision 9 in
+`EXECUTION-PLAN.md` records why and what it costs. It is not on the exclusions list,
+so the same rule applies: do not add it there. Bringing it back needs only a new entry
+in `EXECUTION-PLAN.md`. If it returns, the constraint from its original entry still
+stands: on touch, selection begins with a long press, never a plain drag, because a
+plain drag collides with the calendar's scroll gesture.
 
 ## The overlap-prevention exclusion constraint
 
