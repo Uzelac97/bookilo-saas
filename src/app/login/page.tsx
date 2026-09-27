@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 import { LoginForm } from "@/components/auth/login-form";
+import { getSession } from "@/lib/auth/session";
 
 // Spelled out rather than relying on a template: /login sits outside the
 // (dashboard) group, so it inherits the root layout's untemplated title.
@@ -13,6 +15,11 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ callbackUrl?: string }>;
 }) {
+  // Already signed in: skip the form. Decided here from the verified session
+  // rather than in proxy.ts, whose JWT-only check would also bounce a deleted
+  // user's stale token back to /dashboard — see the comment there.
+  if (await getSession()) redirect("/dashboard");
+
   const { callbackUrl } = await searchParams;
 
   return (

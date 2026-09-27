@@ -320,10 +320,15 @@ export type CancelBookingResult =
 /**
  * Cancels a booking on the strength of its cancel token.
  *
- * Not tenant-scoped, for the same reason as getBookingByCancelToken above — the
- * token is the authorization, and there is no session on this path. Callers must
- * treat NOT_FOUND as covering both "no such booking" and "wrong token", and must
- * never put the token in a log line or an error message.
+ * Not tenant-scoped by id, for the same reason as getBookingByCancelToken above —
+ * the token is the authorization, and there is no session on this path. It does
+ * take the `slug` from the URL the cancel form was on, and a token belonging to
+ * a different shop resolves to NOT_FOUND. That is the write-side twin of the
+ * cancel page's own `booking.tenant.slug !== slug` 404: the action is reachable
+ * by direct POST with any arguments, so it can't rely on the page having checked.
+ *
+ * Callers must treat NOT_FOUND as covering "no such booking", "wrong token" and
+ * "wrong shop", and must never put the token in a log line or an error message.
  *
  * Cancelling frees the slot with no further work: `CANCELLED` sits outside both
  * the `no_overlapping_bookings` constraint's WHERE clause and OCCUPYING_STATUSES
@@ -336,10 +341,11 @@ export type CancelBookingResult =
  */
 export async function cancelBookingByToken(
   cancelToken: string,
+  slug: string,
   now: Date,
 ): Promise<CancelBookingResult> {
   const booking = await prisma.booking.findUnique({
-    where: { cancelToken },
+    where: { cancelToken, tenant: { slug } },
     select: {
       status: true,
       startAt: true,
@@ -369,7 +375,7 @@ export async function cancelBookingByToken(
   }
 
   const { count } = await prisma.booking.updateMany({
-    where: { cancelToken, status: "CONFIRMED" },
+    where: { cancelToken, tenant: { slug }, status: "CONFIRMED" },
     data: { status: "CANCELLED" },
   });
 

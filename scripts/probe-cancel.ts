@@ -26,6 +26,7 @@ import { cancelBookingByToken } from "../src/lib/db/bookings";
 import { prisma } from "../src/lib/db/prisma";
 
 const TENANT_ID = "probe-cancel-tenant";
+const SLUG = "probe-cancel";
 const CUSTOMER_ID = "probe-cancel-customer";
 const SERVICE_ID = "probe-cancel-service";
 const SERVICE_MINUTES = 30;
@@ -39,10 +40,10 @@ const WINDOW = 120;
 const NOW = new Date(Date.UTC(2030, 5, 10, 12, 0, 0, 0));
 
 /** One barber per phase — see the note in makeBooking. */
-const PHASES = ["a", "c", "d", "e"] as const;
+const PHASES = ["a", "c", "d", "e", "g"] as const;
 
 /**
- * How many check() calls a complete run makes — phases A to F, one each.
+ * How many check() calls a complete run makes — phases A to G, one each.
  *
  * Asserted at the end, because "no failures" is also what a run prints when it
  * never reached half its phases. `failures === 0` cannot tell a clean run from a
@@ -53,7 +54,7 @@ const PHASES = ["a", "c", "d", "e"] as const;
  * number, and it has to move when a check is added or removed. Excludes the
  * count check itself.
  */
-const EXPECTED_CHECKS = 6;
+const EXPECTED_CHECKS = 7;
 
 let checksRun = 0;
 let failures = 0;
@@ -145,7 +146,7 @@ async function setup() {
   await prisma.tenant.create({
     data: {
       id: TENANT_ID,
-      slug: "probe-cancel",
+      slug: SLUG,
       name: "Cancel Probe Tenant (throwaway)",
       timezone: "Europe/Berlin",
       contactEmail: "probe@invalid.test",
@@ -186,7 +187,7 @@ async function main() {
   try {
     console.log("\nPhase A — a booking well ahead of the window cancels");
     const a = await makeBooking("a", minutesFromNow(60 * 24));
-    const resultA = await cancelBookingByToken(a, NOW);
+    const resultA = await cancelBookingByToken(a, SLUG, NOW);
     check(
       "A",
       resultA.ok && (await statusOf(a)) === "CANCELLED",
@@ -197,7 +198,7 @@ async function main() {
     // The double-tap and the reloaded form. The conditional updateMany matches
     // nothing the second time, and that has to read as success: the customer
     // asked for this booking to be off the books and it is.
-    const resultB = await cancelBookingByToken(a, NOW);
+    const resultB = await cancelBookingByToken(a, SLUG, NOW);
     check(
       "B",
       resultB.ok === true && (await statusOf(a)) === "CANCELLED",
@@ -206,7 +207,7 @@ async function main() {
 
     console.log("\nPhase C — inside the window it's refused and the row is untouched");
     const c = await makeBooking("c", minutesFromNow(WINDOW - 1));
-    const resultC = await cancelBookingByToken(c, NOW);
+    const resultC = await cancelBookingByToken(c, SLUG, NOW);
     check(
       "C",
       !resultC.ok &&
@@ -220,7 +221,7 @@ async function main() {
     // the edge belongs to the customer. Mirrors the unit test in
     // src/lib/availability/cancellation.test.ts.
     const d = await makeBooking("d", minutesFromNow(WINDOW));
-    const resultD = await cancelBookingByToken(d, NOW);
+    const resultD = await cancelBookingByToken(d, SLUG, NOW);
     check(
       "D",
       resultD.ok === true && (await statusOf(d)) === "CANCELLED",
@@ -229,7 +230,7 @@ async function main() {
 
     console.log("\nPhase E — a completed appointment can't be rewritten by a cancel link");
     const e = await makeBooking("e", minutesFromNow(-60 * 24), "COMPLETED");
-    const resultE = await cancelBookingByToken(e, NOW);
+    const resultE = await cancelBookingByToken(e, SLUG, NOW);
     check(
       "E",
       !resultE.ok &&
@@ -241,8 +242,22 @@ async function main() {
     console.log("\nPhase F — an unknown token is NOT_FOUND, same as a wrong one");
     // Callers must not be able to tell "no such booking" from "not your token",
     // and nothing here may echo the token back.
-    const resultF = await cancelBookingByToken("probe-cancel-token-nope", NOW);
+    const resultF = await cancelBookingByToken("probe-cancel-token-nope", SLUG, NOW);
     check("F", !resultF.ok && resultF.reason === "NOT_FOUND", JSON.stringify(resultF));
+
+    console.log("\nPhase G — a real token under another shop's URL is NOT_FOUND");
+    // The cancel action is reachable by direct POST with any slug, so the
+    // write has to check the pairing itself rather than trust the page's 404.
+    // The other slug needs no tenant behind it: a mismatch is a mismatch.
+    const g = await makeBooking("g", minutesFromNow(60 * 24));
+    const resultG = await cancelBookingByToken(g, "probe-cancel-elsewhere", NOW);
+    check(
+      "G",
+      !resultG.ok &&
+        resultG.reason === "NOT_FOUND" &&
+        (await statusOf(g)) === "CONFIRMED",
+      `${JSON.stringify(resultG)} status=${await statusOf(g)} (untouched)`,
+    );
   } finally {
     await teardown();
     await prisma.$disconnect();

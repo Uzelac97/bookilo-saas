@@ -1,8 +1,25 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 import { cancelBookingByToken } from "@/lib/db/bookings";
+
+/**
+ * The action's arguments, as they actually arrive: untrusted.
+ *
+ * `slug` and `token` are bound with `.bind()` on the cancel page, but binding is
+ * not a protection. An exported Server Action is reachable by direct POST with
+ * whatever arguments the caller chooses — only variables a closure captures get
+ * encrypted by Next, and this is not a closure. So both are validated here as
+ * if they came from a form, and a token that isn't a UUID never reaches Prisma.
+ * Tokens are minted by randomUUID() in createBooking, so nothing legitimate
+ * fails this.
+ */
+const cancelArgsSchema = z.object({
+  slug: z.string().trim().min(1).max(100),
+  token: z.uuid(),
+});
 
 /**
  * Cancels the booking this page is showing.
@@ -19,19 +36,23 @@ import { cancelBookingByToken } from "@/lib/db/bookings";
  * pressing "Cancel appointment" would leave the page insisting the booking is
  * still confirmed.
  *
- * `slug` and `token` arrive as bound arguments rather than hidden form fields.
- * Not for secrecy — the token is a bearer secret the customer legitimately holds
- * and anyone can POST any token; holding it *is* the authorization. It's so the
- * revalidated path can't be steered somewhere else by editing the form.
+ * Holding the token *is* the authorization — there is no session on this path.
+ * The slug is passed down so a token can only cancel under its own shop's URL,
+ * matching the 404 the page itself renders on a mismatch.
  */
 export async function cancelBooking(args: { slug: string; token: string }) {
-  const { slug, token } = args;
+  const parsed = cancelArgsSchema.safeParse(args);
+  // Malformed arguments get the same silent outcome as a wrong token: the page
+  // re-renders from the row and shows whatever is true.
+  if (!parsed.success) return;
+
+  const { slug, token } = parsed.data;
 
   // The result is deliberately not inspected — see above. It is not logged
   // either: every failure reason here is a normal customer-facing outcome, and
   // the only identifier available to log it against is the token itself, which
   // must never reach a log line.
-  await cancelBookingByToken(token, new Date());
+  await cancelBookingByToken(token, slug, new Date());
 
   revalidatePath(`/b/${slug}/cancel/${token}`);
 }

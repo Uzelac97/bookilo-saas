@@ -21,10 +21,17 @@
  * it scopes through the relation (`staff: { tenantId }`) in the query itself.
  * Phase E asserts that too, since a filter is as easy to drop as a re-fetch.
  *
+ * Phases F-H were added by the Phase 15 audit: F is rule 3 (createBooking
+ * re-verifying its foreign keys), G is the no-hard-delete guard in
+ * src/lib/db/prisma.ts, and H is the public booking form's inability to rewrite
+ * a returning customer's name or email.
+ *
  * It writes real rows. Every one belongs to one of two dedicated throwaway
- * tenants that are deleted before and after the run. No bookings are created, so
- * the cascade from Tenant is enough to clean up.
+ * tenants that are deleted before and after the run. Phase F's control writes
+ * one booking, so teardown removes bookings before the tenants.
  */
+import { createBooking } from "../src/lib/db/bookings";
+import { findOrCreateCustomer } from "../src/lib/db/customers";
 import { prisma } from "../src/lib/db/prisma";
 import {
   createService,
@@ -83,7 +90,7 @@ const HOLIDAY = {
  *
  * Excludes the count check itself, which is reported separately below.
  */
-const EXPECTED_CHECKS = 25;
+const EXPECTED_CHECKS = 37;
 
 let checksRun = 0;
 let failures = 0;
@@ -112,7 +119,21 @@ function reportCheckCount() {
   );
 }
 
+/** True when `fn` throws or rejects — for the writes that must refuse loudly. */
+async function rejects(fn: () => Promise<unknown>): Promise<boolean> {
+  try {
+    await fn();
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 async function teardown() {
+  // Bookings first: phase F's control writes one, and Booking -> Staff/Service/
+  // Customer is onDelete: Restrict, so the cascade from Tenant can't be relied
+  // on to remove them in a safe order.
+  await prisma.booking.deleteMany({ where: { tenantId: { in: [OURS, THEIRS] } } });
   await prisma.tenant.deleteMany({ where: { id: { in: [OURS, THEIRS] } } });
 }
 
@@ -426,6 +447,139 @@ async function main() {
         inProgress[0].startAt < NOW &&
         inProgress[0].endAt > NOW,
       `in-progress time off stays listed: ${inProgress.length} shown, ${inProgress[0]?.startAt.toISOString()} -> ${inProgress[0]?.endAt.toISOString()} spanning now=${NOW.toISOString()}`,
+    );
+
+    console.log("\nPhase F — createBooking refuses any foreign key that isn't this tenant's");
+
+    // CLAUDE.md rule 3. A Prisma foreign key only proves the row exists
+    // somewhere, so this re-fetch is the only thing keeping one shop's booking
+    // from pointing at another shop's barber, service or customer. Fresh
+    // fixtures rather than phases A-E's, so this phase doesn't depend on what
+    // state they happened to leave behind.
+    const ownStaff = await createStaff(OURS, { name: "F Barber", photoUrl: undefined });
+    const ownService = await createService(OURS, {
+      name: "F Cut",
+      durationMinutes: 30,
+      priceMinorUnits: 2000,
+      category: undefined,
+    });
+    const ownCustomer = await findOrCreateCustomer(
+      OURS,
+      { name: "F Customer", phone: "+4915100000010" },
+      { updateExisting: true },
+    );
+    const theirStaff = await createStaff(THEIRS, { name: "F Their Barber", photoUrl: undefined });
+    const theirService = await createService(THEIRS, {
+      name: "F Their Cut",
+      durationMinutes: 30,
+      priceMinorUnits: 2000,
+      category: undefined,
+    });
+    const theirCustomer = await findOrCreateCustomer(
+      THEIRS,
+      { name: "F Their Customer", phone: "+4915100000011" },
+      { updateExisting: true },
+    );
+    const retiredStaff = await createStaff(OURS, { name: "F Retired", photoUrl: undefined });
+    await setStaffActive(OURS, retiredStaff.id, false);
+    const retiredService = await createService(OURS, {
+      name: "F Retired Cut",
+      durationMinutes: 30,
+      priceMinorUnits: 2000,
+      category: undefined,
+    });
+    await setServiceActive(OURS, retiredService.id, false);
+
+    const bookingAt = new Date(Date.UTC(2030, 5, 11, 10, 0, 0, 0));
+    const attempt = (fks: { staffId: string; serviceId: string; customerId: string }) =>
+      rejects(() => createBooking({ tenantId: OURS, startAt: bookingAt, ...fks }));
+    const own = {
+      staffId: ownStaff.id,
+      serviceId: ownService.id,
+      customerId: ownCustomer.id,
+    };
+
+    check("F1", await attempt({ ...own, staffId: theirStaff.id }), "another tenant's staff refused");
+    check("F2", await attempt({ ...own, serviceId: theirService.id }), "another tenant's service refused");
+    check("F3", await attempt({ ...own, customerId: theirCustomer.id }), "another tenant's customer refused");
+    check("F4", await attempt({ ...own, staffId: retiredStaff.id }), "an inactive barber refused");
+    check("F5", await attempt({ ...own, serviceId: retiredService.id }), "an inactive service refused");
+
+    const bookingsAfterRefusals = await prisma.booking.count({
+      where: { tenantId: { in: [OURS, THEIRS] } },
+    });
+    check(
+      "F6",
+      bookingsAfterRefusals === 0,
+      `refusals happen before the insert: ${bookingsAfterRefusals} bookings written`,
+    );
+
+    // The control. Without it, a createBooking that threw on everything would
+    // pass F1-F5 and look like a perfect tenant boundary.
+    const allOwn = await createBooking({ tenantId: OURS, startAt: bookingAt, ...own });
+    check("F7", allOwn.ok, `all-own foreign keys still book -> ok=${allOwn.ok}`);
+
+    console.log("\nPhase G — the client itself refuses to hard-delete Staff or Service");
+
+    // A never-booked barber and service, deliberately: those are the rows that
+    // `onDelete: Restrict` would NOT protect, so the extension in
+    // src/lib/db/prisma.ts is the only thing in the way.
+    const deletesRefused = await Promise.all([
+      rejects(() => prisma.staff.delete({ where: { id: retiredStaff.id } })),
+      rejects(() => prisma.staff.deleteMany({ where: { id: retiredStaff.id } })),
+      rejects(() => prisma.service.delete({ where: { id: retiredService.id } })),
+      rejects(() => prisma.service.deleteMany({ where: { id: retiredService.id } })),
+    ]);
+    check(
+      "G1",
+      deletesRefused.every(Boolean),
+      `delete / deleteMany on staff and service all throw -> ${JSON.stringify(deletesRefused)}`,
+    );
+    const survivors =
+      (await prisma.staff.count({ where: { id: retiredStaff.id } })) +
+      (await prisma.service.count({ where: { id: retiredService.id } }));
+    check("G2", survivors === 2, `both rows still stored (${survivors} of 2)`);
+
+    console.log("\nPhase H — the public form cannot rewrite a returning customer");
+
+    const phone = "+4915100000012";
+    const first = await findOrCreateCustomer(
+      OURS,
+      { name: "Hanna Original", phone, email: "hanna@probe.test" },
+      { updateExisting: true },
+    );
+    // What a stranger who knows Hanna's number would submit on the public page.
+    const stranger = await findOrCreateCustomer(
+      OURS,
+      { name: "Someone Else", phone, email: "attacker@probe.test" },
+      { updateExisting: false },
+    );
+    const afterPublic = await prisma.customer.findUnique({ where: { id: first.id } });
+    check(
+      "H1",
+      stranger.id === first.id &&
+        afterPublic?.name === "Hanna Original" &&
+        afterPublic.email === "hanna@probe.test",
+      `public path links to the same row and leaves it alone: ${afterPublic?.name} / ${afterPublic?.email}`,
+    );
+
+    // The owner's manual form is authenticated, and correcting a name is its job.
+    await findOrCreateCustomer(
+      OURS,
+      { name: "Hanna Corrected", phone },
+      { updateExisting: true },
+    );
+    const afterOwner = await prisma.customer.findUnique({ where: { id: first.id } });
+    check(
+      "H2",
+      afterOwner?.name === "Hanna Corrected",
+      `owner path updates the name -> ${afterOwner?.name}`,
+    );
+    check(
+      "H3",
+      afterOwner?.email === "hanna@probe.test",
+      // Email is optional on the form, so a blank one must not erase the stored address.
+      `a blank email keeps the stored address -> ${afterOwner?.email}`,
     );
   } finally {
     await teardown();

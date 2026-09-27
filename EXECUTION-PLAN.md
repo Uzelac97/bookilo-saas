@@ -666,6 +666,56 @@ channel for the first customers is walking into shops in Stuttgart, not search. 
 landing page built before the features that make the demo credible would be a page
 describing a product the prospect had just watched fall short.
 
+### Recorded during the Phase 15 audit
+
+Recorded 27 Sep 2026. The audit covered tenant scoping, per-action authorization, the
+proxy/Node auth split, client-supplied `tenantId`, and soft-delete enforcement. It found
+no cross-tenant read or write path. The changes it made are verified by `probe:crud`
+phases F–H and `probe:cancel` phase G. What follows is the behaviour it changed, plus
+the risks it left open on purpose.
+
+**5. The public booking form no longer rewrites a returning customer.** Before,
+`findOrCreateCustomer` upserted on `(tenantId, phone)` and overwrote `name` and
+`email` from whatever the unauthenticated form sent. Anyone who knew a customer's
+phone number could rename them across the owner's whole booking history (the
+dashboard reads the name live) or swap in their own email. Now the public path
+creates the customer on first contact and otherwise only links the booking to the row
+as stored. The owner's manual booking form, which is authenticated, still updates it.
+
+*Cost:* a customer who mistyped their name on a first online booking can't correct it
+by booking again. The owner has to, from a manual booking. There is still no
+customer-edit screen.
+
+**6. Every authenticated request re-reads the user row. A password reset still does
+not end existing sessions.** `getSession` in `lib/auth/session.ts` now checks that the
+JWT's user still exists in the JWT's tenant with role `OWNER`, and otherwise treats the
+request as signed out. That closes two gaps: a deleted user kept dashboard access for
+the token's lifetime (30 days by default), and a `STAFF` user would have had full owner
+rights, because nothing checked `role`. As a result, the "signed in → skip `/login`"
+redirect moved from `proxy.ts` to the login page. The proxy only sees the JWT, so it
+would bounce a deleted user's token between `/login` and `/dashboard` forever.
+
+*Cost:* one indexed primary-key query per request, memoized per request by `cache()`.
+*Still open:* after `scripts/reset-password.ts`, the user row is unchanged, so a
+session issued before the reset stays valid until it expires. Closing that needs a
+per-user token version checked against the JWT, which is a schema change (CLAUDE.md
+rule 4) and needs its own plan.
+
+**7. The phone-keyed rate limiter can be used against a known number.** The limiter
+counts bookings per `(tenant, phone)`. Someone who knows a customer's number can make
+three bookings with it and block that customer from booking online for an hour. This
+is inherent to keying an anonymous form on phone, and the alternative (per-IP limits)
+needs a persistent store, which is a dependency that waits for evidence of real
+abuse (CLAUDE.md). Left as is. When the shop has a phone number, the lockout message
+already gives it, so a blocked customer can still call to book.
+
+**8. Soft delete for Staff and Service is enforced by the Prisma client, not only by
+convention.** `lib/db/prisma.ts` wraps the client with a query extension that throws
+on `delete`/`deleteMany` for both models. `onDelete: Restrict` on `Booking` protected
+only rows that had bookings; a never-booked barber could be hard-deleted, and their
+hours and time off would cascade with them. SQL-level cascades from deleting a whole
+Tenant are deliberately not blocked, because the probes' cleanup depends on them.
+
 ### Deferred out of Day 14
 
 - **The full production-readiness review was cut down to security only.** The

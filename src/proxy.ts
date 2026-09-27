@@ -11,21 +11,28 @@ import { authConfig } from "@/lib/auth/auth.config";
 
 const { auth } = NextAuth(authConfig);
 
+/**
+ * An optimistic check only: "is there a JWT at all". It can't tell whether the
+ * user that JWT names still exists — that needs the database, which this file
+ * deliberately never touches — so lib/auth/session.ts re-verifies on every
+ * dashboard render and action.
+ *
+ * Which is why the reverse redirect (signed in + on /login -> /dashboard) does
+ * NOT live here. For a JWT whose user has been deleted, session.ts sends the
+ * request to /login; a proxy that bounced every JWT on /login straight back to
+ * /dashboard would loop the two forever. The login page does that redirect
+ * itself, from the verified session.
+ */
 const proxy = auth((req) => {
   const { nextUrl } = req;
-  const isSignedIn = Boolean(req.auth?.user?.tenantId);
+  const hasSession = Boolean(req.auth?.user?.tenantId);
   const isOnDashboard = nextUrl.pathname.startsWith("/dashboard");
-  const isOnLogin = nextUrl.pathname === "/login";
 
-  if (isOnDashboard && !isSignedIn) {
+  if (isOnDashboard && !hasSession) {
     const loginUrl = new URL("/login", nextUrl.origin);
     // Send them back where they were headed once they've signed in.
     loginUrl.searchParams.set("callbackUrl", nextUrl.pathname + nextUrl.search);
     return Response.redirect(loginUrl);
-  }
-
-  if (isOnLogin && isSignedIn) {
-    return Response.redirect(new URL("/dashboard", nextUrl.origin));
   }
 
   return undefined;

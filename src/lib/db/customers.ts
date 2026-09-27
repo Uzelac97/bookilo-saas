@@ -25,29 +25,40 @@ const UNIQUE_VIOLATION = "P2002";
  * so the same number at two different shops is two customers — which is correct:
  * these are independent businesses that share no customer list.
  *
- * On a returning customer the stored `name` is overwritten with what they typed
- * this time. They know their own name, and it's the only path by which an
- * earlier typo ever gets corrected. `email` is different: it's optional on the
- * form, so it's only written when one was actually supplied — otherwise leaving
- * the field blank would silently delete an address the shop already had.
+ * WHETHER A RETURNING CUSTOMER'S ROW IS REWRITTEN DEPENDS ON WHO IS ASKING, and
+ * the caller must say so via `updateExisting`:
  *
- * `notes` is never touched here. That column belongs to the owner's dashboard,
- * and a public form must not be able to overwrite what a barber wrote about
- * someone.
+ * - `false` on the public booking form. It is unauthenticated, and the phone
+ *   number is the only identity check it has — a number anyone who has ever
+ *   texted this person knows. Letting it rewrite `name`/`email` would let a
+ *   stranger rename a customer across the owner's entire booking history (the
+ *   dashboard reads the name live off this row) or swap in their own email
+ *   address. So the public path creates on first contact and otherwise only
+ *   links the new booking to the row as stored.
+ * - `true` on the owner's manual booking form. That path is authenticated, and
+ *   the owner correcting a typo in a customer's name is the point of it. `email`
+ *   is still only written when one was supplied — it's optional on the form, and
+ *   leaving it blank must not delete an address the shop already had.
+ *
+ * `notes` is never touched here on either path. That column belongs to the
+ * owner's dashboard.
  */
 export async function findOrCreateCustomer(
   tenantId: string,
   identity: CustomerIdentity,
+  opts: { updateExisting: boolean },
 ): Promise<{ id: string }> {
   const { name, phone, email } = identity;
 
-  const update = {
-    name,
-    // Spread, not `email: email ?? undefined` — Prisma treats an explicit
-    // `undefined` as "no change" today, but writing the intent structurally
-    // means this doesn't depend on that.
-    ...(email ? { email } : {}),
-  };
+  const update = opts.updateExisting
+    ? {
+        name,
+        // Spread, not `email: email ?? undefined` — Prisma treats an explicit
+        // `undefined` as "no change" today, but writing the intent
+        // structurally means this doesn't depend on that.
+        ...(email ? { email } : {}),
+      }
+    : {};
 
   try {
     return await prisma.customer.upsert({
@@ -61,7 +72,8 @@ export async function findOrCreateCustomer(
     // here: both upserts miss on the initial read, both attempt the insert, and
     // one loses on the unique index. That is a normal outcome for a shop where
     // someone books twice in quick succession, not a failure worth showing a
-    // customer — so the loser re-reads the winner's row.
+    // customer — so the loser re-reads the winner's row, applying the same
+    // update the upsert would have (none at all on the public path).
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === UNIQUE_VIOLATION

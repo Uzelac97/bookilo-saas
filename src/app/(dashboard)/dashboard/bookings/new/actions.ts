@@ -105,8 +105,12 @@ export async function createManualBooking(
   try {
     // Resolves to the existing customer when this phone has booked here before,
     // matching on the normalised value the schema produced — so a walk-in the
-    // owner types in is the same person as their online bookings.
-    const { id: customerId } = await findOrCreateCustomer(tenant.id, customer);
+    // owner types in is the same person as their online bookings. Unlike the
+    // public form, this path is authenticated, so what the owner typed does
+    // update the stored name and email.
+    const { id: customerId } = await findOrCreateCustomer(tenant.id, customer, {
+      updateExisting: true,
+    });
 
     // createBooking re-verifies that the staff, service and customer all belong
     // to this tenant and are active (rule 2a), and owns the endAt/blockedUntil

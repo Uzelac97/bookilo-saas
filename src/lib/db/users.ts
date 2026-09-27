@@ -39,3 +39,29 @@ export async function getUserByEmail(email: string): Promise<{
     },
   });
 }
+
+/**
+ * Re-reads the user a session JWT names, scoped by the tenant that JWT names.
+ *
+ * Exists because the session is a stateless JWT (no Session table —
+ * EXECUTION-PLAN.md §3): once issued, it stays valid until it expires, whatever
+ * happens to the user it was issued for. Without a lookup, a deleted user or a
+ * user whose role changed keeps acting on the dashboard for the token's whole
+ * lifetime. lib/auth/session.ts calls this once per request.
+ *
+ * `tenantId` is in the `where` alongside the id, so a token whose userId and
+ * tenantId don't belong together resolves to null rather than to a user of some
+ * other shop.
+ *
+ * Returns the role from the database, not the JWT's copy of it — the whole point
+ * is that the token's claims can be stale.
+ */
+export async function getSessionUser(
+  tenantId: string,
+  userId: string,
+): Promise<{ id: string; role: UserRole } | null> {
+  return prisma.user.findFirst({
+    where: { id: userId, tenantId },
+    select: { id: true, role: true },
+  });
+}

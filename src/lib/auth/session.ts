@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 
 import { getTenantById } from "@/lib/db/tenant";
-import type { UserRole } from "@/lib/db/users";
+import { getSessionUser, type UserRole } from "@/lib/db/users";
 
 import { auth } from "./auth";
 
@@ -13,11 +13,29 @@ export type SessionContext = {
 };
 
 /**
- * Raw session, or null when signed out. Use when "signed out" is a valid state.
+ * The session, or null when signed out. Use when "signed out" is a valid state.
+ *
+ * NOT JUST A JWT DECODE. The token is stateless, so on its own it can't know
+ * that the user it names has since been deleted or changed role — and it stays
+ * valid for its whole lifetime regardless. So the user row is re-read, scoped by
+ * the token's tenant (getSessionUser), and anything that doesn't check out is
+ * treated as signed out:
+ *
+ * - no such user in that tenant: deleted, or a token whose ids don't belong
+ *   together.
+ * - role other than OWNER: the dashboard and every action behind it are owner
+ *   functions, and there is no staff-facing surface yet. Failing closed means a
+ *   STAFF row, whenever one first exists, gets nothing rather than everything.
+ *
+ * What this does NOT catch: a password reset. The user row still exists with the
+ * same role, so a session issued before the reset stays valid. Closing that
+ * needs a per-user token version, which is a schema change — see
+ * EXECUTION-PLAN.md.
  *
  * Memoized per request. A dashboard render asks for the session several times
  * over — the layout guards on it, the page reads the tenant from it, a server
- * action re-checks it — and without this each one is a separate JWT decode.
+ * action re-checks it — and without this each one is a separate JWT decode and
+ * user query.
  *
  * cache() is safe *here* specifically because this module only ever runs inside
  * a request: it calls auth() and redirect(), neither of which exists outside one.
@@ -25,7 +43,15 @@ export type SessionContext = {
  * script and the probes, where there is no React scope to memoize into — see the
  * getShop comment in app/(public)/b/[slug]/page.tsx.
  */
-export const getSession = cache(async () => auth());
+export const getSession = cache(async () => {
+  const session = await auth();
+  if (!session?.user?.tenantId || !session.user.id) return null;
+
+  const user = await getSessionUser(session.user.tenantId, session.user.id);
+  if (!user || user.role !== "OWNER") return null;
+
+  return session;
+});
 
 /**
  * The tenant context for an authenticated request. This is the ONLY approved

@@ -244,8 +244,13 @@ export async function submitBooking(
 
   try {
     // 6. Resolve the customer. After the availability check, so a request that
-    //    was never going to succeed doesn't leave a Customer row behind.
-    const { id: customerId } = await findOrCreateCustomer(tenant.id, customer);
+    //    was never going to succeed doesn't leave a Customer row behind. A
+    //    returning customer's stored name and email are left alone: this form
+    //    is unauthenticated, so knowing a phone number must not be enough to
+    //    rewrite what the shop has on file.
+    const { id: customerId } = await findOrCreateCustomer(tenant.id, customer, {
+      updateExisting: false,
+    });
 
     // 7. Insert. createBooking re-verifies staff/service/customer against the
     //    tenant (CLAUDE.md rule 2a) and owns the endAt/blockedUntil arithmetic
@@ -316,8 +321,10 @@ export async function submitBooking(
 
   // 10. Outside the try block: redirect() signals by throwing, and the catch
   //    above would swallow it and leave the customer staring at a filled-in
-  //    form with no confirmation — the same trap as loginAction.
-  redirect(`/b/${slug}/booked/${token}`);
+  //    form with no confirmation — the same trap as loginAction. The slug is
+  //    the tenant row's own, not the submitted one, so the redirect target is
+  //    never built from client input.
+  redirect(`/b/${tenant.slug}/booked/${token}`);
 }
 
 /** Everything the slot computation needs that doesn't change within one request. */
