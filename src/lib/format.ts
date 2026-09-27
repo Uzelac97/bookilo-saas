@@ -10,10 +10,15 @@
  */
 import { DateTime } from "luxon";
 
+import { INTL_LOCALES, createTranslator } from "@/lib/i18n/translate";
+import type { Locale } from "@/lib/preferences";
+
 /**
  * Prices are stored as EUR cents (schema.prisma) and every tenant is a
- * German-speaking single-location shop for now, so locale and currency are
- * module constants rather than Tenant columns. When a real customer needs
+ * German-speaking single-location shop for now, so the price locale and
+ * currency are module constants rather than Tenant columns — and they do not
+ * follow the interface language: "25,00 €" is what the shop charges, whichever
+ * language the page is read in. When a real customer needs
  * something else, that's a deliberate two-column migration — not a field added
  * "in case" (CLAUDE.md).
  */
@@ -21,51 +26,59 @@ const PRICE_LOCALE = "de-DE";
 const PRICE_CURRENCY = "EUR";
 
 /**
- * The locale every date and time in this file is rendered in.
+ * The locale every date in this file renders in, and the day-first patterns
+ * that go with it.
  *
- * PINNED, AND THAT IS THE WHOLE POINT. Until Day 13 the Luxon calls below passed
- * no locale at all, so weekday and month names came out in whatever the runtime
- * happened to default to, while money three lines above was pinned to de-DE. The
- * inconsistency was the thing worth settling — not whether English abbreviations
- * are acceptable.
+ * ALWAYS PASSED, NEVER TAKEN FROM THE RUNTIME. Until Day 13 the Luxon calls
+ * below passed no locale at all, so weekday and month names came out in
+ * whatever the server happened to default to. A confirmation email quotes a
+ * date to a customer as a promise; that string must not depend on which region
+ * a function booted in, on an LC_ALL somewhere, or on a future self-hosted box.
  *
- * It is settled by pinning both, not by unpinning either. A confirmation email
- * renders on a server and quotes a date to a customer as a promise; that string
- * must not depend on which region a function booted in, on an LC_ALL somewhere,
- * or on a future self-hosted box. Vercel's Node runtime has historically
- * defaulted to en-US, which is why this was latent rather than visible — latent
- * is not the same as decided.
+ * Since Phase 15a the locale is the interface language (lib/preferences.ts),
+ * so a German page says "Di, 28. Jul" and an English one "Tue, 28 Jul". Each
+ * function takes it as a required argument, the same contract as `timezone`:
+ * a caller cannot forget it, and a client component cannot silently fall back
+ * to the browser's.
  *
- * THE TWO VALUES DIFFER ON PURPOSE, and they answer different questions. Money
- * is German because the money is German — these are euro prices at
- * German-speaking shops. Prose is English because every word this product says
- * is English, starting with WEEKDAY_LABELS in lib/availability/opening-hours.ts,
- * which is a hand-written English list rendered by the public hours table, the
- * staff list and the hours editor. German month names beside an English
- * "Monday" column would be a worse inconsistency than the one this replaces.
- *
- * en-GB rather than en-US: the format tokens below are day-first ("d LLL"), and
- * that is the convention en-GB names. The two produce identical output for every
- * token used here — the ordering lives in the token strings, not the locale —
- * so this is a statement of intent that costs nothing today and is right the day
- * a token changes.
+ * The patterns differ per locale rather than just the names in them — German
+ * writes an ordinal dot after the day ("28. Jul"), which no locale setting adds
+ * to an English token string.
  */
-const DATE_LOCALE = "en-GB";
+const DATE_PATTERNS: Record<
+  Locale,
+  { weekdayDayMonth: string; dayMonth: string; day: string }
+> = {
+  de: { weekdayDayMonth: "ccc, d. LLL", dayMonth: "d. LLL", day: "d." },
+  en: { weekdayDayMonth: "ccc, d LLL", dayMonth: "d LLL", day: "d" },
+};
 
 /**
- * A UTC instant as a tenant-local DateTime, in the pinned locale.
+ * A UTC instant as a tenant-local DateTime, in the caller's locale.
  *
  * Every function below goes through this or its sibling rather than calling
  * Luxon directly, so a new formatter cannot forget the locale — which is
  * precisely how the old inconsistency arose one function at a time.
  */
-function localFromInstant(instant: Date, timezone: string): DateTime {
-  return DateTime.fromJSDate(instant).setZone(timezone).setLocale(DATE_LOCALE);
+function localFromInstant(
+  instant: Date,
+  timezone: string,
+  locale: Locale,
+): DateTime {
+  return DateTime.fromJSDate(instant)
+    .setZone(timezone)
+    .setLocale(INTL_LOCALES[locale]);
 }
 
 /** The same, from the ISO date string a URL carries. */
-function localFromISODate(date: string, timezone: string): DateTime {
-  return DateTime.fromISO(date, { zone: timezone }).setLocale(DATE_LOCALE);
+function localFromISODate(
+  date: string,
+  timezone: string,
+  locale: Locale,
+): DateTime {
+  return DateTime.fromISO(date, { zone: timezone }).setLocale(
+    INTL_LOCALES[locale],
+  );
 }
 
 // Constructing an Intl.NumberFormat is the expensive part; reuse one.
@@ -99,6 +112,7 @@ const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
 
 /**
  * 30 -> "30 min", 75 -> "1 h 15 min", 1440 -> "1 day", 10080 -> "7 days"
+ * (German: "30 Min.", "1 Std. 15 Min.", "1 Tag", "7 Tage")
  *
  * THE DAYS TIER EXISTS FOR THE CANCELLATION WINDOW, not for service lengths. A
  * service is capped at 480 minutes by serviceInputSchema, so nothing on a
@@ -116,26 +130,34 @@ const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
  * they're unit symbols, which don't take a plural, and "1 days" is the kind of
  * detail that makes a shop's confirmation email look automated.
  */
-export function formatDuration(minutes: number): string {
+export function formatDuration(minutes: number, locale: Locale): string {
+  const t = createTranslator(locale);
   const days = Math.floor(minutes / MINUTES_PER_DAY);
   const hours = Math.floor((minutes % MINUTES_PER_DAY) / MINUTES_PER_HOUR);
   const remainder = minutes % MINUTES_PER_HOUR;
 
   const parts: string[] = [];
-  if (days > 0) parts.push(days === 1 ? "1 day" : `${days} days`);
-  if (hours > 0) parts.push(`${hours} h`);
-  if (remainder > 0) parts.push(`${remainder} min`);
+  if (days > 0) parts.push(t("duration.days", { count: days }));
+  if (hours > 0) parts.push(t("duration.hours", { count: hours }));
+  if (remainder > 0) parts.push(t("duration.minutes", { count: remainder }));
 
   // Zero is the one value with no non-empty part. It reaches here from a
   // cancellation window of 0, and every caller that can pass one has its own
   // wording for it (formatCancellationDeadline below) — this is the fallback, so
   // a new caller gets something honest rather than an empty string.
-  return parts.length > 0 ? parts.join(" ") : "0 min";
+  return parts.length > 0
+    ? parts.join(" ")
+    : t("duration.minutes", { count: 0 });
 }
 
 /**
- * How long before an appointment a customer can still cancel, as the phrase that
- * slots into "You can cancel online ___ your appointment."
+ * How long before an appointment a customer can still cancel, as the whole
+ * sentence: "You can cancel online up to 2 h before your appointment."
+ *
+ * A WHOLE SENTENCE, NOT A FRAGMENT, since Phase 15a. This used to return just
+ * "up to 2 h before" for callers to wrap in English on either side, and German
+ * cannot be assembled that way — the verb goes to the end ("…vor deinem Termin
+ * online stornieren"). Each language gets its own complete sentence instead.
  *
  * A WINDOW OF 0 GETS ITS OWN WORDING, and this is the whole reason the function
  * exists. `formatDuration(0)` is "0 min", so composing it into that sentence
@@ -149,10 +171,16 @@ export function formatDuration(minutes: number): string {
  * the confirmation page and the cancel page — so they cannot drift into telling
  * one customer something different from another.
  */
-export function formatCancellationDeadline(windowMinutes: number): string {
+export function formatCancellationPolicy(
+  windowMinutes: number,
+  locale: Locale,
+): string {
+  const t = createTranslator(locale);
   return windowMinutes === 0
-    ? "any time before"
-    : `up to ${formatDuration(windowMinutes)} before`;
+    ? t("cancellation.policyAnyTime")
+    : t("cancellation.policyUpTo", {
+        duration: formatDuration(windowMinutes, locale),
+      });
 }
 
 /**
@@ -179,7 +207,9 @@ export function formatMinuteOfDay(minute: number): string {
  * off. Passing the zone explicitly is what makes that impossible to forget.
  */
 export function formatSlotTime(instant: Date, timezone: string): string {
-  return localFromInstant(instant, timezone).toFormat("HH:mm");
+  // HH:mm is identical in every supported locale, so this takes none; the "en"
+  // only satisfies the helper and changes nothing in the output.
+  return localFromInstant(instant, timezone, "en").toFormat("HH:mm");
 }
 
 /**
@@ -202,14 +232,21 @@ export function formatTimeRange(
 }
 
 /**
- * A tenant-local calendar day for display: "2026-07-28" -> "Tue, 28 Jul".
+ * A tenant-local calendar day for display: "2026-07-28" -> "Tue, 28 Jul" /
+ * "Di, 28. Jul".
  *
  * Takes the ISO date string the URL carries, not an instant, so there is no
  * conversion here to get wrong — but it still needs the zone to construct the
  * day, since `DateTime.fromISO` would otherwise anchor it to the local one.
  */
-export function formatBookingDate(date: string, timezone: string): string {
-  return localFromISODate(date, timezone).toFormat("ccc, d LLL");
+export function formatBookingDate(
+  date: string,
+  timezone: string,
+  locale: Locale,
+): string {
+  return localFromISODate(date, timezone, locale).toFormat(
+    DATE_PATTERNS[locale].weekdayDayMonth,
+  );
 }
 
 /**
@@ -224,15 +261,17 @@ export function formatDateRange(
   fromDate: string,
   toDate: string,
   timezone: string,
+  locale: Locale,
 ): string {
-  const from = localFromISODate(fromDate, timezone);
-  const to = localFromISODate(toDate, timezone);
+  const from = localFromISODate(fromDate, timezone, locale);
+  const to = localFromISODate(toDate, timezone, locale);
+  const { dayMonth, day } = DATE_PATTERNS[locale];
 
   const sameMonth = from.hasSame(to, "month") && from.hasSame(to, "year");
 
   return sameMonth
-    ? `${from.toFormat("d")} – ${to.toFormat("d LLL")}`
-    : `${from.toFormat("d LLL")} – ${to.toFormat("d LLL")}`;
+    ? `${from.toFormat(day)} – ${to.toFormat(dayMonth)}`
+    : `${from.toFormat(dayMonth)} – ${to.toFormat(dayMonth)}`;
 }
 
 /**
@@ -253,26 +292,29 @@ export function formatTimeOffRange(
   startAt: Date,
   endAt: Date,
   timezone: string,
+  locale: Locale,
 ): string {
-  const start = localFromInstant(startAt, timezone);
-  const end = localFromInstant(endAt, timezone);
+  const start = localFromInstant(startAt, timezone, locale);
+  const end = localFromInstant(endAt, timezone, locale);
+  const { dayMonth } = DATE_PATTERNS[locale];
 
   const wholeDays =
     start.toMillis() === start.startOf("day").toMillis() &&
     end.toMillis() === end.startOf("day").toMillis();
 
   if (!wholeDays) {
-    return `${start.toFormat("d LLL")}, ${start.toFormat("HH:mm")}–${end.toFormat("HH:mm")}`;
+    return `${start.toFormat(dayMonth)}, ${start.toFormat("HH:mm")}–${end.toFormat("HH:mm")}`;
   }
 
   const lastDay = end.minus({ days: 1 });
 
   return start.hasSame(lastDay, "day")
-    ? start.toFormat("d LLL")
+    ? start.toFormat(dayMonth)
     : formatDateRange(
         start.toISODate() as string,
         lastDay.toISODate() as string,
         timezone,
+        locale,
       );
 }
 
@@ -296,12 +338,13 @@ export function initials(name: string): string {
   return (first + last).toUpperCase();
 }
 
-/** The parts a date-strip cell shows: "Tue" over "28". */
+/** The parts a date-strip cell shows: "Tue" over "28" / "Di" over "28". */
 export function formatStripDay(
   date: string,
   timezone: string,
+  locale: Locale,
 ): { weekday: string; dayOfMonth: string } {
-  const local = localFromISODate(date, timezone);
+  const local = localFromISODate(date, timezone, locale);
 
   return {
     weekday: local.toFormat("ccc"),

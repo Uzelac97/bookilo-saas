@@ -16,7 +16,7 @@
 |---|---|---|
 | **14** | First production deploy | Blocks everything — you cannot demo from localhost |
 | **15** | Security & tenant-isolation audit | Blocks real customer data |
-| **15a** | i18n (DE default, EN toggle) + light/dark mode + drag-to-select booking | Blocks the German in-person demo |
+| **15a** | i18n (DE default, EN toggle) + light/dark mode + ~~drag-to-select booking~~ (cut) | Blocks the German in-person demo |
 | **16** | Salon vertical + DEMO.md | Blocks salon demos |
 | **16a** | Landing page | Blocks nothing — deliberately last |
 | **17** | Code quality pass | **After** first 3–5 demos |
@@ -139,6 +139,10 @@ into the code and should be read before starting rather than rediscovered:
 The cost is QA surface: every screen, in both themes, before the demo. One
 unreviewed screen rendering unreadably in front of a prospect is worse than
 having no dark mode at all.
+
+**Cut from this phase on 27 Sep 2026** — see decision 9 in `EXECUTION-PLAN.md`
+("Recorded during Phase 15a"). The paragraph below is kept as the record of what
+the item was, not as a plan.
 
 **Drag-to-select booking on the calendar.** Outlook/Google Calendar-style range
 selection — drag across a time range, get a booking form prefilled with it. On

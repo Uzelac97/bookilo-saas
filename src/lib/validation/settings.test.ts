@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { createTranslator, translateMessage } from "@/lib/i18n/translate";
+
 import { bookingRulesSchema } from "./settings";
 
 /** The shape the settings form posts, so each test states only what it varies. */
@@ -12,7 +14,11 @@ function input(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** The first message Zod reports for one field, or undefined if it passed. */
+/**
+ * The first message Zod reports for one field, as English text, or undefined
+ * if it passed. Schemas return message keys (lib/i18n); rendering them here
+ * also proves each key — and each encoded parameter — resolves.
+ */
 function errorFor(
   field: keyof ReturnType<typeof input>,
   value: unknown,
@@ -20,7 +26,11 @@ function errorFor(
   const parsed = bookingRulesSchema.safeParse(input({ [field]: value }));
   if (parsed.success) return undefined;
 
-  return parsed.error.issues.find((issue) => issue.path[0] === field)?.message;
+  const message = parsed.error.issues.find(
+    (issue) => issue.path[0] === field,
+  )?.message;
+
+  return message && translateMessage(createTranslator("en"), message);
 }
 
 describe("bookingRulesSchema", () => {

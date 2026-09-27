@@ -40,7 +40,7 @@ export async function loginAction(
     // One message for both "no such account" and "wrong password". Telling
     // them apart hands out a list of which emails are registered.
     if (error instanceof AuthError) {
-      return { error: "Invalid email or password." };
+      return { error: "login.invalidCredentials" };
     }
     throw error;
   }

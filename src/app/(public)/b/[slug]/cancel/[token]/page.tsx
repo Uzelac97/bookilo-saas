@@ -12,14 +12,19 @@ import {
   formatPrice,
   formatSlotTime,
 } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
+import { getLocale } from "@/lib/preferences-server";
 
 import { cancelBooking } from "./actions";
 
 /** Same reasoning as the confirmation page: the URL carries a bearer secret. */
-export const metadata: Metadata = {
-  title: "Cancel booking",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return {
+    title: t("cancel.metaTitle"),
+    robots: { index: false, follow: false },
+  };
+}
 
 type PageProps = { params: Promise<{ slug: string; token: string }> };
 
@@ -46,6 +51,7 @@ export default async function CancelPage({ params }: PageProps) {
   if (!booking || booking.tenant.slug !== slug) notFound();
 
   const { tenant, service } = booking;
+  const [t, locale] = await Promise.all([getT(), getLocale()]);
   const date = DateTime.fromJSDate(booking.startAt)
     .setZone(tenant.timezone)
     .toISODate();
@@ -59,14 +65,21 @@ export default async function CancelPage({ params }: PageProps) {
     windowMinutes: tenant.cancellationWindowMinutes,
   });
 
-  const reachTheShop = tenant.phone
-    ? `call the shop on ${tenant.phone}`
-    : "get in touch with the shop directly";
+  // Whole sentences per case rather than a "call the shop" fragment spliced
+  // into English around it: German puts the separable verb at the end ("ruf
+  // … an"), so the fragment cannot be translated on its own.
+  const phone = tenant.phone;
+  const closedNotice = phone
+    ? t("cancel.closedNoticePhone", { phone })
+    : t("cancel.closedNotice");
+  const tooLateContact = phone
+    ? t("cancel.tooLateContactPhone", { phone })
+    : t("cancel.tooLateContact");
 
   /**
    * Why online cancellation is closed for this booking.
    *
-   * Deliberately not formatCancellationDeadline: that renders the deadline a
+   * Deliberately not formatCancellationPolicy: that renders the deadline a
    * customer still has ("up to 2 h before"), and this states the rule that has
    * already passed. But it needs the same care about a window of 0 — with no
    * window at all, cancellation stays open until the appointment starts, and
@@ -76,52 +89,57 @@ export default async function CancelPage({ params }: PageProps) {
    */
   const closedReason =
     tenant.cancellationWindowMinutes === 0
-      ? "Online cancellation closes once an appointment starts, so this one is too late now."
-      : `Online cancellation closes ${formatDuration(tenant.cancellationWindowMinutes)} before an appointment, so this one is too close now.`;
+      ? t("cancel.closedReasonAtStart")
+      : t("cancel.closedReasonWindow", {
+          duration: formatDuration(tenant.cancellationWindowMinutes, locale),
+        });
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 px-4 py-10 sm:py-16">
+    <div className="flex flex-1 flex-col bg-canvas px-4 py-10 sm:py-16">
       <main className="mx-auto flex w-full max-w-2xl flex-col gap-8">
         <header className="flex flex-col gap-2">
-          <p className="text-sm font-medium text-zinc-500">{tenant.name}</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-zinc-900">
-            {cancelled ? "This booking is cancelled" : "Cancel your booking"}
+          <p className="text-sm font-medium text-fg-muted">{tenant.name}</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-fg">
+            {cancelled ? t("booking.cancelledHeading") : t("cancel.heading")}
           </h1>
-          <p className="text-zinc-600">
-            {cancelled
-              ? "The appointment below is no longer reserved, and the time is back on the shop's calendar."
-              : "Check the details below before you confirm."}
+          <p className="text-fg-tertiary">
+            {cancelled ? t("cancel.cancelledBody") : t("cancel.intro")}
           </p>
         </header>
 
-        <dl className="flex flex-col gap-1.5 rounded-2xl border border-zinc-200 bg-white p-5 text-sm shadow-sm">
-          <Row label="Service" value={service.name} />
-          <Row label="Barber" value={booking.staff.name} />
+        <dl className="flex flex-col gap-1.5 rounded-2xl border border-line bg-surface p-5 text-sm shadow-sm">
+          <Row label={t("booking.service")} value={service.name} />
+          <Row label={t("booking.barber")} value={booking.staff.name} />
           <Row
-            label="When"
+            label={t("booking.when")}
             value={
               date
-                ? `${formatBookingDate(date, tenant.timezone)} at ${formatSlotTime(booking.startAt, tenant.timezone)}`
+                ? t("booking.dateAtTime", {
+                    date: formatBookingDate(date, tenant.timezone, locale),
+                    time: formatSlotTime(booking.startAt, tenant.timezone),
+                  })
                 : formatSlotTime(booking.startAt, tenant.timezone)
             }
           />
-          <Row label="Duration" value={formatDuration(service.durationMinutes)} />
-          <Row label="Price" value={formatPrice(service.priceMinorUnits)} />
+          <Row
+            label={t("booking.duration")}
+            value={formatDuration(service.durationMinutes, locale)}
+          />
+          <Row
+            label={t("booking.price")}
+            value={formatPrice(service.priceMinorUnits)}
+          />
         </dl>
 
         {cancelled ? null : closed ? (
-          <Notice>
-            This appointment can no longer be cancelled online. If something
-            isn&rsquo;t right, {reachTheShop}.
-          </Notice>
+          <Notice>{closedNotice}</Notice>
         ) : inTime ? (
           <form
             action={cancelBooking.bind(null, { slug, token })}
             className="flex flex-col gap-3"
           >
-            <p className="text-sm text-zinc-600">
-              This frees the time for someone else, and it can&rsquo;t be
-              undone — you&rsquo;d need to book again.
+            <p className="text-sm text-fg-tertiary">
+              {t("cancel.warning")}
             </p>
             <CancelButton />
           </form>
@@ -135,16 +153,15 @@ export default async function CancelPage({ params }: PageProps) {
                 gets its leading space trimmed. An explicit space is a real
                 child and can't be. */}
             {closedReason}{" "}
-            If you can&rsquo;t make it, {reachTheShop} — they&rsquo;d rather
-            know.
+            {tooLateContact}
           </Notice>
         )}
 
         <Link
           href={`/b/${slug}`}
-          className="inline-flex min-h-11 items-center self-start text-sm font-medium text-zinc-900 underline underline-offset-4 hover:text-zinc-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
+          className="inline-flex min-h-11 items-center self-start text-sm font-medium text-fg underline underline-offset-4 hover:text-fg-tertiary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
-          Back to {tenant.name}
+          {t("booking.backTo", { shop: tenant.name })}
         </Link>
       </main>
     </div>
@@ -153,7 +170,7 @@ export default async function CancelPage({ params }: PageProps) {
 
 function Notice({ children }: { children: React.ReactNode }) {
   return (
-    <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+    <p className="rounded-xl border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning">
       {children}
     </p>
   );
@@ -162,8 +179,8 @@ function Notice({ children }: { children: React.ReactNode }) {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-4">
-      <dt className="text-zinc-500">{label}</dt>
-      <dd className="text-right font-medium text-zinc-900">{value}</dd>
+      <dt className="text-fg-muted">{label}</dt>
+      <dd className="text-right font-medium text-fg">{value}</dd>
     </div>
   );
 }

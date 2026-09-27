@@ -1,12 +1,18 @@
 import type { BookingByToken } from "@/lib/db/bookings";
 import {
-  formatCancellationDeadline,
+  formatCancellationPolicy,
   formatDuration,
   formatPrice,
   formatSlotTime,
 } from "@/lib/format";
 
-import { renderHtml, renderText, type EmailContent } from "./shell";
+import {
+  EMAIL_LOCALE,
+  emailT as t,
+  renderHtml,
+  renderText,
+  type EmailContent,
+} from "./shell";
 import { localDate } from "./when";
 
 export type RenderedEmail = { subject: string; html: string; text: string };
@@ -32,36 +38,51 @@ export function renderBookingConfirmation(
   const time = formatSlotTime(booking.startAt, tenant.timezone);
   const firstName = booking.customer.name.split(" ")[0] ?? booking.customer.name;
 
+  const when = t("booking.dateAtTime", { date, time });
+
   const rows = [
-    { label: "Service", value: service.name },
-    { label: "Barber", value: booking.staff.name },
-    { label: "When", value: `${date} at ${time}` },
-    { label: "Duration", value: formatDuration(service.durationMinutes) },
-    { label: "Price", value: formatPrice(service.priceMinorUnits) },
+    { label: t("booking.service"), value: service.name },
+    { label: t("booking.barber"), value: booking.staff.name },
+    { label: t("booking.when"), value: when },
+    {
+      label: t("booking.duration"),
+      value: formatDuration(service.durationMinutes, EMAIL_LOCALE),
+    },
+    { label: t("booking.price"), value: formatPrice(service.priceMinorUnits) },
   ];
 
   // Address last, and only when the shop has one on file. A customer who has
   // never been needs it more than anything else here; a nullable column means
   // it can't simply be assumed.
-  if (tenant.address) rows.push({ label: "Where", value: tenant.address });
+  if (tenant.address) {
+    rows.push({ label: t("email.where"), value: tenant.address });
+  }
 
   const footerLines = [
     tenant.phone
-      ? `Questions? Call ${tenant.name} on ${tenant.phone}.`
-      : `Questions? Get in touch with ${tenant.name}.`,
+      ? t("email.questionsPhone", { shop: tenant.name, phone: tenant.phone })
+      : t("email.questions", { shop: tenant.name }),
   ];
 
   const content: EmailContent = {
-    heading: "You're booked in",
-    lead: `Thanks ${firstName} — ${tenant.name} has you down for ${service.name} on ${date} at ${time}.`,
+    heading: t("booked.heading"),
+    lead: t("email.confirmationLead", {
+      name: firstName,
+      shop: tenant.name,
+      service: service.name,
+      when,
+    }),
     rows,
     action: {
-      label: "Cancel this booking",
+      label: t("booked.cancelLink"),
       url: cancelUrl,
       // This sentence is the promise the shop is held to: it's what a customer
       // reads weeks later when they need to cancel, and the window can have been
       // changed since (it's read live, not snapshotted — see lib/db/tenant.ts).
-      hint: `You can cancel online ${formatCancellationDeadline(tenant.cancellationWindowMinutes)} your appointment.`,
+      hint: formatCancellationPolicy(
+        tenant.cancellationWindowMinutes,
+        EMAIL_LOCALE,
+      ),
     },
     footerLines,
   };
@@ -69,7 +90,7 @@ export function renderBookingConfirmation(
   return {
     // Date and time in the subject on purpose: this is the mail someone digs
     // out of an inbox three weeks later to check when they're due.
-    subject: `Your appointment at ${tenant.name} — ${date}, ${time}`,
+    subject: t("email.confirmationSubject", { shop: tenant.name, date, time }),
     html: renderHtml(content),
     text: renderText(content),
   };

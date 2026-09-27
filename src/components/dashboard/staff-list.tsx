@@ -1,12 +1,12 @@
 import Link from "next/link";
 
 import { setStaffActiveAction } from "@/app/(dashboard)/dashboard/staff/actions";
-import {
-  DISPLAY_WEEK,
-  WEEKDAY_LABELS,
-} from "@/lib/availability/opening-hours";
+import { DISPLAY_WEEK } from "@/lib/availability/opening-hours";
 import type { ManagedStaff } from "@/lib/db/staff";
 import { initials } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
+import type { Translator } from "@/lib/i18n/translate";
+import { weekdayName } from "@/lib/i18n/weekdays";
 
 /**
  * The owner's barbers, active and retired.
@@ -20,7 +20,7 @@ import { initials } from "@/lib/format";
  * refresh, and lets the confirmation state the one fact that decides it: how
  * many appointments the person still has ahead of them.
  */
-export function StaffList({
+export async function StaffList({
   staff,
   confirmingId,
 }: {
@@ -29,22 +29,25 @@ export function StaffList({
 }) {
   const active = staff.filter((member) => member.active);
   const retired = staff.filter((member) => !member.active);
+  const t = await getT();
 
   return (
     <div className="flex flex-col gap-8">
       <Section
-        title="Working here"
-        empty="No barbers yet — add the first one above."
+        title={t("staff.active")}
+        empty={t("staff.activeEmpty")}
         staff={active}
         confirmingId={confirmingId}
+        t={t}
       />
 
       {retired.length > 0 ? (
         <Section
-          title="No longer working here"
-          hint="Not offered to customers. Their past and future appointments are untouched."
+          title={t("staff.inactiveBadge")}
+          hint={t("staff.inactiveHint")}
           staff={retired}
           confirmingId={confirmingId}
+          t={t}
         />
       ) : null}
     </div>
@@ -57,24 +60,26 @@ function Section({
   empty,
   staff,
   confirmingId,
+  t,
 }: {
   title: string;
   hint?: string;
   empty?: string;
   staff: ManagedStaff[];
   confirmingId: string | undefined;
+  t: Translator;
 }) {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-col gap-0.5">
-        <h2 className="text-sm font-semibold tracking-tight text-zinc-900">
+        <h2 className="text-sm font-semibold tracking-tight text-fg">
           {title}
         </h2>
-        {hint ? <p className="text-sm text-zinc-500">{hint}</p> : null}
+        {hint ? <p className="text-sm text-fg-muted">{hint}</p> : null}
       </div>
 
       {staff.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-zinc-300 px-4 py-6 text-center text-sm text-zinc-500">
+        <p className="rounded-2xl border border-dashed border-line-strong px-4 py-6 text-center text-sm text-fg-muted">
           {empty}
         </p>
       ) : (
@@ -82,11 +87,11 @@ function Section({
           {staff.map((member) => (
             <li
               key={member.id}
-              className="rounded-2xl border border-zinc-200 bg-white p-4"
+              className="rounded-2xl border border-line bg-surface p-4"
             >
-              <StaffRow member={member} />
+              <StaffRow member={member} t={t} />
               {member.id === confirmingId && member.active ? (
-                <DeactivateConfirmation member={member} />
+                <DeactivateConfirmation member={member} t={t} />
               ) : null}
             </li>
           ))}
@@ -96,7 +101,7 @@ function Section({
   );
 }
 
-function StaffRow({ member }: { member: ManagedStaff }) {
+function StaffRow({ member, t }: { member: ManagedStaff; t: Translator }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
       <div className="flex min-w-0 items-center gap-3">
@@ -105,8 +110,8 @@ function StaffRow({ member }: { member: ManagedStaff }) {
           className={[
             "flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-medium",
             member.active
-              ? "bg-zinc-900 text-white"
-              : "bg-zinc-100 text-zinc-400",
+              ? "bg-primary text-on-primary"
+              : "bg-subtle text-fg-faint",
           ].join(" ")}
         >
           {initials(member.name)}
@@ -116,13 +121,13 @@ function StaffRow({ member }: { member: ManagedStaff }) {
           <span
             className={[
               "font-medium",
-              member.active ? "text-zinc-900" : "text-zinc-500",
+              member.active ? "text-fg" : "text-fg-muted",
             ].join(" ")}
           >
             {member.name}
           </span>
-          <span className="text-sm text-zinc-500">
-            {summariseWeek(member)}
+          <span className="text-sm text-fg-muted">
+            {summariseWeek(member, t)}
           </span>
         </div>
       </div>
@@ -130,9 +135,9 @@ function StaffRow({ member }: { member: ManagedStaff }) {
       <div className="flex items-center gap-2">
         <Link
           href={`/dashboard/staff/${member.id}`}
-          className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100"
+          className="rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm font-medium text-fg-secondary transition-colors hover:bg-subtle"
         >
-          Edit
+          {t("common.edit")}
         </Link>
 
         {member.active ? (
@@ -141,9 +146,9 @@ function StaffRow({ member }: { member: ManagedStaff }) {
           <Link
             href={`/dashboard/staff?deactivate=${member.id}`}
             scroll={false}
-            className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100"
+            className="rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm font-medium text-fg-secondary transition-colors hover:bg-subtle"
           >
-            Remove
+            {t("staff.remove")}
           </Link>
         ) : (
           <form action={setStaffActiveAction}>
@@ -151,9 +156,9 @@ function StaffRow({ member }: { member: ManagedStaff }) {
             <input type="hidden" name="active" value="true" />
             <button
               type="submit"
-              className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100"
+              className="rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm font-medium text-fg-secondary transition-colors hover:bg-subtle"
             >
-              Bring back
+              {t("staff.bringBack")}
             </button>
           </form>
         )}
@@ -170,17 +175,23 @@ function StaffRow({ member }: { member: ManagedStaff }) {
  * it feels like without the number, and the alternative is an owner who avoids
  * the button and keeps a barber who left in the picker.
  */
-function DeactivateConfirmation({ member }: { member: ManagedStaff }) {
+function DeactivateConfirmation({
+  member,
+  t,
+}: {
+  member: ManagedStaff;
+  t: Translator;
+}) {
   const { upcomingBookings } = member;
 
   return (
-    <div className="mt-4 flex flex-col gap-3 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
+    <div className="mt-4 flex flex-col gap-3 rounded-xl bg-warning-soft p-4 text-sm text-warning">
       <p>
-        Remove {member.name} from the booking page?{" "}
+        {t("staff.removeQuestion", { name: member.name })}{" "}
         {upcomingBookings === 0
-          ? "They have no appointments ahead of them."
-          : `Their ${upcomingBookings === 1 ? "1 upcoming appointment stays" : `${upcomingBookings} upcoming appointments stay`} on the calendar — you'll need to move or cancel ${upcomingBookings === 1 ? "it" : "them"} yourself.`}{" "}
-        Their hours are kept, so you can bring them back later.
+          ? t("staff.removeNoUpcoming")
+          : t("staff.removeUpcoming", { count: upcomingBookings })}{" "}
+        {t("staff.removeHoursKept")}
       </p>
 
       <div className="flex items-center gap-3">
@@ -189,18 +200,18 @@ function DeactivateConfirmation({ member }: { member: ManagedStaff }) {
           <input type="hidden" name="active" value="false" />
           <button
             type="submit"
-            className="rounded-lg bg-amber-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-amber-800"
+            className="rounded-lg bg-warning-solid px-3 py-1.5 text-sm font-medium text-on-warning transition-colors hover:bg-warning-solid-hover"
           >
-            Remove {member.name}
+            {t("staff.removeConfirm", { name: member.name })}
           </button>
         </form>
 
         <Link
           href="/dashboard/staff"
           scroll={false}
-          className="text-sm text-amber-900 underline-offset-4 hover:underline"
+          className="text-sm text-warning underline-offset-4 hover:underline"
         >
-          Keep them
+          {t("staff.keep")}
         </Link>
       </div>
     </div>
@@ -215,19 +226,17 @@ function DeactivateConfirmation({ member }: { member: ManagedStaff }) {
  * The exact intervals are one click away on their own screen, which is where
  * they're edited anyway.
  *
- * Abbreviated from the shared WEEKDAY_LABELS rather than a second list of names,
- * so this can't drift from the editor's ordering.
+ * Ordered by the shared DISPLAY_WEEK, so this can't drift from the editor's
+ * ordering, and named through weekdayName() in the interface language.
  */
-function summariseWeek(member: ManagedStaff): string {
+function summariseWeek(member: ManagedStaff, t: Translator): string {
   const worked = new Set(member.workingHours.map((row) => row.dayOfWeek));
 
   if (worked.size === 0) {
-    return member.active
-      ? "No hours set — not bookable yet"
-      : "No hours set";
+    return member.active ? t("staff.noHoursBookable") : t("staff.noHours");
   }
 
   return DISPLAY_WEEK.filter((day) => worked.has(day))
-    .map((day) => WEEKDAY_LABELS[day].slice(0, 3))
+    .map((day) => weekdayName(t, day, "short"))
     .join(", ");
 }

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { encodeMessage } from "@/lib/i18n/translate";
+
 import { BOOKING_HORIZON_DAYS } from "@/lib/availability/booking-options";
 
 /**
@@ -73,21 +75,28 @@ function minutesField(opts: {
 export const bookingRulesSchema = z.object({
   bufferMinutes: minutesField({
     max: MAX_BUFFER_MINUTES,
-    missing: "Enter a gap, or 0 for none.",
-    invalid: "Enter the gap in whole minutes.",
-    outOfRange: `Keep the gap between 0 and ${MAX_BUFFER_MINUTES} minutes.`,
+    missing: "validation.bufferMissing",
+    invalid: "validation.bufferInvalid",
+    outOfRange: encodeMessage("validation.bufferRange", {
+      max: MAX_BUFFER_MINUTES,
+    }),
   }),
   minLeadMinutes: minutesField({
     max: MAX_LEAD_MINUTES,
-    missing: "Enter a notice period, or 0 for none.",
-    invalid: "Enter the notice in whole minutes.",
-    outOfRange: `Keep the notice between 0 minutes and ${MAX_LEAD_MINUTES / 60 / 24} days — customers can only book ${BOOKING_HORIZON_DAYS} days ahead.`,
+    missing: "validation.leadMissing",
+    invalid: "validation.leadInvalid",
+    outOfRange: encodeMessage("validation.leadRange", {
+      maxDays: MAX_LEAD_MINUTES / 60 / 24,
+      horizon: BOOKING_HORIZON_DAYS,
+    }),
   }),
   cancellationWindowMinutes: minutesField({
     max: MAX_CANCELLATION_MINUTES,
-    missing: "Enter a cancellation window, or 0 to allow it any time.",
-    invalid: "Enter the window in whole minutes.",
-    outOfRange: `Keep the window between 0 minutes and ${MAX_CANCELLATION_MINUTES / 60 / 24} days.`,
+    missing: "validation.windowMissing",
+    invalid: "validation.windowInvalid",
+    outOfRange: encodeMessage("validation.windowRange", {
+      maxDays: MAX_CANCELLATION_MINUTES / 60 / 24,
+    }),
   }),
 });
 

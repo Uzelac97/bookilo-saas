@@ -36,10 +36,13 @@ import {
   formatDateRange,
   formatMinuteOfDay,
 } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
+import { getLocale } from "@/lib/preferences-server";
 
-export const metadata: Metadata = {
-  title: "Calendar",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("nav.calendar") };
+}
 
 type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -99,7 +102,11 @@ const MAX_PAGE_WIDTH_WITH_ASIDE = "140rem";
  * interchangeable and aren't.
  */
 export default async function CalendarPage({ searchParams }: PageProps) {
-  const tenant = await getCurrentTenant();
+  const [tenant, t, locale] = await Promise.all([
+    getCurrentTenant(),
+    getT(),
+    getLocale(),
+  ]);
   const query = await searchParams;
   const now = new Date();
 
@@ -172,6 +179,7 @@ export default async function CalendarPage({ searchParams }: PageProps) {
           dates,
           workingHours: relevantHours,
           timezone: tenant.timezone,
+          locale,
           now,
         })
       : buildDayGrid({
@@ -179,6 +187,7 @@ export default async function CalendarPage({ searchParams }: PageProps) {
           staff,
           workingHours: relevantHours,
           timezone: tenant.timezone,
+          locale,
         });
 
   // Two container widths, one per breakpoint — see the note on the wrapper.
@@ -223,22 +232,22 @@ export default async function CalendarPage({ searchParams }: PageProps) {
     >
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-            Calendar
+          <h1 className="text-2xl font-semibold tracking-tight text-fg">
+            {t("nav.calendar")}
           </h1>
           {/* Counts what the grid draws and what the sidebar totals — one
               definition of "appointment" across all three, or the page
               contradicts itself in two places at once. Cancellations are still
               reported, as a separate figure that says what it is rather than
               being folded into a number that then disagrees with the sidebar's. */}
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-fg-muted">
             {occupying.length === 0
-              ? "No appointments"
-              : occupying.length === 1
-                ? "1 appointment"
-                : `${occupying.length} appointments`}
-            {cancelledCount > 0 ? ` · ${cancelledCount} cancelled` : ""} ·{" "}
-            {tenant.timezone}
+              ? t("calendar.noAppointments")
+              : t("calendar.appointmentCount", { count: occupying.length })}
+            {cancelledCount > 0
+              ? ` · ${t("calendar.cancelledCount", { count: cancelledCount })}`
+              : ""}{" "}
+            · {tenant.timezone}
           </p>
         </div>
 
@@ -247,9 +256,9 @@ export default async function CalendarPage({ searchParams }: PageProps) {
             the only route — and it doesn't exist at all on the mobile agenda. */}
         <Link
           href={`/dashboard/bookings/new?date=${date}`}
-          className="rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+          className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-on-primary transition-colors hover:bg-primary-hover"
         >
-          New booking
+          {t("dashboard.newBooking")}
         </Link>
       </header>
 
@@ -268,8 +277,13 @@ export default async function CalendarPage({ searchParams }: PageProps) {
         view={view}
         heading={
           view === "week"
-            ? formatDateRange(range.fromDate, range.toDate, tenant.timezone)
-            : formatBookingDate(date, tenant.timezone)
+            ? formatDateRange(
+                range.fromDate,
+                range.toDate,
+                tenant.timezone,
+                locale,
+              )
+            : formatBookingDate(date, tenant.timezone, locale)
         }
         previousDate={shiftCalendarDate(date, view, -1, tenant.timezone)}
         nextDate={shiftCalendarDate(date, view, 1, tenant.timezone)}

@@ -8,10 +8,14 @@ import { getStaffAvailability } from "@/lib/db/availability";
 import { getActiveServices } from "@/lib/db/services";
 import { getActiveStaff } from "@/lib/db/staff";
 import { formatBookingDate } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
+import type { MessageKey } from "@/lib/i18n/translate";
+import { getLocale } from "@/lib/preferences-server";
 
-export const metadata: Metadata = {
-  title: "New booking",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("dashboard.newBooking") };
+}
 
 type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -55,39 +59,39 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
   ]);
 
   const missing = missingPrerequisite(staff.length, services.length);
+  const [t, locale] = await Promise.all([getT(), getLocale()]);
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8 sm:px-6">
       <header className="flex flex-col gap-2">
         <Link
           href={`/dashboard/calendar?date=${date}`}
-          className="w-fit text-sm text-zinc-500 underline-offset-4 hover:text-zinc-900 hover:underline"
+          className="w-fit text-sm text-fg-muted underline-offset-4 hover:text-fg hover:underline"
         >
-          ← Calendar
+          ← {t("nav.calendar")}
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-          New booking
+        <h1 className="text-2xl font-semibold tracking-tight text-fg">
+          {t("dashboard.newBooking")}
         </h1>
-        <p className="text-sm text-zinc-500">
-          For a walk-in or a booking taken over the phone. Times outside your
-          hours are allowed — you&rsquo;ll be told what they clash with.
+        <p className="text-sm text-fg-muted">
+          {t("manual.intro")}
         </p>
       </header>
 
       {missing ? (
-        <div className="flex flex-col gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          <p>{missing.message}</p>
+        <div className="flex flex-col gap-3 rounded-2xl border border-warning-line bg-warning-soft p-4 text-sm text-warning">
+          <p>{t(missing.message)}</p>
           <Link
             href={missing.href}
-            className="w-fit rounded-lg bg-amber-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-amber-800"
+            className="w-fit rounded-lg bg-warning-solid px-3 py-1.5 text-sm font-medium text-on-warning transition-colors hover:bg-warning-solid-hover"
           >
-            {missing.action}
+            {t(missing.action)}
           </Link>
         </div>
       ) : (
-        <section className="flex flex-col gap-6 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6">
-          <h2 className="text-sm font-semibold tracking-tight text-zinc-900">
-            {formatBookingDate(date, tenant.timezone)}
+        <section className="flex flex-col gap-6 rounded-2xl border border-line bg-surface p-4 sm:p-6">
+          <h2 className="text-sm font-semibold tracking-tight text-fg">
+            {formatBookingDate(date, tenant.timezone, locale)}
           </h2>
 
           <ManualBookingForm
@@ -124,22 +128,20 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
 function missingPrerequisite(
   staffCount: number,
   serviceCount: number,
-): { message: string; href: string; action: string } | null {
+): { message: MessageKey; href: string; action: MessageKey } | null {
   if (staffCount === 0) {
     return {
-      message:
-        "You need at least one barber before you can book anyone in. Add one, and give them working hours.",
+      message: "manual.needStaff",
       href: "/dashboard/staff",
-      action: "Go to staff",
+      action: "manual.goToStaff",
     };
   }
 
   if (serviceCount === 0) {
     return {
-      message:
-        "You need at least one bookable service — it's what decides how long the appointment runs.",
+      message: "manual.needService",
       href: "/dashboard/services",
-      action: "Go to services",
+      action: "manual.goToServices",
     };
   }
 

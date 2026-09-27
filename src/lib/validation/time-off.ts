@@ -1,6 +1,9 @@
 import { DateTime } from "luxon";
 import { z } from "zod";
 
+// Messages are keys into lib/i18n/messages, not prose — see the note in
+// ./auth.ts. Tests read them back through the English dictionary.
+
 import { localDayWindowUtc } from "@/lib/availability/slots";
 
 import { hasControlCharacters } from "./text";
@@ -28,17 +31,17 @@ const MAX_REASON_LENGTH = 80;
  */
 export const timeOffPayloadSchema = z.object({
   allDay: z.boolean(),
-  startDate: z.string().trim().min(1, "Pick a start date."),
+  startDate: z.string().trim().min(1, "validation.startDateRequired"),
   endDate: z.string().trim(),
   startTime: z.string().trim(),
   endTime: z.string().trim(),
   reason: z
     .string()
     .trim()
-    .max(MAX_REASON_LENGTH, "That note is too long.")
+    .max(MAX_REASON_LENGTH, "validation.noteTooLong")
     .refine(
       (reason) => !hasControlCharacters(reason),
-      "Keep the note on a single line.",
+      "validation.noteSingleLine",
     )
     .optional(),
 });
@@ -89,8 +92,8 @@ export function toTimeOffRange(
     return {
       ok: false,
       message: payload.allDay
-        ? "The last day can't be before the first."
-        : "The end time has to be after the start time.",
+        ? "validation.lastDayBeforeFirst"
+        : "validation.endBeforeStart",
     };
   }
 
@@ -100,7 +103,7 @@ export function toTimeOffRange(
   if (spanDays > MAX_SPAN_DAYS) {
     return {
       ok: false,
-      message: `That's longer than a year — check the dates.`,
+      message: "validation.longerThanYear",
     };
   }
 
@@ -130,7 +133,7 @@ function allDayRange(payload: TimeOffPayload, timezone: string): RangeResult {
   } catch {
     // localDayWindowUtc throws on a date it can't parse. A date input can post
     // an empty or malformed value if the browser lets it through.
-    return { ok: false, message: "Those dates couldn't be read." };
+    return { ok: false, message: "validation.datesUnreadable" };
   }
 }
 
@@ -151,7 +154,7 @@ function timedRange(payload: TimeOffPayload, timezone: string): RangeResult {
   const end = atLocalTime(payload.startDate, payload.endTime, timezone);
 
   if (!start || !end) {
-    return { ok: false, message: "Enter a start and an end time." };
+    return { ok: false, message: "validation.timesRequired" };
   }
 
   return { ok: true, startAt: start, endAt: end };

@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+// Messages are keys into lib/i18n/messages, not prose — see the note in
+// ./auth.ts. Tests read them back through the English dictionary.
+
 import { hasControlCharacters } from "./text";
 
 /** Minutes in a day. An interval may end at 24:00 but never start there. */
@@ -42,14 +45,14 @@ export const workingHoursRowSchema = z
     dayOfWeek: z
       .number()
       .int()
-      .min(0, "Unknown day.")
-      .max(6, "Unknown day."),
+      .min(0, "validation.dayUnknown")
+      .max(6, "validation.dayUnknown"),
     startMinute: z.number().int().min(0).max(MINUTES_PER_DAY),
     endMinute: z.number().int().min(0).max(MINUTES_PER_DAY),
   })
   .refine(
     (row) => row.startMinute < row.endMinute,
-    "An interval has to end after it starts.",
+    "validation.intervalOrder",
   );
 
 export type WorkingHoursRowInput = z.infer<typeof workingHoursRowSchema>;
@@ -73,9 +76,9 @@ export type WorkingHoursRowInput = z.infer<typeof workingHoursRowSchema>;
  */
 export const workingHoursSchema = z
   .array(workingHoursRowSchema)
-  .max(21, "That's more intervals than a week needs.")
+  .max(21, "validation.intervalsTooMany")
   .refine((rows) => !hasOverlap(rows), {
-    message: "Two intervals on the same day overlap.",
+    message: "validation.intervalsOverlap",
   });
 
 /** True when any two rows on the same weekday cover a shared minute. */
@@ -139,7 +142,7 @@ export function toWorkingHoursRows(
     const endMinute = parseTimeToMinutes(entry.end);
 
     if (startMinute === null || endMinute === null) {
-      return { ok: false, message: "Every interval needs a start and an end time." };
+      return { ok: false, message: "validation.intervalIncomplete" };
     }
 
     rows.push({ dayOfWeek: entry.dayOfWeek, startMinute, endMinute });
@@ -149,7 +152,7 @@ export function toWorkingHoursRows(
   if (!parsed.success) {
     return {
       ok: false,
-      message: parsed.error.issues[0]?.message ?? "Those hours don't work.",
+      message: parsed.error.issues[0]?.message ?? "validation.hoursInvalid",
     };
   }
 
@@ -166,11 +169,11 @@ export const staffInputSchema = z.object({
   name: z
     .string()
     .trim()
-    .min(2, "Enter this barber's name.")
-    .max(60, "That name is too long.")
+    .min(2, "validation.staffNameRequired")
+    .max(60, "validation.nameTooLong")
     .refine(
       (name) => !hasControlCharacters(name),
-      "Enter the name on a single line.",
+      "validation.nameSingleLineGeneric",
     ),
   /**
    * A pasted link, not an upload — there is no file storage in the MVP and
@@ -186,11 +189,11 @@ export const staffInputSchema = z.object({
       z
         .string()
         .trim()
-        .max(500, "That link is too long.")
-        .pipe(z.url("Enter a link starting with https://"))
+        .max(500, "validation.linkTooLong")
+        .pipe(z.url("validation.linkHttps"))
         .refine(
           (url) => /^https?:\/\//i.test(url),
-          "Enter a link starting with https://",
+          "validation.linkHttps",
         ),
     ])
     .optional()

@@ -1,5 +1,6 @@
 import type { DaySummary } from "@/lib/dashboard/today-summary";
 import { formatPrice, formatSlotTime } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
 
 import { SummaryCell } from "./today-list";
 
@@ -33,31 +34,37 @@ export const CALENDAR_ASIDE_GAP = "1.5rem";
  * that hasn't started yet, so a range entirely in the past yields null on its
  * own rather than needing to be told.
  */
-export function CalendarSummary({
+export async function CalendarSummary({
   summary,
   timezone,
 }: {
   summary: DaySummary;
   timezone: string;
 }) {
+  const t = await getT();
+
   return (
-    <div className="flex flex-col gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200">
+    <div className="flex flex-col gap-px overflow-hidden rounded-2xl border border-line bg-subtle-strong">
       <SummaryCell
-        label="Booked"
+        label={t("summary.booked")}
         value={String(summary.booked)}
-        detail={summary.booked === 1 ? "appointment" : "appointments"}
+        detail={t("summary.appointments", { count: summary.booked })}
       />
       <SummaryCell
-        label="Next"
+        label={t("summary.next")}
         value={
           summary.next ? formatSlotTime(summary.next.startAt, timezone) : "—"
         }
-        detail={summary.next ? summary.next.customer.name : "nothing upcoming"}
+        detail={
+          summary.next
+            ? summary.next.customer.name
+            : t("summary.nothingUpcoming")
+        }
       />
       <SummaryCell
-        label="Booked value"
+        label={t("summary.bookedValue")}
         value={formatPrice(summary.revenueMinorUnits)}
-        detail="excl. no-shows"
+        detail={t("summary.exclNoShows")}
       />
     </div>
   );

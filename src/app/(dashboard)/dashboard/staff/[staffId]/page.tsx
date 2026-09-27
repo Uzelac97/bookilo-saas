@@ -7,6 +7,7 @@ import { TimeOffEditor } from "@/components/dashboard/time-off-editor";
 import { WorkingHoursEditor } from "@/components/dashboard/working-hours-editor";
 import { getCurrentTenant } from "@/lib/auth/session";
 import { getStaffMember } from "@/lib/db/staff";
+import { getT } from "@/lib/i18n/server";
 
 type PageProps = { params: Promise<{ staffId: string }> };
 
@@ -16,8 +17,9 @@ export async function generateMetadata({
   const { staffId } = await params;
   const tenant = await getCurrentTenant();
   const member = await getStaffMember(tenant.id, staffId, new Date());
+  const t = await getT();
 
-  return { title: member ? member.name : "Barber not found" };
+  return { title: member ? member.name : t("staff.notFound") };
 }
 
 /**
@@ -40,53 +42,51 @@ export default async function StaffMemberPage({ params }: PageProps) {
 
   if (!member) notFound();
 
+  const t = await getT();
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6">
       <header className="flex flex-col gap-2">
         <Link
           href="/dashboard/staff"
-          className="w-fit text-sm text-zinc-500 underline-offset-4 hover:text-zinc-900 hover:underline"
+          className="w-fit text-sm text-fg-muted underline-offset-4 hover:text-fg hover:underline"
         >
-          ← All staff
+          ← {t("staff.backToAll")}
         </Link>
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
+          <h1 className="text-2xl font-semibold tracking-tight text-fg">
             {member.name}
           </h1>
           {!member.active ? (
-            <span className="rounded-md bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
-              No longer working here
+            <span className="rounded-md bg-subtle px-2 py-0.5 text-xs font-medium text-fg-tertiary">
+              {t("staff.inactiveBadge")}
             </span>
           ) : null}
         </div>
         {member.upcomingBookings > 0 ? (
-          <p className="text-sm text-zinc-500">
-            {member.upcomingBookings === 1
-              ? "1 appointment ahead"
-              : `${member.upcomingBookings} appointments ahead`}
+          <p className="text-sm text-fg-muted">
+            {t("staff.upcoming", { count: member.upcomingBookings })}
           </p>
         ) : null}
       </header>
 
-      <section className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6">
-        <h2 className="text-sm font-semibold tracking-tight text-zinc-900">
-          Details
+      <section className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-4 sm:p-6">
+        <h2 className="text-sm font-semibold tracking-tight text-fg">
+          {t("staff.details")}
         </h2>
         <StaffForm member={member} />
       </section>
 
-      <section className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6">
+      <section className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-4 sm:p-6">
         <div className="flex flex-col gap-1">
-          <h2 className="text-sm font-semibold tracking-tight text-zinc-900">
-            Working hours
+          <h2 className="text-sm font-semibold tracking-tight text-fg">
+            {t("staff.workingHours")}
           </h2>
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-fg-muted">
             {/* Said here because it's the surprising part of a model with no
                 business-level hours field: this is not just when one barber is
                 free, it is what the shop tells customers it's open. */}
-            These decide when customers can book {member.name}, and together with
-            your other barbers&rsquo; hours they are the opening hours shown on
-            your public page. Add a second interval to a day for a lunch break.
+            {t("staff.workingHoursIntro", { name: member.name })}
           </p>
         </div>
         <WorkingHoursEditor
@@ -95,23 +95,20 @@ export default async function StaffMemberPage({ params }: PageProps) {
         />
       </section>
 
-      <section className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6">
+      <section className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-4 sm:p-6">
         <div className="flex flex-col gap-1">
-          <h2 className="text-sm font-semibold tracking-tight text-zinc-900">
-            Time off
+          <h2 className="text-sm font-semibold tracking-tight text-fg">
+            {t("staff.timeOff")}
           </h2>
-          <p className="text-sm text-zinc-500">
-            Holidays, appointments, a morning off — customers can&rsquo;t book{" "}
-            {member.name} during these. Working hours above are the normal week;
-            this is what interrupts it.
+          <p className="text-sm text-fg-muted">
+            {t("staff.timeOffIntro", { name: member.name })}
           </p>
           {/* Both stated here rather than discovered. The first is the same
               shape as the buffer note on the settings screen — a change that
               deliberately doesn't reach backwards — and the second is a gap an
               owner would otherwise read as the save having failed. */}
-          <p className="text-sm text-zinc-500">
-            Appointments already booked inside a time off stay booked, and time
-            off doesn&rsquo;t show on the calendar yet.
+          <p className="text-sm text-fg-muted">
+            {t("staff.timeOffNote")}
           </p>
         </div>
         <TimeOffEditor

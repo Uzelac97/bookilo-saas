@@ -58,8 +58,14 @@ export default function MarketingLayout({
   // data-marketing is the hook globals.css matches on to enable smooth anchor
   // scrolling for this route group only — scroll-behavior has to live on the
   // scrolling element (html), so it cannot be scoped by nesting.
+  //
+  // lang="en" because this page's copy is the shop's own, written in English,
+  // and is not translated with the app's interface language. <html lang> now
+  // follows that language (German by default), so without this a screen
+  // reader would read English copy with German pronunciation.
   return (
     <div
+      lang="en"
       data-marketing
       className={`${fraunces.variable} ${abril.variable} flex flex-1 flex-col`}
     >

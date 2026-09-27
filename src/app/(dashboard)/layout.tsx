@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
+import { PreferenceToggles } from "@/components/preferences/preference-toggles";
 import { getCurrentTenant, requireSession } from "@/lib/auth/session";
+import { getT } from "@/lib/i18n/server";
+import { getTheme } from "@/lib/preferences-server";
 
 import { signOutAction } from "./actions";
 
@@ -32,10 +35,11 @@ export default async function DashboardLayout({
 }) {
   await requireSession();
   const tenant = await getCurrentTenant();
+  const [t, theme] = await Promise.all([getT(), getTheme()]);
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50">
-      <header className="border-b border-zinc-200 bg-white">
+    <div className="flex flex-1 flex-col bg-canvas">
+      <header className="border-b border-line bg-surface">
         {/* NO max-width, deliberately, and this is the Day 13 resolution of the
             header-inset question carried over from Day 10.
 
@@ -61,25 +65,28 @@ export default async function DashboardLayout({
         <div className="flex w-full flex-col gap-4 px-4 py-4 sm:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-col">
-              <span className="text-base font-semibold tracking-tight text-zinc-900">
+              <span className="text-base font-semibold tracking-tight text-fg">
                 {tenant.name}
               </span>
               <Link
                 href={`/b/${tenant.slug}`}
-                className="w-fit text-sm text-zinc-500 underline-offset-4 hover:text-zinc-900 hover:underline"
+                className="w-fit text-sm text-fg-muted underline-offset-4 hover:text-fg hover:underline"
               >
-                View public page
+                {t("dashboard.viewPublicPage")}
               </Link>
             </div>
 
-            <form action={signOutAction}>
-              <button
-                type="submit"
-                className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100"
-              >
-                Sign out
-              </button>
-            </form>
+            <div className="flex flex-wrap items-center gap-2">
+              <PreferenceToggles theme={theme} />
+              <form action={signOutAction}>
+                <button
+                  type="submit"
+                  className="rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm font-medium text-fg-secondary transition-colors hover:bg-subtle"
+                >
+                  {t("dashboard.signOut")}
+                </button>
+              </form>
+            </div>
           </div>
 
           <DashboardNav />

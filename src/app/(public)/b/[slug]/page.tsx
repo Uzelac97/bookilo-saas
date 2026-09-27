@@ -8,6 +8,8 @@ import { mergeOpeningHours } from "@/lib/availability/opening-hours";
 import { getActiveServices } from "@/lib/db/services";
 import { getWorkingHoursForActiveStaff } from "@/lib/db/staff";
 import { getTenantBySlug } from "@/lib/db/tenant";
+import { getT } from "@/lib/i18n/server";
+import type { MessageKey } from "@/lib/i18n/translate";
 
 /**
  * generateMetadata and the page component both need the tenant, and Next's
@@ -29,8 +31,8 @@ import { getTenantBySlug } from "@/lib/db/tenant";
  */
 const getShop = cache(async (slug: string) => getTenantBySlug(slug));
 
-const BUSINESS_TYPE_LABELS: Record<string, string> = {
-  BARBERSHOP: "Barbershop",
+const BUSINESS_TYPE_LABELS: Record<string, MessageKey> = {
+  BARBERSHOP: "shop.businessTypeBarbershop",
 };
 
 type PageProps = { params: Promise<{ slug: string }> };
@@ -39,17 +41,20 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const tenant = await getShop(slug);
+  const [tenant, t] = await Promise.all([getShop(slug), getT()]);
 
   if (!tenant) {
-    return { title: "Shop not found" };
+    return { title: t("shop.notFoundTitle") };
   }
 
   return {
     title: tenant.name,
     description: tenant.address
-      ? `Book an appointment at ${tenant.name}, ${tenant.address}.`
-      : `Book an appointment at ${tenant.name}.`,
+      ? t("shop.metaDescriptionWithAddress", {
+          shop: tenant.name,
+          address: tenant.address,
+        })
+      : t("shop.metaDescription", { shop: tenant.name }),
   };
 }
 
@@ -68,25 +73,27 @@ export default async function BusinessPage({ params }: PageProps) {
   ]);
 
   const openingHours = mergeOpeningHours(workingHours);
+  const t = await getT();
+  const businessType = BUSINESS_TYPE_LABELS[tenant.businessType];
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 px-4 py-10 sm:py-16">
+    <div className="flex flex-1 flex-col bg-canvas px-4 py-10 sm:py-16">
       <main className="mx-auto flex w-full max-w-2xl flex-col gap-10">
         <header className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
-            <p className="text-sm font-medium text-zinc-500">
-              {BUSINESS_TYPE_LABELS[tenant.businessType] ?? "Appointments"}
+            <p className="text-sm font-medium text-fg-muted">
+              {t(businessType ?? "shop.businessTypeFallback")}
             </p>
             {/* Larger than the h1 on the three transactional pages, and the
                 only place that differs. This is the shop's front door and the
                 one heading that is the shop's own name rather than a step in a
                 process. */}
-            <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 sm:text-4xl">
+            <h1 className="text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
               {tenant.name}
             </h1>
           </div>
 
-          <div className="flex flex-col gap-1 text-sm text-zinc-600">
+          <div className="flex flex-col gap-1 text-sm text-fg-tertiary">
             {tenant.address ? <p>{tenant.address}</p> : null}
             {tenant.phone ? (
               // The one control on this page that isn't a booking, and on a
@@ -95,7 +102,7 @@ export default async function BusinessPage({ params }: PageProps) {
               // happens to be tappable.
               <a
                 href={`tel:${tenant.phone.replace(/\s+/g, "")}`}
-                className="inline-flex min-h-11 w-fit items-center font-medium text-zinc-900 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
+                className="inline-flex min-h-11 w-fit items-center font-medium text-fg underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               >
                 {tenant.phone}
               </a>
@@ -104,17 +111,17 @@ export default async function BusinessPage({ params }: PageProps) {
         </header>
 
         <section className="flex flex-col gap-4">
-          <h2 className="text-lg font-semibold tracking-tight text-zinc-900">
-            Services
+          <h2 className="text-lg font-semibold tracking-tight text-fg">
+            {t("shop.services")}
           </h2>
           <ServiceList services={services} slug={tenant.slug} />
         </section>
 
         <section className="flex flex-col gap-4">
-          <h2 className="text-lg font-semibold tracking-tight text-zinc-900">
-            Opening hours
+          <h2 className="text-lg font-semibold tracking-tight text-fg">
+            {t("shop.openingHours")}
           </h2>
-          <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
             <OpeningHours days={openingHours} />
           </div>
         </section>

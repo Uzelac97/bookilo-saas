@@ -4,6 +4,10 @@ import { setServiceActiveAction } from "@/app/(dashboard)/dashboard/services/act
 import { ServiceForm } from "@/components/dashboard/service-form";
 import type { ManagedService } from "@/lib/db/services";
 import { formatDuration, formatPrice } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
+import type { Translator } from "@/lib/i18n/translate";
+import type { Locale } from "@/lib/preferences";
+import { getLocale } from "@/lib/preferences-server";
 
 /**
  * The owner's list of services, with the row being edited swapped for its form.
@@ -17,7 +21,7 @@ import { formatDuration, formatPrice } from "@/lib/format";
  * (CLAUDE.md), so "retired" is a state an owner can be in by accident, and a
  * screen that hides those rows offers no way back out of it.
  */
-export function ServiceList({
+export async function ServiceList({
   services,
   editingId,
 }: {
@@ -26,22 +30,27 @@ export function ServiceList({
 }) {
   const active = services.filter((service) => service.active);
   const retired = services.filter((service) => !service.active);
+  const [t, locale] = await Promise.all([getT(), getLocale()]);
 
   return (
     <div className="flex flex-col gap-8">
       <Section
-        title="Bookable"
-        empty="Nothing bookable yet — add your first service above."
+        title={t("services.bookable")}
+        empty={t("services.bookableEmpty")}
         services={active}
         editingId={editingId}
+        t={t}
+        locale={locale}
       />
 
       {retired.length > 0 ? (
         <Section
-          title="Retired"
-          hint="Not shown to customers. Existing appointments keep them."
+          title={t("services.retired")}
+          hint={t("services.retiredHint")}
           services={retired}
           editingId={editingId}
+          t={t}
+          locale={locale}
         />
       ) : null}
     </div>
@@ -54,24 +63,28 @@ function Section({
   empty,
   services,
   editingId,
+  t,
+  locale,
 }: {
   title: string;
   hint?: string;
   empty?: string;
   services: ManagedService[];
   editingId: string | undefined;
+  t: Translator;
+  locale: Locale;
 }) {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-col gap-0.5">
-        <h2 className="text-sm font-semibold tracking-tight text-zinc-900">
+        <h2 className="text-sm font-semibold tracking-tight text-fg">
           {title}
         </h2>
-        {hint ? <p className="text-sm text-zinc-500">{hint}</p> : null}
+        {hint ? <p className="text-sm text-fg-muted">{hint}</p> : null}
       </div>
 
       {services.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-zinc-300 px-4 py-6 text-center text-sm text-zinc-500">
+        <p className="rounded-2xl border border-dashed border-line-strong px-4 py-6 text-center text-sm text-fg-muted">
           {empty}
         </p>
       ) : (
@@ -79,12 +92,12 @@ function Section({
           {services.map((service) => (
             <li
               key={service.id}
-              className="rounded-2xl border border-zinc-200 bg-white p-4"
+              className="rounded-2xl border border-line bg-surface p-4"
             >
               {service.id === editingId ? (
                 <ServiceForm service={service} />
               ) : (
-                <ServiceRow service={service} />
+                <ServiceRow service={service} t={t} locale={locale} />
               )}
             </li>
           ))}
@@ -94,7 +107,15 @@ function Section({
   );
 }
 
-function ServiceRow({ service }: { service: ManagedService }) {
+function ServiceRow({
+  service,
+  t,
+  locale,
+}: {
+  service: ManagedService;
+  t: Translator;
+  locale: Locale;
+}) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
       <div className="flex min-w-0 flex-col gap-0.5">
@@ -102,19 +123,19 @@ function ServiceRow({ service }: { service: ManagedService }) {
           <span
             className={[
               "font-medium",
-              service.active ? "text-zinc-900" : "text-zinc-500",
+              service.active ? "text-fg" : "text-fg-muted",
             ].join(" ")}
           >
             {service.name}
           </span>
           {service.category ? (
-            <span className="rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs font-medium text-zinc-600">
+            <span className="rounded-md bg-subtle px-1.5 py-0.5 text-xs font-medium text-fg-tertiary">
               {service.category}
             </span>
           ) : null}
         </div>
-        <span className="text-sm text-zinc-500">
-          {formatDuration(service.durationMinutes)} ·{" "}
+        <span className="text-sm text-fg-muted">
+          {formatDuration(service.durationMinutes, locale)} ·{" "}
           {formatPrice(service.priceMinorUnits)}
         </span>
       </div>
@@ -122,9 +143,9 @@ function ServiceRow({ service }: { service: ManagedService }) {
       <div className="flex items-center gap-2">
         <Link
           href={`/dashboard/services?edit=${service.id}`}
-          className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100"
+          className="rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm font-medium text-fg-secondary transition-colors hover:bg-subtle"
         >
-          Edit
+          {t("common.edit")}
         </Link>
 
         {/* "Retire" is always active = false, never a delete: Booking.serviceId
@@ -139,9 +160,9 @@ function ServiceRow({ service }: { service: ManagedService }) {
           />
           <button
             type="submit"
-            className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100"
+            className="rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm font-medium text-fg-secondary transition-colors hover:bg-subtle"
           >
-            {service.active ? "Retire" : "Restore"}
+            {service.active ? t("services.retire") : t("services.restore")}
           </button>
         </form>
       </div>

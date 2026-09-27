@@ -37,7 +37,7 @@ export const manualBookingSchema = customerDetailsSchema.extend({
   time: z
     .string()
     .trim()
-    .regex(/^\d{1,2}:\d{2}$/, "Enter a time like 14:30."),
+    .regex(/^\d{1,2}:\d{2}$/, "validation.timeFormat"),
 });
 
 export type ManualBooking = z.infer<typeof manualBookingSchema>;

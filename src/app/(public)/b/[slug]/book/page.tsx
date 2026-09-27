@@ -21,6 +21,8 @@ import { getActiveServices } from "@/lib/db/services";
 import { getActiveStaff } from "@/lib/db/staff";
 import { getTenantBySlug } from "@/lib/db/tenant";
 import { formatBookingDate } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
+import { getLocale } from "@/lib/preferences-server";
 
 /**
  * Same per-request memo as the business page next door: generateMetadata and the
@@ -38,12 +40,12 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const tenant = await getShop(slug);
+  const [tenant, t] = await Promise.all([getShop(slug), getT()]);
 
-  if (!tenant) return { title: "Shop not found" };
+  if (!tenant) return { title: t("shop.notFoundTitle") };
 
   return {
-    title: `Book · ${tenant.name}`,
+    title: t("book.metaTitle", { shop: tenant.name }),
     // A booking form is a transient, parameterised page — there is nothing here
     // for a search engine that the business page doesn't already say better.
     robots: { index: false, follow: true },
@@ -120,13 +122,15 @@ export default async function BookPage({ params, searchParams }: PageProps) {
     ? "FULLY_BOOKED"
     : "CLOSED";
 
+  const [t, locale] = await Promise.all([getT(), getLocale()]);
+
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 px-4 py-10 sm:py-16">
+    <div className="flex flex-1 flex-col bg-canvas px-4 py-10 sm:py-16">
       <main className="mx-auto flex w-full max-w-2xl flex-col gap-8">
         <header className="flex flex-col gap-1">
-          <p className="text-sm font-medium text-zinc-500">{tenant.name}</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-zinc-900">
-            Book an appointment
+          <p className="text-sm font-medium text-fg-muted">{tenant.name}</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-fg">
+            {t("book.heading")}
           </h1>
         </header>
 
@@ -148,9 +152,11 @@ export default async function BookPage({ params, searchParams }: PageProps) {
           timezone={tenant.timezone}
         />
 
-        <p className="text-center text-sm text-zinc-500">
-          Showing times for {formatBookingDate(date, tenant.timezone)} in{" "}
-          {tenant.name}&rsquo;s local time.
+        <p className="text-center text-sm text-fg-muted">
+          {t("book.timezoneNote", {
+            date: formatBookingDate(date, tenant.timezone, locale),
+            shop: tenant.name,
+          })}
         </p>
       </main>
     </div>

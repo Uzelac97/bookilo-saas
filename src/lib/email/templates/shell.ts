@@ -13,6 +13,23 @@
  * attributes are the only thing every client agrees on.
  */
 
+import { createTranslator } from "@/lib/i18n/translate";
+import type { Locale } from "@/lib/preferences";
+
+/**
+ * Every email is German, whatever language the booker's page was in.
+ *
+ * An email is sent from the server after the request that caused it, to a
+ * recipient whose interface language is recorded nowhere — the customer has
+ * no account, and the owner-notification recipient isn't the one who clicked.
+ * Carrying a per-recipient language would need a column on Booking or Tenant,
+ * which is a schema change, and German is right for every shop this product
+ * is sold to. So this is a module constant, not a parameter.
+ */
+export const EMAIL_LOCALE: Locale = "de";
+
+export const emailT = createTranslator(EMAIL_LOCALE);
+
 export type EmailRow = { label: string; value: string };
 
 export type EmailContent = {
@@ -55,7 +72,7 @@ const FONT =
  * shop, and an email that leads with the software's name instead of the
  * barber's reads like spam. This is attribution, not a header.
  */
-const SIGN_OFF = "Sent by Bookilo";
+const SIGN_OFF = emailT("email.signOff");
 
 export function renderHtml(content: EmailContent): string {
   const rows = content.rows
@@ -87,7 +104,7 @@ export function renderHtml(content: EmailContent): string {
     )
     .join("");
 
-  return `<div style="margin:0;padding:24px;background:#fafafa;font-family:${FONT};">
+  return `<div lang="${EMAIL_LOCALE}" style="margin:0;padding:24px;background:#fafafa;font-family:${FONT};">
   <div style="max-width:480px;margin:0 auto;padding:28px;background:#ffffff;border:1px solid #e4e4e7;border-radius:16px;">
     <h1 style="margin:0 0 8px;font-size:22px;line-height:1.3;color:#18181b;">${escapeHtml(content.heading)}</h1>
     <p style="margin:0 0 20px;color:#52525b;font-size:15px;line-height:1.5;">${escapeHtml(content.lead)}</p>

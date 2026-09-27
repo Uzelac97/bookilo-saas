@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
 
+import { createTranslator, translateMessage } from "@/lib/i18n/translate";
+
 import { customerDetailsSchema } from "./booking";
 import { normalizePhone, phoneDigitCount } from "./phone";
+
+/**
+ * A validation message as an English-speaking user reads it. Schemas return
+ * message keys (lib/i18n), so assertions go through the dictionary — which
+ * also proves every key a schema can emit actually resolves.
+ */
+const en = (message: string | false | undefined) =>
+  typeof message === "string"
+    ? translateMessage(createTranslator("en"), message)
+    : message;
 
 describe("normalizePhone", () => {
   it("strips the punctuation a customer actually types", () => {
@@ -98,7 +110,7 @@ describe("customerDetailsSchema.phone", () => {
     const result = parse("12 () - .");
 
     expect(result.success).toBe(false);
-    expect(result.success === false && result.error.issues[0]?.message).toBe(
+    expect(en(result.success === false && result.error.issues[0]?.message)).toBe(
       "Enter a phone number so the shop can reach you.",
     );
   });
@@ -107,7 +119,7 @@ describe("customerDetailsSchema.phone", () => {
     const result = parse("");
 
     expect(result.success).toBe(false);
-    expect(result.success === false && result.error.issues[0]?.message).toBe(
+    expect(en(result.success === false && result.error.issues[0]?.message)).toBe(
       "Enter a phone number so the shop can reach you.",
     );
   });

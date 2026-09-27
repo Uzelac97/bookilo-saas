@@ -26,6 +26,8 @@ import type { WorkingHoursRow } from "@/lib/availability/slots";
 import type { DashboardBooking } from "@/lib/db/bookings";
 import type { CalendarStaff } from "@/lib/db/staff";
 import { formatMinuteOfDay, formatStripDay } from "@/lib/format";
+import { createTranslator } from "@/lib/i18n/translate";
+import type { Locale } from "@/lib/preferences";
 
 const MINUTES_PER_DAY = 24 * 60;
 const MINUTES_PER_HOUR = 60;
@@ -352,6 +354,8 @@ export type BuildGridInput = {
   bookings: DashboardBooking[];
   workingHours: WorkingHoursRow[];
   timezone: string;
+  /** The interface language column headers are written in. */
+  locale: Locale;
 };
 
 /**
@@ -368,6 +372,7 @@ export function buildDayGrid(
   input: BuildGridInput & { staff: CalendarStaff[] },
 ): CalendarGrid {
   const { bookings, staff, workingHours, timezone } = input;
+  const t = createTranslator(input.locale);
 
   const spans = bookings.map((booking) => ({
     booking,
@@ -391,7 +396,7 @@ export function buildDayGrid(
     columns.push({
       key: member.id,
       label: member.name,
-      sublabel: member.active ? null : "No longer here",
+      sublabel: member.active ? null : t("calendar.staffInactive"),
       muted: !member.active,
       highlight: false,
     });
@@ -410,7 +415,7 @@ export function buildDayGrid(
     columns.push({
       key: id,
       label: name,
-      sublabel: "Unknown barber",
+      sublabel: t("calendar.staffUnknown"),
       muted: true,
       highlight: false,
     });
@@ -439,7 +444,7 @@ export function buildDayGrid(
 export function buildWeekGrid(
   input: BuildGridInput & { dates: string[]; now: Date },
 ): CalendarGrid {
-  const { bookings, dates, workingHours, timezone, now } = input;
+  const { bookings, dates, workingHours, timezone, locale, now } = input;
 
   const spans = bookings.map((booking) => ({
     booking,
@@ -450,7 +455,7 @@ export function buildWeekGrid(
   const today = localParts(now, timezone).date;
 
   const columns = dates.map((date) => {
-    const { weekday, dayOfMonth } = formatStripDay(date, timezone);
+    const { weekday, dayOfMonth } = formatStripDay(date, timezone, locale);
 
     return {
       column: {

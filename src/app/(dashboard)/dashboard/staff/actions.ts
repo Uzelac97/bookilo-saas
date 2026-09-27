@@ -167,12 +167,12 @@ export async function saveWorkingHoursAction(
   try {
     payload = JSON.parse(String(formData.get("hours") ?? "[]"));
   } catch {
-    return { status: "invalid", message: "Those hours couldn't be read. Reload the page." };
+    return { status: "invalid", message: "validation.hoursUnreadable" };
   }
 
   const parsed = workingHoursPayloadSchema.safeParse(payload);
   if (!parsed.success) {
-    return { status: "invalid", message: "Those hours couldn't be read. Reload the page." };
+    return { status: "invalid", message: "validation.hoursUnreadable" };
   }
 
   const rows = toWorkingHoursRows(parsed.data);
@@ -255,7 +255,7 @@ export async function addTimeOffAction(
   if (!parsed.success) {
     return {
       status: "invalid",
-      message: parsed.error.issues[0]?.message ?? "Check the dates.",
+      message: parsed.error.issues[0]?.message ?? "validation.checkDates",
     };
   }
 

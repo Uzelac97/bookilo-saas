@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+import { encodeMessage } from "@/lib/i18n/translate";
+
+// Messages are keys into lib/i18n/messages, not prose — see the note in
+// ./auth.ts. Tests read them back through the English dictionary.
+
 import { hasControlCharacters } from "./text";
 
 /**
@@ -77,11 +82,11 @@ export const serviceInputSchema = z.object({
   name: z
     .string()
     .trim()
-    .min(2, "Enter a name for this service.")
-    .max(60, "That name is too long.")
+    .min(2, "validation.serviceNameRequired")
+    .max(60, "validation.nameTooLong")
     .refine(
       (name) => !hasControlCharacters(name),
-      "Enter the name on a single line.",
+      "validation.nameSingleLineGeneric",
     ),
   /**
    * Arrives as a string from the form. `coerce` would turn "" into 0 and "abc"
@@ -91,15 +96,18 @@ export const serviceInputSchema = z.object({
   durationMinutes: z
     .string()
     .trim()
-    .min(1, "Enter how long this takes.")
+    .min(1, "validation.durationRequired")
     .transform((value) => (/^\d+$/.test(value) ? Number(value) : Number.NaN))
     .refine(
       (value) => Number.isInteger(value),
-      "Enter the length in whole minutes.",
+      "validation.durationWhole",
     )
     .refine(
       (value) => value >= MIN_DURATION_MINUTES && value <= MAX_DURATION_MINUTES,
-      `Length must be between ${MIN_DURATION_MINUTES} minutes and ${MAX_DURATION_MINUTES / 60} hours.`,
+      encodeMessage("validation.durationRange", {
+        min: MIN_DURATION_MINUTES,
+        maxHours: MAX_DURATION_MINUTES / 60,
+      }),
     ),
   /**
    * Typed in euros, stored in cents. The field is named for what the owner
@@ -109,15 +117,15 @@ export const serviceInputSchema = z.object({
   priceMinorUnits: z
     .string()
     .trim()
-    .min(1, "Enter a price.")
+    .min(1, "validation.priceRequired")
     .transform((value) => parsePriceToMinorUnits(value) ?? Number.NaN)
     .refine(
       (value) => Number.isInteger(value),
-      "Enter a price like 25 or 25,50.",
+      "validation.priceFormat",
     )
     .refine(
       (value) => value <= MAX_PRICE_MINOR_UNITS,
-      "That price looks too high — check the decimal point.",
+      "validation.priceTooHigh",
     ),
   /**
    * A plain grouping label, not a taxonomy (EXECUTION-PLAN.md). Optional, and an
@@ -130,10 +138,10 @@ export const serviceInputSchema = z.object({
       z
         .string()
         .trim()
-        .max(40, "That category name is too long.")
+        .max(40, "validation.categoryTooLong")
         .refine(
           (category) => !hasControlCharacters(category),
-          "Enter the category on a single line.",
+          "validation.categorySingleLine",
         ),
     ])
     .optional()

@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+// Messages are keys into lib/i18n/messages, not prose — see the note in
+// ./auth.ts. Tests read them back through the English dictionary.
+
 import { normalizePhone, phoneDigitCount } from "./phone";
 // Moved to ./text.ts on Day 11, when the services and staff screens needed the
 // same single-line rule for the names an owner types. Same function, one home.
@@ -36,11 +39,11 @@ export const customerDetailsSchema = z.object({
   name: z
     .string()
     .trim()
-    .min(2, "Enter your name.")
-    .max(80, "That name is too long.")
+    .min(2, "validation.nameRequired")
+    .max(80, "validation.nameTooLong")
     .refine(
       (name) => !hasControlCharacters(name),
-      "Enter your name on a single line.",
+      "validation.nameSingleLine",
     ),
   /**
    * Phone is the identity key for a customer within a tenant
@@ -66,13 +69,13 @@ export const customerDetailsSchema = z.object({
   phone: z
     .string()
     .trim()
-    .min(6, "Enter a phone number so the shop can reach you.")
-    .max(32, "That phone number is too long.")
-    .regex(/^[+\d][\d\s()/.-]*$/, "Enter a valid phone number.")
+    .min(6, "validation.phoneRequired")
+    .max(32, "validation.phoneTooLong")
+    .regex(/^[+\d][\d\s()/.-]*$/, "validation.phoneInvalid")
     .transform(normalizePhone)
     .refine(
       (phone) => phoneDigitCount(phone) >= MIN_PHONE_DIGITS,
-      "Enter a phone number so the shop can reach you.",
+      "validation.phoneRequired",
     ),
   /**
    * Optional, and normalised the same way as the login schema. An empty string
@@ -80,7 +83,7 @@ export const customerDetailsSchema = z.object({
    * without this, leaving an optional field blank is an error.
    */
   email: z
-    .union([z.literal(""), z.string().trim().toLowerCase().pipe(z.email("Enter a valid email address."))])
+    .union([z.literal(""), z.string().trim().toLowerCase().pipe(z.email("validation.emailInvalid"))])
     .optional()
     .transform((value) => (value ? value : undefined)),
 });

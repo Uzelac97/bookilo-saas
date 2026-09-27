@@ -527,7 +527,7 @@ export default async function KastanienBarbershopPage() {
                           {service.name}
                         </h3>
                         <p className="mt-3 text-sm text-shop-muted">
-                          {formatDuration(service.durationMinutes)}
+                          {formatDuration(service.durationMinutes, "en")}
                         </p>
                       </div>
                       {/* Same type size as the name, so the price reads as
@@ -584,7 +584,7 @@ export default async function KastanienBarbershopPage() {
                                 {service.name}
                               </p>
                               <p className="mt-1 text-sm text-shop-muted">
-                                {formatDuration(service.durationMinutes)}
+                                {formatDuration(service.durationMinutes, "en")}
                               </p>
                             </div>
                             <span className="shrink-0 tabular-nums text-shop-bone">

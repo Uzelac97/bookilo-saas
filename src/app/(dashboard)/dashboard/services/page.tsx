@@ -4,10 +4,12 @@ import { ServiceForm } from "@/components/dashboard/service-form";
 import { ServiceList } from "@/components/dashboard/service-list";
 import { getCurrentTenant } from "@/lib/auth/session";
 import { getServicesForTenant } from "@/lib/db/services";
+import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = {
-  title: "Services",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("nav.services") };
+}
 
 type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -34,23 +36,24 @@ export default async function ServicesPage({ searchParams }: PageProps) {
   const tenant = await getCurrentTenant();
   const query = await searchParams;
   const services = await getServicesForTenant(tenant.id);
+  const t = await getT();
 
   const editingId = first(query.edit);
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-          Services
+        <h1 className="text-2xl font-semibold tracking-tight text-fg">
+          {t("nav.services")}
         </h1>
-        <p className="text-sm text-zinc-500">
-          What customers can book, how long it takes and what it costs.
+        <p className="text-sm text-fg-muted">
+          {t("services.intro")}
         </p>
       </header>
 
-      <section className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6">
-        <h2 className="text-sm font-semibold tracking-tight text-zinc-900">
-          Add a service
+      <section className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-4 sm:p-6">
+        <h2 className="text-sm font-semibold tracking-tight text-fg">
+          {t("services.addHeading")}
         </h2>
         <ServiceForm />
       </section>

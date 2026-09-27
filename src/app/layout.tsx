@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+
+import { LocaleProvider } from "@/components/i18n/locale-provider";
+import { getT } from "@/lib/i18n/server";
+import { getLocale, getTheme } from "@/lib/preferences-server";
+
 import "./globals.css";
 
 const geistSans = Geist({
@@ -21,26 +26,35 @@ const geistMono = Geist_Mono({
  * owner-facing subtree gets the brand suffix from (dashboard)/layout.tsx
  * instead, which is the only place it belongs.
  */
-export const metadata: Metadata = {
-  title: "Bookilo",
-  description: "Online booking for barbershops and hair salons.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return {
+    title: "Bookilo",
+    description: t("meta.description"),
+  };
+}
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const [locale, theme] = await Promise.all([getLocale(), getTheme()]);
+
   return (
     <html
-      lang="en"
+      lang={locale}
+      // Absent for "system", so color-scheme in globals.css defers to the OS.
+      data-theme={theme === "system" ? undefined : theme}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       {/* font-sans is load-bearing, not decoration: it is the only thing that
           actually applies the Geist font loaded above. See the note in
           globals.css for what it replaced and why the class has to sit here
           rather than in the stylesheet. */}
-      <body className="flex min-h-full flex-col font-sans">{children}</body>
+      <body className="flex min-h-full flex-col font-sans">
+        <LocaleProvider locale={locale}>{children}</LocaleProvider>
+      </body>
     </html>
   );
 }

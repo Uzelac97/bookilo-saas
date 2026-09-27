@@ -9,6 +9,8 @@ import {
 } from "@/app/(dashboard)/dashboard/staff/actions";
 import { Field } from "@/components/ui/field";
 import type { ManagedStaff } from "@/lib/db/staff";
+import { useT } from "@/lib/i18n/client";
+import { translateMessage } from "@/lib/i18n/translate";
 
 /** See the note in service-form.tsx — a "use server" module can't export this. */
 const INITIAL_STATE: StaffFormState = { status: "idle" };
@@ -28,6 +30,7 @@ const INITIAL_STATE: StaffFormState = { status: "idle" };
  */
 export function StaffForm({ member }: { member?: ManagedStaff }) {
   const editing = member !== undefined;
+  const t = useT();
   const [state, formAction, pending] = useActionState<StaffFormState, FormData>(
     editing ? updateStaffAction : createStaffAction,
     INITIAL_STATE,
@@ -37,6 +40,9 @@ export function StaffForm({ member }: { member?: ManagedStaff }) {
   // barber's own screen, so this unmounts rather than needing clearing, and the
   // edit form's values are the barber's current ones and should stay.
   const errors = state.status === "invalid" ? state.fieldErrors : {};
+  // Errors arrive as message keys from the shared schema (lib/validation).
+  const errorText = (message: string | undefined) =>
+    message ? translateMessage(t, message) : undefined;
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -49,69 +55,68 @@ export function StaffForm({ member }: { member?: ManagedStaff }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
           id="name"
-          label="Name"
+          label={t("services.name")}
           autoComplete="off"
           defaultValue={member?.name}
           placeholder="Marco Rossi"
-          error={errors.name}
+          error={errorText(errors.name)}
         />
         <Field
           id="photoUrl"
-          label="Photo link"
+          label={t("staff.photoLink")}
           type="url"
           inputMode="url"
           defaultValue={member?.photoUrl ?? ""}
           placeholder="https://…"
-          hint="Optional — shown on your public page."
-          error={errors.photoUrl}
+          hint={t("staff.photoHint")}
+          error={errorText(errors.photoUrl)}
         />
       </div>
 
       {state.status === "saved" ? (
         <p
           role="status"
-          className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+          className="rounded-lg bg-success-soft px-3 py-2 text-sm text-success"
         >
-          Saved.
+          {t("common.saved")}
         </p>
       ) : null}
 
       {state.status === "gone" ? (
         <p
           role="alert"
-          className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          className="rounded-lg bg-warning-soft px-3 py-2 text-sm text-warning"
         >
-          That barber no longer exists. Reload the page.
+          {t("staff.gone")}
         </p>
       ) : null}
 
       {state.status === "error" ? (
         <p
           role="alert"
-          className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+          className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger"
         >
-          Something went wrong and nothing was saved. Please try again.
+          {t("common.saveError")}
         </p>
       ) : null}
 
       <button
         type="submit"
         disabled={pending}
-        className="w-fit rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-fit rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
       >
         {pending
           ? editing
-            ? "Saving…"
-            : "Adding…"
+            ? t("common.saving")
+            : t("common.adding")
           : editing
-            ? "Save changes"
-            : "Add barber"}
+            ? t("common.saveChanges")
+            : t("staff.submitAdd")}
       </button>
 
       {!editing ? (
-        <p className="text-sm text-zinc-500">
-          You&rsquo;ll set their working hours next. Until then they aren&rsquo;t
-          bookable.
+        <p className="text-sm text-fg-muted">
+          {t("staff.addNote")}
         </p>
       ) : null}
     </form>

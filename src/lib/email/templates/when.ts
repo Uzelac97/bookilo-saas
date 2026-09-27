@@ -2,8 +2,10 @@ import { DateTime } from "luxon";
 
 import { formatBookingDate, formatSlotTime } from "@/lib/format";
 
+import { EMAIL_LOCALE } from "./shell";
+
 /**
- * A booking instant as the shop's calendar day: "Tue, 28 Jul".
+ * A booking instant as the shop's calendar day: "Di, 28. Jul".
  *
  * lib/format has formatBookingDate, but it takes the ISO date string the URL
  * already carries. An email starts from the instant instead, so the tenant-local
@@ -18,6 +20,6 @@ export function localDate(instant: Date, timezone: string): string {
   const date = DateTime.fromJSDate(instant).setZone(timezone).toISODate();
 
   return date
-    ? formatBookingDate(date, timezone)
+    ? formatBookingDate(date, timezone, EMAIL_LOCALE)
     : formatSlotTime(instant, timezone);
 }

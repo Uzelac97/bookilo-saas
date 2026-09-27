@@ -2,6 +2,8 @@
 
 import { useFormStatus } from "react-dom";
 
+import { useT } from "@/lib/i18n/client";
+
 /**
  * The submit button for the cancel form.
  *
@@ -18,14 +20,15 @@ import { useFormStatus } from "react-dom";
  */
 export function CancelButton() {
   const { pending } = useFormStatus();
+  const t = useT();
 
   return (
     <button
       type="submit"
       disabled={pending}
-      className="inline-flex min-h-12 items-center justify-center self-start rounded-lg border border-red-300 bg-white px-4 text-base font-medium text-red-700 transition-colors hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:text-zinc-400"
+      className="inline-flex min-h-12 items-center justify-center self-start rounded-lg border border-danger-line bg-surface px-4 text-base font-medium text-danger transition-colors hover:bg-danger-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger disabled:cursor-not-allowed disabled:border-line disabled:text-fg-faint"
     >
-      {pending ? "Cancelling…" : "Cancel appointment"}
+      {pending ? t("cancel.submitting") : t("cancel.submit")}
     </button>
   );
 }

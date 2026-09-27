@@ -2,6 +2,7 @@
 
 import { ANY_STAFF } from "@/lib/availability/booking-options";
 import type { PublicStaff } from "@/lib/db/staff";
+import { useT } from "@/lib/i18n/client";
 
 /**
  * Optional barber preference. "Any barber" is the default and is listed first:
@@ -21,14 +22,16 @@ export function StaffPicker({
   pending: boolean;
   onSelect: (staffId: string) => void;
 }) {
+  const t = useT();
+
   if (staff.length < 2) return null;
 
-  const options = [{ id: ANY_STAFF, name: "Any barber" }, ...staff];
+  const options = [{ id: ANY_STAFF, name: t("book.anyBarber") }, ...staff];
 
   return (
     <div
       role="group"
-      aria-label="Preferred barber"
+      aria-label={t("book.preferredBarber")}
       className="flex flex-wrap gap-2"
     >
       {options.map((option) => {
@@ -43,10 +46,10 @@ export function StaffPicker({
             onClick={() => onSelect(option.id)}
             className={[
               // Was py-1.5 — a 32px pill, the smallest target in the flow.
-              "inline-flex min-h-11 items-center rounded-full border px-4 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 disabled:opacity-60",
+              "inline-flex min-h-11 items-center rounded-full border px-4 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-60",
               selected
-                ? "border-zinc-900 bg-zinc-900 text-white"
-                : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-400",
+                ? "border-primary bg-primary text-on-primary"
+                : "border-line bg-surface text-fg-secondary hover:border-line-stronger",
             ].join(" ")}
           >
             {option.name}

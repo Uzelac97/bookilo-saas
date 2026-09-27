@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 
+import { createTranslator, translateMessage } from "@/lib/i18n/translate";
+
 import { customerDetailsSchema } from "./booking";
+
+/**
+ * A validation message as an English-speaking user reads it. Schemas return
+ * message keys (lib/i18n), so assertions go through the dictionary — which
+ * also proves every key a schema can emit actually resolves.
+ */
+const en = (message: string | false | undefined) =>
+  typeof message === "string"
+    ? translateMessage(createTranslator("en"), message)
+    : message;
 
 /** Parses a name against the schema, with the other fields held valid. */
 function parseName(name: string) {
@@ -38,7 +50,7 @@ describe("customerDetailsSchema.name", () => {
       const result = parseName(name);
 
       expect(result.success).toBe(false);
-      expect(result.success === false && result.error.issues[0]?.message).toBe(
+      expect(en(result.success === false && result.error.issues[0]?.message)).toBe(
         SINGLE_LINE_MESSAGE,
       );
     }
@@ -71,7 +83,7 @@ describe("customerDetailsSchema.name", () => {
     const result = parseName("\n");
 
     expect(result.success).toBe(false);
-    expect(result.success === false && result.error.issues[0]?.message).toBe(
+    expect(en(result.success === false && result.error.issues[0]?.message)).toBe(
       "Enter your name.",
     );
   });

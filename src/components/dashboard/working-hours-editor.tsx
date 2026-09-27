@@ -6,29 +6,30 @@ import {
   saveWorkingHoursAction,
   type WorkingHoursState,
 } from "@/app/(dashboard)/dashboard/staff/actions";
-import {
-  DISPLAY_WEEK,
-  WEEKDAY_LABELS,
-} from "@/lib/availability/opening-hours";
+import { DISPLAY_WEEK } from "@/lib/availability/opening-hours";
 import type { WorkingHoursRow } from "@/lib/db/staff";
 import { formatMinuteOfDay } from "@/lib/format";
+import { useT } from "@/lib/i18n/client";
+import { translateMessage } from "@/lib/i18n/translate";
+import { weekdayName } from "@/lib/i18n/weekdays";
 
 /** See the note in service-form.tsx — a "use server" module can't export this. */
 const INITIAL_STATE: WorkingHoursState = { status: "idle" };
 
 /**
- * The weekday ordering and labels come from lib/availability/opening-hours.ts
- * rather than being written again here, and that file says why: the schema's
+ * The weekday ordering comes from lib/availability/opening-hours.ts rather
+ * than being written again here, and that file says why: the schema's
  * 0 = Sunday numbering is storage, not presentation, and keeping the Monday-first
  * reordering in one place is what stops a second, subtly different weekday
  * mapping appearing in the UI layer. This editor and the public opening-hours
  * table must agree about which day is which, or an owner sets Monday's hours and
  * a customer reads them as Sunday's.
  *
- * They are also fixed English labels rather than Luxon's locale-dependent ones,
- * which matters here specifically: these name a recurring weekday, not a real
- * date, so they'd otherwise follow the *runtime's* locale — the inconsistency
- * recorded for Day 13 in EXECUTION-PLAN.md.
+ * The names come from the dictionaries via weekdayName() rather than from
+ * Luxon, which matters here specifically: these name a recurring weekday, not a
+ * real date, so a Luxon rendering would need a made-up date to hang off and
+ * would follow whatever locale that date carried — the inconsistency recorded
+ * for Day 13 in EXECUTION-PLAN.md.
  */
 
 /** A default interval for a day being opened, in the shape the form holds. */
@@ -76,6 +77,7 @@ export function WorkingHoursEditor({
     })),
   );
   const [nextKey, setNextKey] = useState(0);
+  const t = useT();
   const [state, formAction, pending] = useActionState<
     WorkingHoursState,
     FormData
@@ -121,9 +123,9 @@ export function WorkingHoursEditor({
         )}
       />
 
-      <ul className="flex flex-col divide-y divide-zinc-100">
+      <ul className="flex flex-col divide-y divide-line-faint">
         {DISPLAY_WEEK.map((dayOfWeek) => {
-          const label = WEEKDAY_LABELS[dayOfWeek];
+          const label = weekdayName(t, dayOfWeek);
           const rows = intervals.filter(
             (interval) => interval.dayOfWeek === dayOfWeek,
           );
@@ -133,36 +135,41 @@ export function WorkingHoursEditor({
               key={dayOfWeek}
               className="flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:gap-4"
             >
-              <span className="w-28 shrink-0 pt-1.5 text-sm font-medium text-zinc-700">
+              <span className="w-28 shrink-0 pt-1.5 text-sm font-medium text-fg-secondary">
                 {label}
               </span>
 
               <div className="flex flex-1 flex-col gap-2">
                 {rows.length === 0 ? (
-                  <span className="pt-1.5 text-sm text-zinc-400">Closed</span>
+                  <span className="pt-1.5 text-sm text-fg-faint">
+                    {t("shop.closed")}
+                  </span>
                 ) : (
                   rows.map((row) => (
                     <div key={row.key} className="flex flex-wrap items-center gap-2">
                       <TimeInput
-                        label={`${label} start`}
+                        label={t("hours.startOf", { day: label })}
                         value={row.start}
                         onChange={(start) => updateInterval(row.key, { start })}
                       />
-                      <span aria-hidden className="text-zinc-400">
+                      <span aria-hidden className="text-fg-faint">
                         –
                       </span>
                       <TimeInput
-                        label={`${label} end`}
+                        label={t("hours.endOf", { day: label })}
                         value={row.end}
                         onChange={(end) => updateInterval(row.key, { end })}
                       />
                       <button
                         type="button"
                         onClick={() => removeInterval(row.key)}
-                        aria-label={`Remove ${label} ${row.start}–${row.end}`}
-                        className="rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 text-sm text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900"
+                        aria-label={t("hours.removeInterval", {
+                          day: label,
+                          range: `${row.start}–${row.end}`,
+                        })}
+                        className="rounded-lg border border-line-strong bg-surface px-2.5 py-1.5 text-sm text-fg-tertiary transition-colors hover:bg-subtle hover:text-fg"
                       >
-                        Remove
+                        {t("staff.remove")}
                       </button>
                     </div>
                   ))
@@ -171,9 +178,9 @@ export function WorkingHoursEditor({
                 <button
                   type="button"
                   onClick={() => addInterval(dayOfWeek)}
-                  className="w-fit text-sm text-zinc-500 underline-offset-4 hover:text-zinc-900 hover:underline"
+                  className="w-fit text-sm text-fg-muted underline-offset-4 hover:text-fg hover:underline"
                 >
-                  {rows.length === 0 ? "Add hours" : "Add another interval"}
+                  {rows.length === 0 ? t("hours.add") : t("hours.addAnother")}
                 </button>
               </div>
             </li>
@@ -184,36 +191,36 @@ export function WorkingHoursEditor({
       {state.status === "invalid" ? (
         <p
           role="alert"
-          className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+          className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger"
         >
-          {state.message}
+          {translateMessage(t, state.message)}
         </p>
       ) : null}
 
       {state.status === "gone" ? (
         <p
           role="alert"
-          className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          className="rounded-lg bg-warning-soft px-3 py-2 text-sm text-warning"
         >
-          That barber no longer exists. Reload the page.
+          {t("staff.gone")}
         </p>
       ) : null}
 
       {state.status === "error" ? (
         <p
           role="alert"
-          className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+          className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger"
         >
-          Something went wrong and the hours weren&rsquo;t saved. Please try again.
+          {t("hours.error")}
         </p>
       ) : null}
 
       {state.status === "saved" ? (
         <p
           role="status"
-          className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+          className="rounded-lg bg-success-soft px-3 py-2 text-sm text-success"
         >
-          Hours saved.
+          {t("hours.saved")}
         </p>
       ) : null}
 
@@ -221,12 +228,12 @@ export function WorkingHoursEditor({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {pending ? "Saving…" : "Save hours"}
+          {pending ? t("common.saving") : t("hours.submit")}
         </button>
-        <p className="text-sm text-zinc-500">
-          A day with no hours is closed for this barber.
+        <p className="text-sm text-fg-muted">
+          {t("hours.closedNote")}
         </p>
       </div>
     </form>
@@ -256,7 +263,7 @@ function TimeInput({
       // Same explicit bg/text as the shared Field: Tailwind's preflight resets
       // form controls to inherited colours, which is how these once rendered
       // near-white on white.
-      className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-base text-zinc-900 outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900"
+      className="rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-base text-fg outline-none focus:border-focus focus:ring-1 focus:ring-focus"
     />
   );
 }

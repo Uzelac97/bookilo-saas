@@ -10,6 +10,8 @@ import type {
 } from "@/lib/availability/booking-options";
 import type { PublicService } from "@/lib/db/services";
 import type { PublicStaff } from "@/lib/db/staff";
+import { useT } from "@/lib/i18n/client";
+import type { Translator } from "@/lib/i18n/translate";
 
 import { BookingForm } from "./booking-form";
 import { DateStrip } from "./date-strip";
@@ -61,6 +63,7 @@ export function BookingFlow({
   timezone: string;
 }) {
   const router = useRouter();
+  const t = useT();
   const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
 
@@ -168,8 +171,8 @@ export function BookingFlow({
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold tracking-tight text-zinc-900">
-          Pick a date
+        <h2 className="text-lg font-semibold tracking-tight text-fg">
+          {t("book.pickDate")}
         </h2>
         <DateStrip
           days={stripDays}
@@ -192,15 +195,15 @@ export function BookingFlow({
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold tracking-tight text-zinc-900">
-          Pick a time
+        <h2 className="text-lg font-semibold tracking-tight text-fg">
+          {t("book.pickTime")}
         </h2>
         {slotLost ? (
           <p
             role="alert"
-            className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+            className="rounded-xl border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning"
           >
-            {lostSlotMessage(slotLost, staff)}
+            {lostSlotMessage(t, slotLost, staff)}
           </p>
         ) : null}
         <SlotGrid
@@ -215,8 +218,8 @@ export function BookingFlow({
 
       {selectedSlot ? (
         <section ref={detailsRef} className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold tracking-tight text-zinc-900">
-            Your details
+          <h2 className="text-lg font-semibold tracking-tight text-fg">
+            {t("book.yourDetails")}
           </h2>
           <BookingForm
             slug={slug}
@@ -242,16 +245,22 @@ export function BookingFlow({
  * booking. Telling them to pick a different time there — as a single shared
  * "unavailable" message did — would send them away from a slot they can still have.
  */
-function lostSlotMessage(lost: LostSlotState, staff: PublicStaff[]): string {
+function lostSlotMessage(
+  t: Translator,
+  lost: LostSlotState,
+  staff: PublicStaff[],
+): string {
   switch (lost.status) {
     case "staff_taken": {
       const name = staff.find((member) => member.id === lost.staffId)?.name;
 
-      return `${name ?? "That barber"} was just booked at this time. Another barber is still free — the details below now show who, so you can confirm again.`;
+      return name
+        ? t("book.lostStaffTakenNamed", { name })
+        : t("book.lostStaffTaken");
     }
     case "slot_taken":
-      return "Someone else booked that time just before you. The times below are up to date — please pick another.";
+      return t("book.lostSlotTaken");
     case "unavailable":
-      return "That time isn't available anymore. The times below are up to date — please pick another.";
+      return t("book.lostUnavailable");
   }
 }

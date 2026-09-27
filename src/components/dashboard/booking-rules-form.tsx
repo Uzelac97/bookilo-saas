@@ -8,6 +8,8 @@ import {
 } from "@/app/(dashboard)/dashboard/settings/actions";
 import { Field } from "@/components/ui/field";
 import type { BookingRules } from "@/lib/db/tenant";
+import { useT } from "@/lib/i18n/client";
+import { translateMessage } from "@/lib/i18n/translate";
 
 /**
  * Lives here rather than next to the action: a "use server" module turns every
@@ -34,7 +36,11 @@ export function BookingRulesForm({ rules }: { rules: BookingRules }) {
     FormData
   >(updateBookingRulesAction, INITIAL_STATE);
 
+  const t = useT();
   const errors = state.status === "invalid" ? state.fieldErrors : {};
+  // Errors arrive as message keys from the shared schema (lib/validation).
+  const errorText = (message: string | undefined) =>
+    message ? translateMessage(t, message) : undefined;
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -44,54 +50,54 @@ export function BookingRulesForm({ rules }: { rules: BookingRules }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
           id="bufferMinutes"
-          label="Gap between appointments"
+          label={t("settings.buffer")}
           inputMode="numeric"
           defaultValue={String(rules.bufferMinutes)}
           placeholder="0"
-          hint="Minutes of clean-up time after each cut. 0 for back-to-back."
-          error={errors.bufferMinutes}
+          hint={t("settings.bufferHint")}
+          error={errorText(errors.bufferMinutes)}
         />
         <Field
           id="minLeadMinutes"
-          label="Minimum notice"
+          label={t("settings.minLead")}
           inputMode="numeric"
           defaultValue={String(rules.minLeadMinutes)}
           placeholder="60"
-          hint="How far ahead an online booking must be made. Doesn't apply to walk-ins you enter yourself."
-          error={errors.minLeadMinutes}
+          hint={t("settings.minLeadHint")}
+          error={errorText(errors.minLeadMinutes)}
         />
         <Field
           id="cancellationWindowMinutes"
-          label="Cancellation window"
+          label={t("settings.cancellationWindow")}
           inputMode="numeric"
           defaultValue={String(rules.cancellationWindowMinutes)}
           placeholder="120"
-          hint="How long before an appointment a customer can still cancel online."
-          error={errors.cancellationWindowMinutes}
+          hint={t("settings.cancellationWindowHint")}
+          error={errorText(errors.cancellationWindowMinutes)}
         />
       </div>
 
       {state.status === "saved" ? (
         <p
           role="status"
-          className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+          className="rounded-lg bg-success-soft px-3 py-2 text-sm text-success"
         >
-          Saved.
+          {t("common.saved")}
         </p>
       ) : null}
 
       {state.status === "gone" ? (
         <p
           role="alert"
-          className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          className="rounded-lg bg-warning-soft px-3 py-2 text-sm text-warning"
         >
-          Your shop record couldn’t be found. Sign out and back in.
+          {t("settings.gone")}
         </p>
       ) : null}
 
       {state.status === "error" ? (
-        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-          Something went wrong and nothing was saved. Please try again.
+        <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
+          {t("common.saveError")}
         </p>
       ) : null}
 
@@ -99,9 +105,9 @@ export function BookingRulesForm({ rules }: { rules: BookingRules }) {
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {pending ? "Saving…" : "Save rules"}
+          {pending ? t("common.saving") : t("settings.submit")}
         </button>
       </div>
 
@@ -109,17 +115,16 @@ export function BookingRulesForm({ rules }: { rules: BookingRules }) {
           owner gets wrong the moment they change a value and look at the result.
           The first two are the same shape as the note on the services form: what
           a booking snapshotted at creation, versus what is read live. */}
-      <div className="flex flex-col gap-2 text-sm text-zinc-500">
+      <div className="flex flex-col gap-2 text-sm text-fg-muted">
         <p>
-          Changing the gap affects new bookings only — appointments already in
-          the calendar keep the gaps they were booked with.
+          {t("settings.bufferNote")}
         </p>
         <p>
-          Changing the cancellation window applies to{" "}
-          <strong className="font-medium text-zinc-700">existing</strong>{" "}
-          bookings too. Customers were emailed the old window when they booked,
-          so making it longer can stop someone cancelling who was told they
-          could.
+          {t("settings.windowNoteBefore")}{" "}
+          <strong className="font-medium text-fg-secondary">
+            {t("settings.windowNoteStrong")}
+          </strong>{" "}
+          {t("settings.windowNoteAfter")}
         </p>
       </div>
     </form>

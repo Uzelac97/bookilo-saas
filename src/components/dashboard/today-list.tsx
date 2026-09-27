@@ -2,7 +2,9 @@ import Link from "next/link";
 
 import { STATUS_LABELS } from "@/lib/dashboard/booking-status";
 import type { DashboardBooking } from "@/lib/db/bookings";
+import type { Translator } from "@/lib/i18n/translate";
 import { formatPrice, formatSlotTime, formatTimeRange } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
 
 /**
  * How each status is badged here. The words are shared with the calendar via
@@ -11,9 +13,9 @@ import { formatPrice, formatSlotTime, formatTimeRange } from "@/lib/format";
  */
 const STATUS_BADGE_STYLES: Record<DashboardBooking["status"], string> = {
   CONFIRMED: "",
-  CANCELLED: "border-zinc-200 bg-zinc-100 text-zinc-500",
-  COMPLETED: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  NO_SHOW: "border-amber-200 bg-amber-100 text-amber-800",
+  CANCELLED: "border-line bg-subtle text-fg-muted",
+  COMPLETED: "border-success-line bg-success-soft text-success-secondary",
+  NO_SHOW: "border-warning-line-soft bg-warning-muted text-warning-secondary",
 };
 
 /**
@@ -27,7 +29,7 @@ const STATUS_BADGE_STYLES: Record<DashboardBooking["status"], string> = {
  * instant: a component that called new Date() itself could classify a booking as
  * past in the summary and upcoming in the list, on the same screen.
  */
-export function TodayList({
+export async function TodayList({
   bookings,
   timezone,
   now,
@@ -38,6 +40,8 @@ export function TodayList({
 }) {
   if (bookings.length === 0) return null;
 
+  const t = await getT();
+
   return (
     <ul className="flex flex-col gap-2">
       {bookings.map((booking) => (
@@ -46,6 +50,7 @@ export function TodayList({
           booking={booking}
           timezone={timezone}
           now={now}
+          t={t}
         />
       ))}
     </ul>
@@ -56,10 +61,12 @@ function BookingRow({
   booking,
   timezone,
   now,
+  t,
 }: {
   booking: DashboardBooking;
   timezone: string;
   now: Date;
+  t: Translator;
 }) {
   const cancelled = booking.status === "CANCELLED";
   // Past by end time, not start: an appointment in progress is still today's
@@ -70,27 +77,27 @@ function BookingRow({
   return (
     <li
       className={[
-        "rounded-2xl border border-zinc-200 bg-white p-4 transition-opacity",
+        "rounded-2xl border border-line bg-surface p-4 transition-opacity",
         past || cancelled ? "opacity-55" : "",
       ].join(" ")}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <span
           className={[
-            "font-mono text-sm text-zinc-900",
+            "font-mono text-sm text-fg",
             cancelled ? "line-through" : "",
           ].join(" ")}
         >
           {formatTimeRange(booking.startAt, booking.endAt, timezone)}
         </span>
 
-        <span className="text-sm text-zinc-500">{booking.staff.name}</span>
+        <span className="text-sm text-fg-muted">{booking.staff.name}</span>
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
         <span
           className={[
-            "font-medium text-zinc-900",
+            "font-medium text-fg",
             cancelled ? "line-through" : "",
           ].join(" ")}
         >
@@ -101,29 +108,29 @@ function BookingRow({
           <span
             className={`rounded-full border px-2 py-0.5 text-xs font-medium ${STATUS_BADGE_STYLES[booking.status]}`}
           >
-            {statusLabel}
+            {t(statusLabel)}
           </span>
         ) : null}
 
         {booking.source === "MANUAL" ? (
-          <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-xs font-medium text-zinc-600">
-            Walk-in
+          <span className="rounded-full border border-line bg-canvas px-2 py-0.5 text-xs font-medium text-fg-tertiary">
+            {t("dashboard.walkIn")}
           </span>
         ) : null}
       </div>
 
-      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zinc-600">
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-fg-tertiary">
         <span className={cancelled ? "line-through" : ""}>
           {booking.service.name}
         </span>
-        <span aria-hidden="true" className="text-zinc-300">
+        <span aria-hidden="true" className="text-fg-disabled">
           ·
         </span>
         {/* Strip spaces for the dial target only — the visible number keeps the
             formatting the customer typed. */}
         <a
           href={`tel:${booking.customer.phone.replace(/\s+/g, "")}`}
-          className="font-medium text-zinc-900 underline-offset-4 hover:underline"
+          className="font-medium text-fg underline-offset-4 hover:underline"
         >
           {booking.customer.phone}
         </a>
@@ -136,7 +143,7 @@ function BookingRow({
  * The day at a glance. Rendered above the list, and on its own when there is no
  * list — a fresh shop's dashboard is an empty day, not an error.
  */
-export function TodaySummary({
+export async function TodaySummary({
   booked,
   next,
   revenueMinorUnits,
@@ -147,22 +154,24 @@ export function TodaySummary({
   revenueMinorUnits: number;
   timezone: string;
 }) {
+  const t = await getT();
+
   return (
-    <dl className="grid grid-cols-3 gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200">
+    <dl className="grid grid-cols-3 gap-px overflow-hidden rounded-2xl border border-line bg-subtle-strong">
       <SummaryCell
-        label="Booked"
+        label={t("summary.booked")}
         value={String(booked)}
-        detail={booked === 1 ? "appointment" : "appointments"}
+        detail={t("summary.appointments", { count: booked })}
       />
       <SummaryCell
-        label="Next"
+        label={t("summary.next")}
         value={next ? formatSlotTime(next.startAt, timezone) : "—"}
-        detail={next ? next.customer.name : "nothing left today"}
+        detail={next ? next.customer.name : t("summary.nothingLeftToday")}
       />
       <SummaryCell
-        label="Booked value"
+        label={t("summary.bookedValue")}
         value={formatPrice(revenueMinorUnits)}
-        detail="excl. no-shows"
+        detail={t("summary.exclNoShows")}
       />
     </dl>
   );
@@ -185,33 +194,53 @@ export function SummaryCell({
   value: string;
   detail: string;
 }) {
+  // Label and detail wrap rather than truncate. In the three-up row a cell is
+  // ~81px wide at a 375px viewport, and German runs long: "ohne
+  // Nichterscheinen" was ellipsised to nothing useful. Plain wrapping isn't
+  // enough on its own, because "Nichterscheinen" alone is wider than the cell,
+  // so hyphens-auto breaks it at a real syllable (driven by <html lang>) and
+  // wrap-break-word is the backstop that guarantees nothing overflows into the
+  // neighbouring cell. The row's cells stretch to equal height, so a two-line
+  // detail doesn't misalign the grid.
+  //
+  // The value shrinks below sm instead of wrapping: a figure is read at a
+  // glance and shouldn't break across lines. The widest real value is a
+  // four-figure day's revenue, "1.234,00 €" — about 96px at text-xl against an
+  // ~81px cell at 375px, and it can't wrap at all, since Intl puts a no-break
+  // space before the €. At text-base it's about 77px. The count and the "next"
+  // time are far narrower. sm and up (including the calendar sidebar, which
+  // only renders at 2xl) keep text-xl.
   return (
-    <div className="flex flex-col gap-0.5 bg-white p-4">
-      <dt className="text-xs font-medium tracking-wide text-zinc-500 uppercase">
+    <div className="flex flex-col gap-0.5 bg-surface p-4">
+      <dt className="text-xs font-medium tracking-wide text-fg-muted uppercase hyphens-auto wrap-break-word">
         {label}
       </dt>
-      <dd className="text-xl font-semibold tracking-tight text-zinc-900">
+      <dd className="text-base font-semibold tracking-tight text-fg sm:text-xl">
         {value}
       </dd>
-      <span className="truncate text-xs text-zinc-500">{detail}</span>
+      <span className="text-xs text-fg-muted hyphens-auto wrap-break-word">
+        {detail}
+      </span>
     </div>
   );
 }
 
 /** Shown when nothing is on the books — the default view of a brand-new shop. */
-export function TodayEmptyState({ slug }: { slug: string }) {
+export async function TodayEmptyState({ slug }: { slug: string }) {
+  const t = await getT();
+
   return (
-    <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-8 text-center">
-      <p className="font-medium text-zinc-900">No appointments today</p>
-      <p className="mt-1 text-sm text-zinc-500">
-        Bookings made on your{" "}
+    <div className="rounded-2xl border border-dashed border-line-strong bg-surface p-8 text-center">
+      <p className="font-medium text-fg">{t("today.emptyTitle")}</p>
+      <p className="mt-1 text-sm text-fg-muted">
+        {t("today.emptyBodyBefore")}{" "}
         <Link
           href={`/b/${slug}`}
-          className="font-medium text-zinc-900 underline underline-offset-4"
+          className="font-medium text-fg underline underline-offset-4"
         >
-          public page
+          {t("today.emptyBodyLink")}
         </Link>{" "}
-        show up here.
+        {t("today.emptyBodyAfter")}
       </p>
     </div>
   );

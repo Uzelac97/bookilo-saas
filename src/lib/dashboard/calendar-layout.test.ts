@@ -445,7 +445,13 @@ describe("buildDayGrid", () => {
     staff: CalendarStaff[],
     workingHours: WorkingHoursRow[] = [hours(TUESDAY_DOW, 8 * 60, 18 * 60)],
   ) {
-    return buildDayGrid({ bookings, staff, workingHours, timezone: TZ });
+    return buildDayGrid({
+      bookings,
+      staff,
+      workingHours,
+      timezone: TZ,
+      locale: "en",
+    });
   }
 
   it("gives every active barber a column, even an empty one", () => {
@@ -610,6 +616,7 @@ describe("buildDayGrid", () => {
       staff: [],
       workingHours: [],
       timezone: TZ,
+      locale: "en",
     });
 
     expect(grid.columns).toEqual([]);
@@ -662,6 +669,7 @@ describe("buildWeekGrid", () => {
       dates: opts.dates ?? WEEK,
       workingHours: opts.workingHours ?? WIDE_WEEK,
       timezone: TZ,
+      locale: "en",
       now: opts.now ?? local(TUESDAY, "12:00"),
     });
   }
@@ -886,6 +894,7 @@ function blockOfDuration(minutes: number) {
     staff: [staffMember(MARCO.id, MARCO.name)],
     workingHours: [hours(TUESDAY_DOW)],
     timezone: TZ,
+    locale: "en",
   });
 
   return grid.columns[0].bookings[0];
@@ -961,6 +970,7 @@ describe("block geometry across durations", () => {
         staff: [staffMember(MARCO.id, MARCO.name)],
         workingHours: [hours(TUESDAY_DOW, open, close)],
         timezone: TZ,
+        locale: "en",
       });
 
       return grid.columns[0].bookings[0];
@@ -976,6 +986,7 @@ describe("block geometry across durations", () => {
       staff: [staffMember(MARCO.id, MARCO.name)],
       workingHours: [hours(TUESDAY_DOW)],
       timezone: TZ,
+      locale: "en",
     });
 
     // 09:00-18:00 is nine hours.
@@ -994,6 +1005,7 @@ describe("block geometry across durations", () => {
       staff: [staffMember(MARCO.id, MARCO.name)],
       workingHours: [hours(TUESDAY_DOW)],
       timezone: TZ,
+      locale: "en",
     });
 
     const block = grid.columns[0].bookings[0];

@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { useTransition } from "react";
 
 import type { CalendarView } from "@/lib/dashboard/calendar-range";
+import { useT } from "@/lib/i18n/client";
 
 /**
  * The only component on the calendar that writes the URL.
@@ -48,6 +49,7 @@ export function CalendarNav({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
+  const t = useT();
 
   function navigate(changes: Record<string, string>) {
     const next = new URLSearchParams(searchParams);
@@ -64,20 +66,20 @@ export function CalendarNav({
     });
   }
 
-  const unit = view === "week" ? "week" : "day";
+  const week = view === "week";
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <div className="flex items-center gap-2">
           <StepButton
-            label={`Previous ${unit}`}
+            label={week ? t("calendar.previousWeek") : t("calendar.previousDay")}
             glyph="‹"
             disabled={pending}
             onClick={() => navigate({ date: previousDate, view })}
           />
           <StepButton
-            label={`Next ${unit}`}
+            label={week ? t("calendar.nextWeek") : t("calendar.nextDay")}
             glyph="›"
             disabled={pending}
             onClick={() => navigate({ date: nextDate, view })}
@@ -86,16 +88,16 @@ export function CalendarNav({
             type="button"
             disabled={atToday || pending}
             onClick={() => navigate({ date: todayDate, view })}
-            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-900 transition-colors hover:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-zinc-200"
+            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium text-fg transition-colors hover:border-line-stronger disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-line"
           >
-            Today
+            {t("nav.today")}
           </button>
 
           {/* Announced on change: the ‹ › buttons keep their own labels, so
               without this the only feedback for a step is visual. */}
           <h2
             aria-live="polite"
-            className="ml-1 text-base font-semibold tracking-tight text-zinc-900"
+            className="ml-1 text-base font-semibold tracking-tight text-fg"
           >
             {heading}
           </h2>
@@ -103,11 +105,11 @@ export function CalendarNav({
 
         <div
           role="group"
-          aria-label="Calendar view"
-          className="flex gap-1 rounded-xl border border-zinc-200 bg-white p-1"
+          aria-label={t("calendar.view")}
+          className="flex gap-1 rounded-xl border border-line bg-surface p-1"
         >
           <ViewButton
-            label="Day"
+            label={t("calendar.viewDay")}
             target="day"
             current={view}
             disabled={pending}
@@ -120,7 +122,7 @@ export function CalendarNav({
             onSelect={() => navigate({ view: "day" })}
           />
           <ViewButton
-            label="Week"
+            label={t("calendar.viewWeek")}
             target="week"
             current={view}
             disabled={pending}
@@ -160,7 +162,7 @@ function StepButton({
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="shrink-0 rounded-lg border border-zinc-200 bg-white px-2.5 py-2 text-lg leading-none text-zinc-600 transition-colors hover:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-zinc-200"
+      className="shrink-0 rounded-lg border border-line bg-surface px-2.5 py-2 text-lg leading-none text-fg-tertiary transition-colors hover:border-line-stronger disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-line"
     >
       {glyph}
     </button>
@@ -191,8 +193,8 @@ function ViewButton({
       className={[
         "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed",
         selected
-          ? "bg-zinc-900 text-white"
-          : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900",
+          ? "bg-primary text-on-primary"
+          : "text-fg-tertiary hover:bg-subtle hover:text-fg",
       ].join(" ")}
     >
       {label}

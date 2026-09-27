@@ -41,6 +41,14 @@ describe("escapeHtml", () => {
 });
 
 describe("the shared shell", () => {
+  it("renders in German regardless of any interface language", () => {
+    // EMAIL_LOCALE is a constant: there is no recipient language to follow.
+    const mail = renderBookingConfirmation(booking(), CANCEL_URL);
+
+    expect(mail.html).toContain('lang="de"');
+    expect(mail.text).toContain("Leistung: Skin fade");
+  });
+
   it("signs both emails off with the product name, in HTML and text", () => {
     // One place spells the brand (shell.ts), so this asserts on both templates
     // rather than on the constant — the thing that could regress is a new email
@@ -49,8 +57,8 @@ describe("the shared shell", () => {
     const notification = renderOwnerNotification(booking(), "+491761234567");
 
     for (const mail of [confirmation, notification]) {
-      expect(mail.html).toContain("Sent by Bookilo");
-      expect(mail.text).toContain("Sent by Bookilo");
+      expect(mail.html).toContain("Gesendet über Bookilo");
+      expect(mail.text).toContain("Gesendet über Bookilo");
     }
   });
 });
@@ -63,7 +71,7 @@ describe("renderBookingConfirmation", () => {
 
     expect(mail.text).toContain("14:30");
     expect(mail.subject).toContain("14:30");
-    expect(mail.subject).toContain("Tue, 28 Jul");
+    expect(mail.subject).toContain("Di, 28. Jul");
   });
 
   it("carries the cancel link in both the HTML and the text part", () => {
@@ -71,7 +79,7 @@ describe("renderBookingConfirmation", () => {
 
     expect(mail.html).toContain(`href="${CANCEL_URL}"`);
     expect(mail.text).toContain(CANCEL_URL);
-    expect(mail.text).toContain("2 h");
+    expect(mail.text).toContain("bis 2 Std. vor deinem Termin");
   });
 
   it("includes the address when the shop has one, and omits it otherwise", () => {
@@ -82,7 +90,7 @@ describe("renderBookingConfirmation", () => {
       booking({ tenant: { ...booking().tenant, address: null } }),
       CANCEL_URL,
     );
-    expect(without.text).not.toContain("Where");
+    expect(without.text).not.toContain("Wo:");
   });
 
   it("escapes customer-supplied text rather than emitting it as markup", () => {
@@ -95,7 +103,7 @@ describe("renderBookingConfirmation", () => {
     );
 
     expect(mail.html).not.toContain("<b>Jonas</b>");
-    expect(mail.html).toContain("Thanks &lt;b&gt;Jonas&lt;/b&gt;");
+    expect(mail.html).toContain("Danke, &lt;b&gt;Jonas&lt;/b&gt;");
   });
 });
 
@@ -103,9 +111,9 @@ describe("renderOwnerNotification", () => {
   it("leads with the customer's name and number", () => {
     const mail = renderOwnerNotification(booking(), "+491761234567");
 
-    expect(mail.subject).toBe("New booking: Jonas Weber, Tue, 28 Jul at 14:30");
-    expect(mail.text).toContain("Customer: Jonas Weber");
-    expect(mail.text).toContain("Phone: +491761234567");
+    expect(mail.subject).toBe("Neue Buchung: Jonas Weber, Di, 28. Jul um 14:30");
+    expect(mail.text).toContain("Kunde: Jonas Weber");
+    expect(mail.text).toContain("Telefon: +491761234567");
   });
 
   it("says so plainly when no email was given", () => {
@@ -116,8 +124,8 @@ describe("renderOwnerNotification", () => {
       "+491761234567",
     );
 
-    expect(mail.text).toContain("Email: not given");
-    expect(mail.text).toContain("no cancellation link");
+    expect(mail.text).toContain("E-Mail: nicht angegeben");
+    expect(mail.text).toContain("keinen Stornierungslink");
   });
 
   it("escapes the full customer name it renders in a row", () => {

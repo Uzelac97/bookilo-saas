@@ -11,10 +11,13 @@ import { getCurrentTenant } from "@/lib/auth/session";
 import { summariseDay } from "@/lib/dashboard/today-summary";
 import { getBookingsForDay } from "@/lib/db/bookings";
 import { formatBookingDate } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
+import { getLocale } from "@/lib/preferences-server";
 
-export const metadata: Metadata = {
-  title: "Today",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("nav.today") };
+}
 
 /**
  * The owner's first screen: what's on the books today.
@@ -28,7 +31,11 @@ export const metadata: Metadata = {
  * boundary and put a booking under "next" that the list has already dimmed.
  */
 export default async function DashboardPage() {
-  const tenant = await getCurrentTenant();
+  const [tenant, t, locale] = await Promise.all([
+    getCurrentTenant(),
+    getT(),
+    getLocale(),
+  ]);
   const now = new Date();
 
   // "Today" is the shop's today, not the server's — a Berlin shop's day must not
@@ -47,11 +54,12 @@ export default async function DashboardPage() {
       <div className="flex flex-col gap-6">
         <header className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-              Today
+            <h1 className="text-2xl font-semibold tracking-tight text-fg">
+              {t("nav.today")}
             </h1>
-            <p className="text-sm text-zinc-500">
-              {formatBookingDate(date, tenant.timezone)} · {tenant.timezone}
+            <p className="text-sm text-fg-muted">
+              {formatBookingDate(date, tenant.timezone, locale)} ·{" "}
+              {tenant.timezone}
             </p>
           </div>
 
@@ -59,9 +67,9 @@ export default async function DashboardPage() {
               for. The calendar's button carries whatever day it's showing. */}
           <Link
             href={`/dashboard/bookings/new?date=${date}`}
-            className="rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
+            className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-on-primary transition-colors hover:bg-primary-hover"
           >
-            New booking
+            {t("dashboard.newBooking")}
           </Link>
         </header>
 

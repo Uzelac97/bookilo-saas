@@ -6,11 +6,13 @@ import { notFound } from "next/navigation";
 import { getBookingByCancelToken } from "@/lib/db/bookings";
 import {
   formatBookingDate,
-  formatCancellationDeadline,
+  formatCancellationPolicy,
   formatDuration,
   formatPrice,
   formatSlotTime,
 } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
+import { getLocale } from "@/lib/preferences-server";
 
 /**
  * The URL contains a bearer secret, so this page is never indexed and never
@@ -18,10 +20,13 @@ import {
  * there is nothing here worth a crawler following, and the less this URL
  * circulates the better.
  */
-export const metadata: Metadata = {
-  title: "Booking confirmed",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return {
+    title: t("booked.metaTitle"),
+    robots: { index: false, follow: false },
+  };
+}
 
 type PageProps = { params: Promise<{ slug: string; token: string }> };
 
@@ -37,12 +42,13 @@ export default async function BookedPage({ params }: PageProps) {
   if (!booking || booking.tenant.slug !== slug) notFound();
 
   const { tenant, service } = booking;
+  const [t, locale] = await Promise.all([getT(), getLocale()]);
   const date = DateTime.fromJSDate(booking.startAt)
     .setZone(tenant.timezone)
     .toISODate();
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 px-4 py-10 sm:py-16">
+    <div className="flex flex-1 flex-col bg-canvas px-4 py-10 sm:py-16">
       <main className="mx-auto flex w-full max-w-2xl flex-col gap-8">
         <header className="flex flex-col gap-2">
           {/* The one decorative element in the public flow, and it earns its
@@ -55,7 +61,7 @@ export default async function BookedPage({ params }: PageProps) {
           {booking.status === "CANCELLED" ? null : (
             <span
               aria-hidden="true"
-              className="mb-1 flex size-11 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"
+              className="mb-1 flex size-11 items-center justify-center rounded-full bg-success-muted text-success-secondary"
             >
               <svg
                 viewBox="0 0 20 20"
@@ -70,53 +76,64 @@ export default async function BookedPage({ params }: PageProps) {
               </svg>
             </span>
           )}
-          <p className="text-sm font-medium text-zinc-500">{tenant.name}</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-zinc-900">
+          <p className="text-sm font-medium text-fg-muted">{tenant.name}</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-fg">
             {booking.status === "CANCELLED"
-              ? "This booking is cancelled"
-              : "You're booked in"}
+              ? t("booking.cancelledHeading")
+              : t("booked.heading")}
           </h1>
-          <p className="text-zinc-600">
+          <p className="text-fg-tertiary">
             {booking.status === "CANCELLED"
-              ? "The appointment below is no longer reserved."
-              : `Thanks, ${booking.customer.name.split(" ")[0]} — we've saved your spot.`}
+              ? t("booked.cancelledBody")
+              : t("booked.thanks", {
+                  name: booking.customer.name.split(" ")[0],
+                })}
           </p>
         </header>
 
-        <dl className="flex flex-col gap-1.5 rounded-2xl border border-zinc-200 bg-white p-5 text-sm shadow-sm">
-          <Row label="Service" value={service.name} />
-          <Row label="Barber" value={booking.staff.name} />
+        <dl className="flex flex-col gap-1.5 rounded-2xl border border-line bg-surface p-5 text-sm shadow-sm">
+          <Row label={t("booking.service")} value={service.name} />
+          <Row label={t("booking.barber")} value={booking.staff.name} />
           <Row
-            label="When"
+            label={t("booking.when")}
             value={
               date
-                ? `${formatBookingDate(date, tenant.timezone)} at ${formatSlotTime(booking.startAt, tenant.timezone)}`
+                ? t("booking.dateAtTime", {
+                    date: formatBookingDate(date, tenant.timezone, locale),
+                    time: formatSlotTime(booking.startAt, tenant.timezone),
+                  })
                 : formatSlotTime(booking.startAt, tenant.timezone)
             }
           />
-          <Row label="Duration" value={formatDuration(service.durationMinutes)} />
-          <Row label="Price" value={formatPrice(service.priceMinorUnits)} />
+          <Row
+            label={t("booking.duration")}
+            value={formatDuration(service.durationMinutes, locale)}
+          />
+          <Row
+            label={t("booking.price")}
+            value={formatPrice(service.priceMinorUnits)}
+          />
         </dl>
 
         {booking.status === "CANCELLED" ? null : (
-          <p className="text-sm text-zinc-500">
-            Need to change something? You can{" "}
+          <p className="text-sm text-fg-muted">
+            {t("booked.changeIntro")}{" "}
+            {formatCancellationPolicy(tenant.cancellationWindowMinutes, locale)}{" "}
             <Link
               href={`/b/${slug}/cancel/${booking.cancelToken}`}
-              className="font-medium text-zinc-900 underline underline-offset-4 hover:text-zinc-600"
+              className="font-medium text-fg underline underline-offset-4 hover:text-fg-tertiary"
             >
-              cancel this booking
+              {t("booked.cancelLink")}
             </Link>{" "}
-            {formatCancellationDeadline(tenant.cancellationWindowMinutes)} your
-            appointment. The confirmation email carries the same link.
+            {t("booked.emailHasLink")}
           </p>
         )}
 
         <Link
           href={`/b/${slug}`}
-          className="inline-flex min-h-11 items-center self-start text-sm font-medium text-zinc-900 underline underline-offset-4 hover:text-zinc-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
+          className="inline-flex min-h-11 items-center self-start text-sm font-medium text-fg underline underline-offset-4 hover:text-fg-tertiary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
-          Back to {tenant.name}
+          {t("booking.backTo", { shop: tenant.name })}
         </Link>
       </main>
     </div>
@@ -126,8 +143,8 @@ export default async function BookedPage({ params }: PageProps) {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-4">
-      <dt className="text-zinc-500">{label}</dt>
-      <dd className="text-right font-medium text-zinc-900">{value}</dd>
+      <dt className="text-fg-muted">{label}</dt>
+      <dd className="text-right font-medium text-fg">{value}</dd>
     </div>
   );
 }

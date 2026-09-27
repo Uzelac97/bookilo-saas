@@ -4,17 +4,19 @@ import { DateTime } from "luxon";
 
 import type { BookableSlot } from "@/lib/availability/booking-options";
 import { formatSlotTime } from "@/lib/format";
+import { useT } from "@/lib/i18n/client";
+import type { MessageKey } from "@/lib/i18n/translate";
 
 /**
  * Why groups exist: a 09:00–18:00 shift on a 15-minute grid is ~34 buttons, and
  * an undifferentiated wall of them is hard to scan on a phone. Boundaries are
  * plain wall-clock hours in the tenant's zone, not a Tenant setting.
  */
-const PARTS = [
-  { label: "Morning", untilHour: 12 },
-  { label: "Afternoon", untilHour: 17 },
-  { label: "Evening", untilHour: 24 },
-] as const;
+const PARTS: readonly { label: MessageKey; untilHour: number }[] = [
+  { label: "book.partMorning", untilHour: 12 },
+  { label: "book.partAfternoon", untilHour: 17 },
+  { label: "book.partEvening", untilHour: 24 },
+];
 
 export type SlotGridEmptyReason = "CLOSED" | "FULLY_BOOKED";
 
@@ -33,12 +35,14 @@ export function SlotGrid({
   pending: boolean;
   onSelect: (slot: BookableSlot) => void;
 }) {
+  const t = useT();
+
   if (slots.length === 0) {
     return (
-      <p className="rounded-2xl border border-dashed border-zinc-300 px-4 py-8 text-center text-sm text-zinc-500">
+      <p className="rounded-2xl border border-dashed border-line-strong px-4 py-8 text-center text-sm text-fg-muted">
         {emptyReason === "CLOSED"
-          ? "Closed on this day."
-          : "Fully booked — try another day."}
+          ? t("book.closedOnDay")
+          : t("book.fullyBooked")}
       </p>
     );
   }
@@ -58,14 +62,14 @@ export function SlotGrid({
       {groups.map((group) => (
         <div key={group.label}>
           {groups.length > 1 ? (
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-              {group.label}
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
+              {t(group.label)}
             </h3>
           ) : null}
 
           <div
             role="group"
-            aria-label={`${group.label} times`}
+            aria-label={t("book.slotGroupLabel", { part: t(group.label) })}
             className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-2"
           >
             {group.slots.map((slot) => {
@@ -86,10 +90,10 @@ export function SlotGrid({
                     // 09:00–18:00 shift is thirty-odd of them side by side on a
                     // phone — so they are the ones where an undersized target
                     // actually costs a mis-tap.
-                    "flex min-h-11 items-center justify-center rounded-lg border px-2 text-sm font-medium tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 disabled:cursor-not-allowed",
+                    "flex min-h-11 items-center justify-center rounded-lg border px-2 text-sm font-medium tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed",
                     selected
-                      ? "border-zinc-900 bg-zinc-900 text-white"
-                      : "border-zinc-200 bg-white text-zinc-900 hover:border-zinc-400",
+                      ? "border-primary bg-primary text-on-primary"
+                      : "border-line bg-surface text-fg hover:border-line-stronger",
                   ].join(" ")}
                 >
                   {formatSlotTime(slot.startAt, timezone)}
@@ -111,7 +115,7 @@ export function SlotGrid({
 function groupByPartOfDay(
   slots: BookableSlot[],
   timezone: string,
-): { label: string; slots: BookableSlot[] }[] {
+): { label: MessageKey; slots: BookableSlot[] }[] {
   const groups = PARTS.map((part) => ({
     label: part.label,
     slots: [] as BookableSlot[],

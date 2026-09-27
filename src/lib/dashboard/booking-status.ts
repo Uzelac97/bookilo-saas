@@ -16,10 +16,11 @@
  * need attention.
  */
 import type { BookingStatus } from "@/lib/db/bookings";
+import type { MessageKey } from "@/lib/i18n/translate";
 
-export const STATUS_LABELS: Record<BookingStatus, string | null> = {
+export const STATUS_LABELS: Record<BookingStatus, MessageKey | null> = {
   CONFIRMED: null,
-  CANCELLED: "Cancelled",
-  COMPLETED: "Done",
-  NO_SHOW: "No-show",
+  CANCELLED: "status.cancelled",
+  COMPLETED: "status.completed",
+  NO_SHOW: "status.noShow",
 };

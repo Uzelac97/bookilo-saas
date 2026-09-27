@@ -100,7 +100,7 @@ describe("toTimeOffRange — all day", () => {
 
     expect(result).toEqual({
       ok: false,
-      message: "The last day can't be before the first.",
+      message: "validation.lastDayBeforeFirst",
     });
   });
 
@@ -114,7 +114,7 @@ describe("toTimeOffRange — all day", () => {
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.message).toContain("longer than a year");
+    expect(result.message).toBe("validation.longerThanYear");
   });
 
   it("accepts a span of exactly a year", () => {
@@ -132,7 +132,7 @@ describe("toTimeOffRange — all day", () => {
 
     expect(result).toEqual({
       ok: false,
-      message: "Those dates couldn't be read.",
+      message: "validation.datesUnreadable",
     });
   });
 });
@@ -161,7 +161,7 @@ describe("toTimeOffRange — timed", () => {
 
       expect(result).toEqual({
         ok: false,
-        message: "The end time has to be after the start time.",
+        message: "validation.endBeforeStart",
       });
     }
   });
@@ -178,7 +178,7 @@ describe("toTimeOffRange — timed", () => {
 
       expect(result).toEqual({
         ok: false,
-        message: "Enter a start and an end time.",
+        message: "validation.timesRequired",
       });
     }
   });

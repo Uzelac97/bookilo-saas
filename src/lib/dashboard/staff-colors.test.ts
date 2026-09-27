@@ -65,6 +65,6 @@ describe("staffColor", () => {
   it("falls back to a neutral for an unknown barber", () => {
     // buildDayGrid renders a column for a booking whose barber is missing from
     // the staff list rather than dropping the appointment, so this is reachable.
-    expect(staffColor({}, "nobody")).toBe("bg-zinc-300");
+    expect(staffColor({}, "nobody")).toBe("bg-fill");
   });
 });

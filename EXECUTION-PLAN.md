@@ -282,7 +282,7 @@ de-risks the project; a slightly later demo does not.
 | 14.2 | First-ever Vercel import, env vars set in the dashboard, new Neon branch for production, first `prisma migrate deploy` against it, demo tenant seeded on prod                                                                                                                                                                                                                                                                                                                                   |
 | 14.3 | Prod verification: exclusion constraint re-proven under Neon pooled connections, Auth.js edge/Node split on real Vercel runtime, root-URL fix, full owner + customer click-through on the live URL from a phone                                                                                                                                                                                                                                                                                 |
 | 15   | Security and tenant-isolation audit — the only pre-launch review that runs. Narrow accessibility pass on the public booking page only                                                                                                                                                                                                                                                                                                                                                           |
-| 15a  | i18n (German default, English toggle) + light/dark mode toggle + drag-to-select booking on the calendar. Inserted 13 Aug 2026; i18n is a reversal of an exclusion, the other two are new. See "Decisions recorded after 14.3"                                                                                                                                                                                                                                                                    |
+| 15a  | i18n (German default, English toggle) + light/dark mode toggle + ~~drag-to-select booking on the calendar~~ (cut, decision 9). Inserted 13 Aug 2026; i18n is a reversal of an exclusion, the other two are new. See "Decisions recorded after 14.3" and "Recorded during Phase 15a"                                                                                                                                                                                                              |
 | 16   | `Tenant.vertical` + terminology map, salon demo tenant seed, `DEMO.md`                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | 16a  | Landing page — deliberately last, and deliberately not an SEO surface                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | 17   | Code quality pass — **runs after the first 3–5 real demos, not before**                                                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -407,6 +407,15 @@ code, which is a resolution and is recorded as one.
   tokens are day-first; they render identically today. A test renders every affected
   function under `de-DE`, `fr-FR` and `ar-EG` and asserts the output doesn't move — it
   fails if the pin is removed.
+
+  **Superseded in Phase 15a — the date locale now follows the interface language.** The
+  premise above, "every word this product says is English", stopped being true when the
+  German default shipped. What survives is the part that mattered: the locale is still
+  never taken from the runtime. Every date formatter now takes the interface locale as a
+  required argument (`de` → `de-DE`, `en` → `en-GB`), the same contract as `timezone`,
+  and the test now renders both languages under hostile runtime defaults. Money is
+  unchanged and still pinned to `de-DE` in both languages. Kept rather than rewritten,
+  the same as the other corrections in this file.
 
   **One caller was not a display bug.** `localInstant` in `lib/dashboard/manual-booking.ts`
   detected the spring-forward gap by comparing `toFormat("HH:mm")` against the typed
@@ -715,6 +724,51 @@ on `delete`/`deleteMany` for both models. `onDelete: Restrict` on `Booking` prot
 only rows that had bookings; a never-booked barber could be hard-deleted, and their
 hours and time off would cascade with them. SQL-level cascades from deleting a whole
 Tenant are deliberately not blocked, because the probes' cleanup depends on them.
+
+### Recorded during Phase 15a
+
+Recorded 27 Sep 2026, while implementing items 1 and 2 above. Same format as the
+entries above: what was decided, what it costs.
+
+**9. Drag-to-select (item 3) is cut from Phase 15a.** Item 3's own justification was
+daily-use ergonomics — "the one item of the three that pays off after the demo rather
+than during it" — and it was already marked as the first to cut. The project's stated
+goal is a complete, reviewable portfolio piece (`CLAUDE.md`, Project context), which
+the benefit doesn't serve, while the cost it named stays the same: the highest
+implementation risk of the three items. Cut, not excluded. It is not added to the
+exclusions list, and bringing it back needs only a new entry here, not a reversal.
+
+*Cost:* booking from the calendar stays at its current speed. The existing path is
+clicking an empty slot, which opens the manual booking form prefilled with barber, day
+and time, at 30-minute granularity.
+
+**10. Language and theme are per-browser cookie preferences.** Two cookies, `locale`
+(`de` | `en`) and `theme` (`system` | `light` | `dark`), read server-side in
+the root layout, so the first byte already has the right `lang` and `data-theme`. No
+flash, and no inline script. The toggles appear in the dashboard header and on the
+login page only. A customer on `/b/[slug]` gets German and their OS theme, with no
+switch.
+
+*Cost:* the choice doesn't follow an owner to another device, because storing it per
+user would be a schema change. Per-tenant language is excluded under item 1. A browser
+that has set a preference also carries it onto that shop's public pages, which is how
+an owner previews their page in English. That is harmless, since it identifies nobody.
+
+**11. Emails are always German.** An email is sent after the request that caused it,
+to a recipient whose language is recorded nowhere: customers have no account, and the
+owner-notification recipient isn't the person who clicked. `EMAIL_LOCALE` in
+`lib/email/templates/shell.ts` is a constant, not a parameter.
+
+*Cost:* an owner who uses the dashboard in English still gets German booking
+notifications. A per-recipient language needs a column, which is a schema change and
+its own decision.
+
+**12. The Kastanien marketing page is excluded from both features.** It is the shop's
+own copy, written in English, on a fixed dark palette (`shop-*` tokens, not
+`light-dark()` pairs). It stays English in both languages, carries `lang="en"` on its
+wrapper so screen readers don't read it with German pronunciation, and looks the same
+in both themes. Translating a shop's marketing copy is content work for that shop, not
+app chrome.
 
 ### Deferred out of Day 14
 

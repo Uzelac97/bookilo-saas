@@ -18,6 +18,8 @@ import {
 import type { PublicService } from "@/lib/db/services";
 import type { PublicStaff } from "@/lib/db/staff";
 import { formatDuration, formatPrice, formatSlotTime } from "@/lib/format";
+import { useLocale, useT } from "@/lib/i18n/client";
+import { translateMessage, type MessageKey } from "@/lib/i18n/translate";
 
 /** See the note in service-form.tsx — a "use server" module can't export this. */
 const INITIAL_STATE: ManualBookingState = { status: "idle" };
@@ -59,6 +61,8 @@ export function ManualBookingForm({
   prefill: { staffId?: string; serviceId?: string; time?: string };
 }) {
   const router = useRouter();
+  const t = useT();
+  const locale = useLocale();
   const [navigating, startNavigation] = useTransition();
 
   const [staffId, setStaffId] = useState(
@@ -97,6 +101,9 @@ export function ManualBookingForm({
     context && startAt ? describeConflicts(context, startAt) : [];
 
   const errors = state.status === "invalid" ? state.fieldErrors : {};
+  // Errors arrive as message keys from the shared schema (lib/validation).
+  const errorText = (message: string | undefined) =>
+    message ? translateMessage(t, message) : undefined;
 
   /** A date change needs the server's availability for the new day. */
   function changeDate(next: string) {
@@ -122,7 +129,7 @@ export function ManualBookingForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <Select
           id="barber"
-          label="Barber"
+          label={t("booking.barber")}
           value={staffId}
           onChange={setStaffId}
           options={staff.map((member) => ({
@@ -133,31 +140,31 @@ export function ManualBookingForm({
 
         <Select
           id="service"
-          label="Service"
+          label={t("booking.service")}
           value={serviceId}
           onChange={setServiceId}
           options={services.map((item) => ({
             value: item.id,
-            label: `${item.name} · ${formatDuration(item.durationMinutes)} · ${formatPrice(item.priceMinorUnits)}`,
+            label: `${item.name} · ${formatDuration(item.durationMinutes, locale)} · ${formatPrice(item.priceMinorUnits)}`,
           }))}
         />
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="date-input" className="text-sm font-medium text-zinc-700">
-            Day
+          <label htmlFor="date-input" className="text-sm font-medium text-fg-secondary">
+            {t("manual.day")}
           </label>
           <input
             id="date-input"
             type="date"
             value={date}
             onChange={(event) => changeDate(event.target.value)}
-            className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base text-zinc-900 outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900"
+            className="rounded-lg border border-line-strong bg-surface px-3 py-2 text-base text-fg outline-none focus:border-focus focus:ring-1 focus:ring-focus"
           />
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="time-input" className="text-sm font-medium text-zinc-700">
-            Start time
+          <label htmlFor="time-input" className="text-sm font-medium text-fg-secondary">
+            {t("manual.startTime")}
           </label>
           <input
             id="time-input"
@@ -166,30 +173,30 @@ export function ManualBookingForm({
             onChange={(event) => setTime(event.target.value)}
             aria-invalid={errors.time ? true : undefined}
             className={[
-              "rounded-lg border bg-white px-3 py-2 text-base text-zinc-900 outline-none focus:ring-1",
+              "rounded-lg border bg-surface px-3 py-2 text-base text-fg outline-none focus:ring-1",
               errors.time
-                ? "border-red-400 focus:border-red-500 focus:ring-red-500"
-                : "border-zinc-300 focus:border-zinc-900 focus:ring-zinc-900",
+                ? "border-danger-line-strong focus:border-danger-focus focus:ring-danger-focus"
+                : "border-line-strong focus:border-focus focus:ring-focus",
             ].join(" ")}
           />
           {errors.time ? (
-            <p role="alert" className="text-sm text-red-700">
-              {errors.time}
+            <p role="alert" className="text-sm text-danger">
+              {errorText(errors.time)}
             </p>
           ) : null}
         </div>
       </div>
 
       <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium text-zinc-700">
-          {navigating ? "Loading times…" : "Open times"}
+        <h3 className="text-sm font-medium text-fg-secondary">
+          {navigating ? t("manual.loadingTimes") : t("manual.openTimes")}
         </h3>
 
         {slots.length === 0 ? (
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-fg-muted">
             {member && member.workingHours.length === 0
-              ? "This barber has no hours set for any day."
-              : "Nothing open on this day — you can still type a time below."}
+              ? t("manual.noHoursAtAll")
+              : t("manual.nothingOpen")}
           </p>
         ) : (
           <div
@@ -210,8 +217,8 @@ export function ManualBookingForm({
                   className={[
                     "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors",
                     chosen
-                      ? "border-zinc-900 bg-zinc-900 text-white"
-                      : "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100",
+                      ? "border-primary bg-primary text-on-primary"
+                      : "border-line-strong bg-surface text-fg-secondary hover:bg-subtle",
                   ].join(" ")}
                 >
                   {label}
@@ -227,10 +234,10 @@ export function ManualBookingForm({
           // Warnings, not errors: role="status" rather than "alert", because
           // nothing here has gone wrong and nothing is being refused.
           role="status"
-          className="flex flex-col gap-1 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          className="flex flex-col gap-1 rounded-xl border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning"
         >
           {conflicts.map((conflict) => (
-            <li key={conflict}>{CONFLICT_MESSAGES[conflict]}</li>
+            <li key={conflict}>{t(CONFLICT_MESSAGES[conflict])}</li>
           ))}
         </ul>
       ) : null}
@@ -238,64 +245,61 @@ export function ManualBookingForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
           id="name"
-          label="Customer name"
+          label={t("manual.customerName")}
           autoComplete="off"
-          error={errors.name}
+          error={errorText(errors.name)}
         />
         <Field
           id="phone"
-          label="Phone"
+          label={t("book.phone")}
           type="tel"
           autoComplete="off"
-          hint="Also how the shop recognises a returning customer."
-          error={errors.phone}
+          hint={t("manual.phoneHint")}
+          error={errorText(errors.phone)}
         />
         <Field
           id="email"
-          label="Email"
+          label={t("common.email")}
           type="email"
           autoComplete="off"
-          hint="Optional — sends them a confirmation and a cancel link."
-          error={errors.email}
+          hint={t("manual.emailHint")}
+          error={errorText(errors.email)}
         />
       </div>
 
       {state.status === "taken" ? (
         <p
           role="alert"
-          className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700"
+          className="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger"
         >
-          That barber already has an appointment overlapping this time. Pick
-          another time or another barber.
+          {t("manual.taken")}
         </p>
       ) : null}
 
       {state.status === "impossible_time" ? (
         <p
           role="alert"
-          className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700"
+          className="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger"
         >
-          That time doesn&rsquo;t exist on this day — the clocks go forward. Pick
-          a time before or after the change.
+          {t("manual.impossibleTime")}
         </p>
       ) : null}
 
       {state.status === "error" ? (
         <p
           role="alert"
-          className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700"
+          className="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger"
         >
-          Something went wrong and the booking wasn&rsquo;t saved. Please try
-          again.
+          {t("manual.error")}
         </p>
       ) : null}
 
       <button
         type="submit"
         disabled={pending || !staffId || !serviceId || !time}
-        className="w-fit rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-fit rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-on-primary transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {pending ? "Saving…" : "Create booking"}
+        {pending ? t("common.saving") : t("manual.submit")}
       </button>
     </form>
   );
@@ -309,12 +313,11 @@ export function ManualBookingForm({
  * be booked" — because a message that sounds like a refusal in front of a button
  * that works is worse than no message.
  */
-const CONFLICT_MESSAGES: Record<ManualBookingConflict, string> = {
-  OVERLAPS_BOOKING:
-    "This barber already has something booked over this time — the shop's own rules will reject it.",
-  DURING_TIME_OFF: "This falls inside time off for this barber.",
-  OUTSIDE_HOURS: "This is outside this barber's working hours for that day.",
-  IN_THE_PAST: "This time has already passed.",
+const CONFLICT_MESSAGES: Record<ManualBookingConflict, MessageKey> = {
+  OVERLAPS_BOOKING: "manual.conflictOverlaps",
+  DURING_TIME_OFF: "manual.conflictTimeOff",
+  OUTSIDE_HOURS: "manual.conflictOutsideHours",
+  IN_THE_PAST: "manual.conflictPast",
 };
 
 function Select({
@@ -332,7 +335,7 @@ function Select({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium text-zinc-700">
+      <label htmlFor={id} className="text-sm font-medium text-fg-secondary">
         {label}
       </label>
       <select
@@ -341,7 +344,7 @@ function Select({
         onChange={(event) => onChange(event.target.value)}
         // Same explicit bg/text as the shared Field, and for the same reason —
         // Tailwind's preflight resets form controls to inherited colours.
-        className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base text-zinc-900 outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900"
+        className="rounded-lg border border-line-strong bg-surface px-3 py-2 text-base text-fg outline-none focus:border-focus focus:ring-1 focus:ring-focus"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>

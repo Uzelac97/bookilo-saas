@@ -22,6 +22,8 @@ import {
   formatTimeRange,
   initials,
 } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
+import type { Translator } from "@/lib/i18n/translate";
 
 /**
  * The chrome and text metrics each density tier is allowed, and the content it
@@ -73,10 +75,10 @@ const ACCENT_WIDTH = "w-1";
  * cancellations, which is why the shared labels keep theirs.
  */
 const STATUS_BLOCK_STYLES: Record<DashboardBooking["status"], string> = {
-  CONFIRMED: "border-zinc-300 bg-white text-zinc-900",
-  CANCELLED: "border-zinc-200 bg-zinc-50 text-zinc-500 line-through",
-  COMPLETED: "border-emerald-200 bg-emerald-50 text-emerald-900",
-  NO_SHOW: "border-amber-200 bg-amber-100 text-amber-900",
+  CONFIRMED: "border-line-strong bg-surface text-fg",
+  CANCELLED: "border-line bg-canvas text-fg-muted line-through",
+  COMPLETED: "border-success-line bg-success-soft text-success-strong",
+  NO_SHOW: "border-warning-line-soft bg-warning-muted text-warning",
 };
 
 /**
@@ -90,7 +92,7 @@ const STATUS_BLOCK_STYLES: Record<DashboardBooking["status"], string> = {
  * that logic in a component is exactly how the two would drift apart at a DST
  * boundary and put an afternoon on the wrong rows.
  */
-export function CalendarGrid({
+export async function CalendarGrid({
   grid,
   timezone,
   staffColors,
@@ -122,7 +124,12 @@ export function CalendarGrid({
    */
   slotHref?: (columnKey: string, minute: number) => string;
 }) {
-  if (grid.columns.length === 0) return <CalendarEmptyState />;
+  // Resolved once and handed down: the helpers below are plain functions
+  // rendered many times over, and one translator for the whole grid keeps
+  // them synchronous.
+  const t = await getT();
+
+  if (grid.columns.length === 0) return <CalendarEmptyState t={t} />;
 
   const template = `${AXIS_WIDTH} repeat(${grid.columns.length}, minmax(${MIN_COLUMN_WIDTH}, ${MAX_COLUMN_WIDTH}))`;
 
@@ -145,7 +152,7 @@ export function CalendarGrid({
     // would simply put the emptiness back on the right-hand side, which is the
     // thing it was added to avoid. Centred, the slack is split evenly and the
     // card reads as deliberately compact instead of unfinished.
-    <div className="mx-auto w-fit max-w-full overflow-x-auto rounded-2xl border border-zinc-200 bg-white">
+    <div className="mx-auto w-fit max-w-full overflow-x-auto rounded-2xl border border-line bg-surface">
       <div
         // Below this width the columns stop shrinking and the wrapper — headers,
         // hour rules and all — grows past the viewport into the scroll above,
@@ -167,7 +174,7 @@ export function CalendarGrid({
       >
         <div
           style={{ gridTemplateColumns: template }}
-          className="grid border-b border-zinc-200"
+          className="grid border-b border-line"
         >
           <div aria-hidden="true" />
           {grid.columns.map((column) => (
@@ -189,16 +196,16 @@ export function CalendarGrid({
               key={mark.minute}
               aria-hidden="true"
               style={{ top: `${mark.topPercent}%`, left: AXIS_WIDTH }}
-              className="absolute right-0 border-t border-zinc-100"
+              className="absolute right-0 border-t border-line-faint"
             />
           ))}
 
-          <div className="relative border-r border-zinc-200">
+          <div className="relative border-r border-line">
             {grid.hourMarks.map((mark) => (
               <span
                 key={mark.minute}
                 style={{ top: `${mark.topPercent}%` }}
-                className={`absolute right-2 font-mono text-[11px] tabular-nums text-zinc-400 ${labelShift(mark.topPercent)}`}
+                className={`absolute right-2 font-mono text-[11px] tabular-nums text-fg-faint ${labelShift(mark.topPercent)}`}
               >
                 {mark.label}
               </span>
@@ -214,6 +221,7 @@ export function CalendarGrid({
               staffColors={staffColors}
               showBarber={showBarber}
               slotHref={slotHref}
+              t={t}
             />
           ))}
         </div>
@@ -229,12 +237,12 @@ function ColumnHeader({ column }: { column: GridColumn }) {
       className={[
         "flex min-w-0 flex-col gap-0.5 px-2 py-2.5 text-sm",
         // `highlight` is today in the week view.
-        column.highlight ? "bg-zinc-100 font-semibold text-zinc-900" : "",
+        column.highlight ? "bg-subtle font-semibold text-fg" : "",
         // `muted` is a barber who no longer works at the shop but still has
         // appointments on the books — those bookings are real and cannot be
         // hidden, so the column is dimmed rather than dropped.
-        column.muted ? "text-zinc-400" : "",
-        !column.highlight && !column.muted ? "text-zinc-900" : "",
+        column.muted ? "text-fg-faint" : "",
+        !column.highlight && !column.muted ? "text-fg" : "",
       ].join(" ")}
     >
       <span className="truncate">{column.label}</span>
@@ -242,7 +250,7 @@ function ColumnHeader({ column }: { column: GridColumn }) {
         <span
           className={[
             "truncate text-xs",
-            column.muted ? "text-zinc-400" : "text-zinc-500",
+            column.muted ? "text-fg-faint" : "text-fg-muted",
           ].join(" ")}
         >
           {column.sublabel}
@@ -273,6 +281,7 @@ function ColumnBody({
   staffColors,
   showBarber,
   slotHref,
+  t,
 }: {
   column: GridColumn;
   grid: CalendarGridModel;
@@ -280,16 +289,17 @@ function ColumnBody({
   staffColors: Record<string, string>;
   showBarber: boolean;
   slotHref: ((columnKey: string, minute: number) => string) | undefined;
+  t: Translator;
 }) {
   return (
     <div
       className={[
-        "relative border-r border-zinc-200 last:border-r-0",
-        column.highlight ? "bg-zinc-50" : "",
+        "relative border-r border-line last:border-r-0",
+        column.highlight ? "bg-canvas" : "",
       ].join(" ")}
     >
       {slotHref ? (
-        <SlotLinks column={column} grid={grid} slotHref={slotHref} />
+        <SlotLinks column={column} grid={grid} slotHref={slotHref} t={t} />
       ) : null}
 
       <ol
@@ -303,6 +313,7 @@ function ColumnBody({
             timezone={timezone}
             staffColors={staffColors}
             showBarber={showBarber}
+            t={t}
           />
         ))}
       </ol>
@@ -334,10 +345,12 @@ function SlotLinks({
   column,
   grid,
   slotHref,
+  t,
 }: {
   column: GridColumn;
   grid: CalendarGridModel;
   slotHref: (columnKey: string, minute: number) => string;
+  t: Translator;
 }) {
   const span = grid.endMinute - grid.startMinute;
   if (span <= 0) return null;
@@ -362,12 +375,15 @@ function SlotLinks({
             href={slotHref(column.key, minute)}
             // The column label is in the name because in the week view a column
             // is a day, and "New booking at 09:30" seven times over says nothing.
-            aria-label={`New booking, ${column.label} at ${label}`}
+            aria-label={t("calendar.slotLink", {
+              column: column.label,
+              time: label,
+            })}
             style={{
               top: `${((minute - grid.startMinute) / span) * 100}%`,
               height: `${(SLOT_TARGET_MINUTES / span) * 100}%`,
             }}
-            className="absolute inset-x-0 transition-colors hover:bg-zinc-100 focus-visible:bg-zinc-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-zinc-900"
+            className="absolute inset-x-0 transition-colors hover:bg-subtle focus-visible:bg-subtle focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
           />
         );
       })}
@@ -380,11 +396,13 @@ function BookingBlock({
   timezone,
   staffColors,
   showBarber,
+  t,
 }: {
   placed: PlacedBooking;
   timezone: string;
   staffColors: Record<string, string>;
   showBarber: boolean;
+  t: Translator;
 }) {
   const { booking, lane, laneCount } = placed;
   const statusLabel = STATUS_LABELS[booking.status];
@@ -405,8 +423,8 @@ function BookingBlock({
     formatTimeRange(booking.startAt, booking.endAt, timezone),
     booking.customer.name,
     booking.service.name,
-    statusLabel,
-    walkIn ? "Walk-in" : null,
+    statusLabel ? t(statusLabel) : null,
+    walkIn ? t("dashboard.walkIn") : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -528,19 +546,19 @@ function BookingBlock({
 }
 
 /** Shown when the shop has no barbers yet — a new shop's calendar, not an error. */
-function CalendarEmptyState() {
+function CalendarEmptyState({ t }: { t: Translator }) {
   return (
-    <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-8 text-center">
-      <p className="font-medium text-zinc-900">No barbers yet</p>
-      <p className="mt-1 text-sm text-zinc-500">
-        Add someone on the{" "}
+    <div className="rounded-2xl border border-dashed border-line-strong bg-surface p-8 text-center">
+      <p className="font-medium text-fg">{t("calendar.emptyTitle")}</p>
+      <p className="mt-1 text-sm text-fg-muted">
+        {t("calendar.emptyBodyBefore")}{" "}
         <Link
           href="/dashboard/staff"
-          className="font-medium text-zinc-900 underline underline-offset-4"
+          className="font-medium text-fg underline underline-offset-4"
         >
-          staff page
+          {t("calendar.emptyBodyLink")}
         </Link>{" "}
-        and their day shows up here.
+        {t("calendar.emptyBodyAfter")}
       </p>
     </div>
   );

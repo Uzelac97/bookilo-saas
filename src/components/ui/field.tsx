@@ -34,7 +34,7 @@ export function Field({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium text-zinc-700">
+      <label htmlFor={id} className="text-sm font-medium text-fg-secondary">
         {label}
       </label>
       <input
@@ -53,27 +53,29 @@ export function Field({
           // text-base, not text-sm — iOS Safari zooms the viewport on focus for
           // anything under 16px, and this is demoed on a phone.
           //
-          // bg-white and text-zinc-900 are stated rather than inherited on
+          // bg-surface and text-fg are stated rather than inherited on
           // purpose. Tailwind's preflight resets form controls to
           // `color: inherit; background-color: #0000`, so without these an input
           // renders in whatever colour an ancestor happens to carry — which is
           // how a leftover dark-mode block in globals.css once made these fields
-          // near-white text on a white card. Naming both here means a future
-          // change to body colour can't reach back into this input.
+          // near-white text on a white card. Body colour now changes with the
+          // theme by design, so this matters more, not less: naming both tokens
+          // here keeps text and background flipping together, from one source.
+          // src/app/theme-tokens.test.ts fails if any form control drops either.
           // py-2.5 rather than py-2: with a 16px line that is a 46px control,
           // over the 44px touch minimum the rest of this flow now holds to.
-          "rounded-lg border bg-white px-3 py-2.5 text-base text-zinc-900 outline-none focus:ring-1",
+          "rounded-lg border bg-surface px-3 py-2.5 text-base text-fg outline-none focus:ring-1",
           error
-            ? "border-red-400 focus:border-red-500 focus:ring-red-500"
-            : "border-zinc-300 focus:border-zinc-900 focus:ring-zinc-900",
+            ? "border-danger-line-strong focus:border-danger-focus focus:ring-danger-focus"
+            : "border-line-strong focus:border-focus focus:ring-focus",
         ].join(" ")}
       />
       {error ? (
-        <p id={`${id}-error`} role="alert" className="text-sm text-red-700">
+        <p id={`${id}-error`} role="alert" className="text-sm text-danger">
           {error}
         </p>
       ) : hint ? (
-        <p id={`${id}-hint`} className="text-sm text-zinc-500">
+        <p id={`${id}-hint`} className="text-sm text-fg-muted">
           {hint}
         </p>
       ) : null}

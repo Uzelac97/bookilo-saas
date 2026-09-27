@@ -11,6 +11,8 @@ import {
 import { Field } from "@/components/ui/field";
 import type { ManagedService } from "@/lib/db/services";
 import { formatPriceInput } from "@/lib/format";
+import { useT } from "@/lib/i18n/client";
+import { translateMessage } from "@/lib/i18n/translate";
 
 /**
  * Lives here rather than next to the action: a "use server" module turns every
@@ -33,6 +35,7 @@ const INITIAL_STATE: ServiceFormState = { status: "idle" };
  */
 export function ServiceForm({ service }: { service?: ManagedService }) {
   const editing = service !== undefined;
+  const t = useT();
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState<
     ServiceFormState,
@@ -48,6 +51,9 @@ export function ServiceForm({ service }: { service?: ManagedService }) {
   }, [state]);
 
   const errors = state.status === "invalid" ? state.fieldErrors : {};
+  // Errors arrive as message keys from the shared schema (lib/validation).
+  const errorText = (message: string | undefined) =>
+    message ? translateMessage(t, message) : undefined;
 
   return (
     <form ref={formRef} action={formAction} className="flex flex-col gap-4">
@@ -61,59 +67,59 @@ export function ServiceForm({ service }: { service?: ManagedService }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
           id="name"
-          label="Name"
+          label={t("services.name")}
           defaultValue={service?.name}
-          placeholder="Haircut"
-          error={errors.name}
+          placeholder={t("services.namePlaceholder")}
+          error={errorText(errors.name)}
         />
         <Field
           id="category"
-          label="Category"
+          label={t("services.category")}
           defaultValue={service?.category ?? ""}
-          placeholder="Hair"
-          hint="Optional — groups services on your public page."
-          error={errors.category}
+          placeholder={t("services.categoryPlaceholder")}
+          hint={t("services.categoryHint")}
+          error={errorText(errors.category)}
         />
         <Field
           id="durationMinutes"
-          label="Length in minutes"
+          label={t("services.length")}
           inputMode="numeric"
           defaultValue={service ? String(service.durationMinutes) : ""}
           placeholder="30"
-          hint="How long the chair is taken for."
-          error={errors.durationMinutes}
+          hint={t("services.lengthHint")}
+          error={errorText(errors.durationMinutes)}
         />
         <Field
           id="priceMinorUnits"
-          label="Price in €"
+          label={t("services.price")}
           inputMode="decimal"
           defaultValue={service ? formatPriceInput(service.priceMinorUnits) : ""}
           placeholder="25,00"
-          error={errors.priceMinorUnits}
+          error={errorText(errors.priceMinorUnits)}
         />
       </div>
 
       {state.status === "created" ? (
         <p
           role="status"
-          className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+          className="rounded-lg bg-success-soft px-3 py-2 text-sm text-success"
         >
-          “{state.name}” added.
+          {t("services.added", { name: state.name })}
         </p>
       ) : null}
 
       {state.status === "gone" ? (
         <p
           role="alert"
-          className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          className="rounded-lg bg-warning-soft px-3 py-2 text-sm text-warning"
         >
-          That service no longer exists. Reload the page.
+          {t("services.gone")}
         </p>
       ) : null}
 
       {state.status === "error" ? (
-        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-          Something went wrong and nothing was saved. Please try again.
+        <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
+          {t("common.saveError")}
         </p>
       ) : null}
 
@@ -121,23 +127,23 @@ export function ServiceForm({ service }: { service?: ManagedService }) {
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
         >
           {pending
             ? editing
-              ? "Saving…"
-              : "Adding…"
+              ? t("common.saving")
+              : t("common.adding")
             : editing
-              ? "Save changes"
-              : "Add service"}
+              ? t("common.saveChanges")
+              : t("services.submitAdd")}
         </button>
 
         {editing ? (
           <Link
             href="/dashboard/services"
-            className="text-sm text-zinc-500 underline-offset-4 hover:text-zinc-900 hover:underline"
+            className="text-sm text-fg-muted underline-offset-4 hover:text-fg hover:underline"
           >
-            Cancel
+            {t("common.cancel")}
           </Link>
         ) : null}
       </div>
@@ -145,10 +151,8 @@ export function ServiceForm({ service }: { service?: ManagedService }) {
       {editing ? (
         // Stated where the decision is made, because it is the question an owner
         // asks the moment they change a price and look at yesterday's total.
-        <p className="text-sm text-zinc-500">
-          Changing the length leaves existing appointments as they were booked.
-          Changing the price also changes the revenue shown for past
-          appointments.
+        <p className="text-sm text-fg-muted">
+          {t("services.editNote")}
         </p>
       ) : null}
     </form>

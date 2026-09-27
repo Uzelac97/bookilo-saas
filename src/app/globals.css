@@ -1,24 +1,130 @@
 @import "tailwindcss";
 
+/* ------------------------------------------------------------------------
+   THEME: ONE PROPERTY DECIDES IT.
+
+   `color-scheme` is the switch for everything. It governs the browser-painted
+   chrome — scrollbars, autofill shading, the date/time picker panel, select
+   popups, spin buttons, the text caret — and, through `light-dark()`, it also
+   picks every colour token in the palette below. Chrome and palette therefore
+   cannot disagree: there is no second place that could say "dark" while this
+   one says "light".
+
+   No cookie → `data-theme` is absent → `light dark` → the OS preference wins.
+   The toggle's explicit choice lands as `data-theme` on <html>, set server-side
+   from the cookie in app/layout.tsx, so the first byte is already right and no
+   inline script is needed to avoid a flash.
+
+   There is deliberately no `@media (prefers-color-scheme)` block anywhere in
+   this file. The last one here was create-next-app residue that flipped two
+   variables and rendered white-on-white form text — see the note above `body`
+   below, and components/ui/field.tsx.
+   ------------------------------------------------------------------------ */
 :root {
-  /* This app is light-only by design: every surface picks an explicit Tailwind
-     colour (bg-white, bg-zinc-50, text-zinc-900), so there is no dark theme for
-     the browser to cooperate with. Declaring it stops native form controls and
-     other UA-painted chrome — scrollbars, autofill shading, the date/time picker
-     panel, select popups, spin buttons, the text caret — from following the OS
-     preference into a dark palette that clashes with a white page.
+  color-scheme: light dark;
+}
 
-     This alone does NOT fix dark-mode input text; see the note below. Both
-     changes are needed, for two different halves of the same symptom. */
+:root[data-theme="light"] {
   color-scheme: light;
+}
 
-  --background: #ffffff;
-  --foreground: #171717;
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* ------------------------------------------------------------------------
+   THE PRODUCT PALETTE — every colour the dashboard, login and booking flow use.
+
+   The whole palette, not two variables: each token below replaces one Tailwind
+   shade the app used to name directly, one to one. The light ground and body
+   text (surface, canvas, fg) are warm stone rather than zinc, so the light
+   theme reads less clinical. Muted and faint text and the strong borders were
+   darkened for contrast (below). Every other light value is still the zinc
+   shade it replaced, noted where it isn't obvious.
+
+   Components name these tokens (bg-surface, text-fg, border-line) and never a
+   raw zinc/white/red/amber/emerald shade; src/app/theme-tokens.test.ts fails the
+   build if one creeps back in, because a raw shade is the one thing that cannot
+   follow the theme.
+
+   Each token is `light-dark(<light>, <dark>)`. Text is held to WCAG AA
+   (4.5:1) against every ground it sits on — surface, canvas and subtle — with
+   a margin, because a pair measured at 4.43 is a pair that fails the next time
+   a ground shifts, as canvas did when it moved to stone. `-faint` is included:
+   it carries real body-size text ("Geschlossen" on the public opening hours),
+   so "faint" means lightest-that-still-passes, not decorative. `-disabled` is
+   exempt as inactive UI (WCAG 1.4.3).
+
+   `line-strong` is the border that outlines form fields and buttons, so it
+   is held to the 3:1 WCAG 1.4.11 asks of a control's boundary, against the
+   grounds a control sits on (surface, canvas). `line-stronger` stays darker
+   than it, so the scale keeps reading in order. `line` and `line-faint`
+   are dividers, which 1.4.11 doesn't cover.
+   ------------------------------------------------------------------------ */
+@theme {
+  /* Surfaces. In light, cards (surface) sit lighter than the page (canvas); in
+     dark the order is kept — cards lift off a darker ground. */
+  --color-surface: light-dark(#fefefe, #18181b);
+  --color-canvas: light-dark(#f5f5f4, #0c0c0e); /* stone-100 */
+  --color-subtle: light-dark(#f4f4f5, #27272a); /* zinc-100: hovers, chips */
+  --color-subtle-strong: light-dark(#e4e4e7, #2f2f35); /* zinc-200 */
+  --color-fill: light-dark(#d4d4d8, #52525b); /* zinc-300: neutral marks */
+  --color-fill-strong: light-dark(#a1a1aa, #71717a); /* zinc-400 */
+
+  /* Text, strongest to weakest. */
+  --color-fg: light-dark(#292524, #fafafa); /* stone-800 */
+  --color-fg-secondary: light-dark(#3f3f46, #d4d4d8); /* zinc-700 */
+  --color-fg-tertiary: light-dark(#52525b, #b8b8c0); /* zinc-600 */
+  /* Light: between zinc-500 and -600. ≥6.0:1 on all three grounds, well clear
+     of AA and of faint below it. */
+  --color-fg-muted: light-dark(#5c5c65, #a1a1aa);
+  /* Between zinc-400 and -500 in both themes. ≥4.65:1 on all three grounds in
+     each, and still a step below muted in each. */
+  --color-fg-faint: light-dark(#6d6d76, #8f8f98);
+  --color-fg-disabled: light-dark(#d4d4d8, #52525b); /* zinc-300 */
+
+  /* Borders and dividers. */
+  --color-line-faint: light-dark(#f4f4f5, #232327); /* zinc-100 */
+  --color-line: light-dark(#e4e4e7, #2f2f35); /* zinc-200 */
+  /* Form-field and button outlines: ≥3.1:1 on surface and canvas, both themes. */
+  --color-line-strong: light-dark(#8a8a93, #66666f);
+  --color-line-stronger: light-dark(#71717a, #71717a); /* zinc-500 */
+
+  /* The primary action and selected state. Inverts in dark — a light button on
+     a dark page — which is what keeps it the strongest thing on the screen. */
+  --color-primary: light-dark(#18181b, #fafafa); /* zinc-900 */
+  --color-primary-hover: light-dark(#27272a, #e4e4e7); /* zinc-800 */
+  --color-on-primary: light-dark(#ffffff, #18181b);
+  --color-focus: light-dark(#18181b, #fafafa); /* focus rings and outlines */
+
+  /* Danger (red): errors, destructive actions. */
+  --color-danger: light-dark(#b91c1c, #fca5a5); /* red-700 */
+  --color-danger-soft: light-dark(#fef2f2, #341416); /* red-50 */
+  --color-danger-line: light-dark(#fca5a5, #7f1d1d); /* red-300 */
+  --color-danger-line-strong: light-dark(#f87171, #b91c1c); /* red-400 */
+  --color-danger-focus: light-dark(#ef4444, #ef4444); /* red-500 */
+
+  /* Warning (amber): notices, no-shows, confirm-before-you-do-it panels. */
+  --color-warning: light-dark(#78350f, #fcd34d); /* amber-900 */
+  --color-warning-secondary: light-dark(#92400e, #fbbf24); /* amber-800 */
+  --color-warning-soft: light-dark(#fffbeb, #2e2108); /* amber-50 */
+  --color-warning-muted: light-dark(#fef3c7, #3d2c0b); /* amber-100 */
+  --color-warning-line: light-dark(#fcd34d, #78350f); /* amber-300 */
+  --color-warning-line-soft: light-dark(#fde68a, #553c10); /* amber-200 */
+  --color-warning-solid: light-dark(#78350f, #fcd34d); /* amber-900 fill */
+  --color-warning-solid-hover: light-dark(#92400e, #fde68a); /* amber-800 */
+  --color-on-warning: light-dark(#ffffff, #1c1917);
+
+  /* Success (emerald): saved, completed. */
+  --color-success: light-dark(#065f46, #6ee7b7); /* emerald-800 */
+  --color-success-strong: light-dark(#064e3b, #a7f3d0); /* emerald-900 */
+  --color-success-secondary: light-dark(#047857, #34d399); /* emerald-700 */
+  --color-success-soft: light-dark(#ecfdf5, #0b2a20); /* emerald-50 */
+  --color-success-muted: light-dark(#d1fae5, #0f3a2b); /* emerald-100 */
+  --color-success-line: light-dark(#a7f3d0, #065f46); /* emerald-200 */
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
@@ -26,23 +132,22 @@
      The shop's palette — Kastanien Barbershop's marketing page only.
 
      PURELY ADDITIVE. Nothing above is redefined and no existing utility
-     changes meaning: the dashboard and the booking flow keep picking explicit
-     Tailwind colours (bg-white, bg-zinc-50, text-zinc-900) and never name a
-     `shop-*` token. Prefixed for exactly that reason — these are one page's
-     palette, not the product's, and Phase 16a's landing page should not
-     inherit a barbershop's browns by accident.
+     changes meaning: the dashboard and the booking flow use the product
+     palette above and never name a `shop-*` token. Prefixed for exactly that
+     reason — these are one page's palette, not the product's, and Phase 16a's
+     landing page should not inherit a barbershop's browns by accident.
 
      Warm neutrals rather than the app's cool zinc, because this page is the
      shop's front door and not a tool. `brass` is the single accent and stays
      rationed: CTAs, section eyebrows, and the placeholder frames. Washing it
      across a surface is what makes an accent stop being one.
 
-     THIS IS NOT A DARK THEME and does not start one. `color-scheme: light`
-     above stays as it is — it governs browser-painted chrome (scrollbars,
-     autofill, pickers, the caret), and this page has no form controls for it
-     to reach. Nothing here responds to prefers-color-scheme; the dark surfaces
-     are painted by this page's own classes. Phase 15a's light/dark toggle is
-     untouched by it.
+     THIS IS NOT A DARK THEME, and the app's theme does not reach it. These
+     are fixed hex values, not light-dark() pairs: the page is dark in both
+     themes because the shop's front door is dark, not because the viewer
+     chose dark. The only thing the theme still governs here is the
+     browser-painted scrollbar, and this page has no form controls for
+     `color-scheme` to reach beyond that.
      ------------------------------------------------------------------ */
   --color-shop-ink: #17130f; /* deep espresso — the page ground */
   --color-shop-walnut: #271f17; /* raised surfaces: cards, placeholder fill */
@@ -111,10 +216,13 @@
    that, because preflight has already overridden the UA's fieldtext/field values
    the property governs.
 
-   Nothing else in the app responds to prefers-color-scheme, so a dark theme was
-   never half-built — this was scaffold residue that only surfaced once real form
-   inputs existed. If a dark theme is ever wanted, it needs the whole palette,
-   not two variables. */
+   THE SAME RESET STILL APPLIES TO THE DARK THEME THAT REPLACED IT. Body colour
+   now legitimately changes with the theme, so any form control that doesn't
+   name its own colours inherits whatever its ancestor carries. The rule that
+   keeps this from recurring: every <input>, <select> and <textarea> states
+   both a background and a text token itself (bg-surface text-fg in
+   components/ui/field.tsx and its siblings). src/app/theme-tokens.test.ts
+   enforces it. */
 
 /* NO font-family HERE, DELIBERATELY. The scaffold left `font-family: Arial,
    Helvetica, sans-serif` on this rule, and it silently beat the Geist font the
@@ -131,8 +239,8 @@
    Setting it here again would only recreate the same override, one typeface
    later. */
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--color-surface);
+  color: var(--color-fg);
 }
 
 /* Smooth anchor scrolling, the marketing page only.

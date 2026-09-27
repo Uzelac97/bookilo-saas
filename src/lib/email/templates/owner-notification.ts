@@ -5,7 +5,13 @@ import {
   formatSlotTime,
 } from "@/lib/format";
 
-import { renderHtml, renderText, type EmailContent } from "./shell";
+import {
+  EMAIL_LOCALE,
+  emailT as t,
+  renderHtml,
+  renderText,
+  type EmailContent,
+} from "./shell";
 import type { RenderedEmail } from "./booking-confirmation";
 import { localDate } from "./when";
 
@@ -28,39 +34,52 @@ export function renderOwnerNotification(
   const date = localDate(booking.startAt, tenant.timezone);
   const time = formatSlotTime(booking.startAt, tenant.timezone);
 
+  const when = t("booking.dateAtTime", { date, time });
+
   const rows = [
-    { label: "Customer", value: booking.customer.name },
-    { label: "Phone", value: customerPhone },
+    { label: t("email.customer"), value: booking.customer.name },
+    { label: t("book.phone"), value: customerPhone },
   ];
 
   // Email is optional on the booking form, so its absence is normal and worth
   // stating plainly — an owner seeing no email row would wonder if it was lost.
   rows.push({
-    label: "Email",
-    value: booking.customer.email ?? "not given",
+    label: t("common.email"),
+    value: booking.customer.email ?? t("email.notGiven"),
   });
 
   rows.push(
-    { label: "Service", value: service.name },
-    { label: "Barber", value: booking.staff.name },
-    { label: "When", value: `${date} at ${time}` },
-    { label: "Duration", value: formatDuration(service.durationMinutes) },
-    { label: "Price", value: formatPrice(service.priceMinorUnits) },
+    { label: t("booking.service"), value: service.name },
+    { label: t("booking.barber"), value: booking.staff.name },
+    { label: t("booking.when"), value: when },
+    {
+      label: t("booking.duration"),
+      value: formatDuration(service.durationMinutes, EMAIL_LOCALE),
+    },
+    { label: t("booking.price"), value: formatPrice(service.priceMinorUnits) },
   );
 
   const content: EmailContent = {
-    heading: "New booking",
-    lead: `${booking.customer.name} booked ${service.name} with ${booking.staff.name} on ${date} at ${time}.`,
+    heading: t("email.ownerHeading"),
+    lead: t("email.ownerLead", {
+      customer: booking.customer.name,
+      service: service.name,
+      barber: booking.staff.name,
+      when,
+    }),
     rows,
     footerLines: [
       booking.customer.email
-        ? "The customer has been sent a confirmation with a cancellation link."
-        : "No email was given, so the customer has no confirmation and no cancellation link — they'll need to call to change anything.",
+        ? t("email.ownerCustomerNotified")
+        : t("email.ownerCustomerNoEmail"),
     ],
   };
 
   return {
-    subject: `New booking: ${booking.customer.name}, ${date} at ${time}`,
+    subject: t("email.ownerSubject", {
+      customer: booking.customer.name,
+      when,
+    }),
     html: renderHtml(content),
     text: renderText(content),
   };

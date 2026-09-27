@@ -2,6 +2,7 @@
 
 import type { StripDay } from "@/lib/availability/booking-options";
 import { formatStripDay } from "@/lib/format";
+import { useLocale, useT } from "@/lib/i18n/client";
 
 /**
  * The seven-day date picker. Dumb by design: `days` arrives already built by
@@ -27,10 +28,13 @@ export function DateStrip({
   onSelect: (date: string) => void;
   onPage: (weeks: number) => void;
 }) {
+  const t = useT();
+  const locale = useLocale();
+
   return (
     <div className="flex items-center gap-2">
       <PageButton
-        label="Previous week"
+        label={t("book.previousWeek")}
         glyph="‹"
         disabled={!canGoBack || pending}
         onClick={() => onPage(-1)}
@@ -38,14 +42,14 @@ export function DateStrip({
 
       <div
         role="group"
-        aria-label="Choose a date"
+        aria-label={t("book.chooseDate")}
         // scrollbar-hide is ours, defined in app/globals.css — it hides the bar
         // without touching the scrolling. The ‹ › buttons flanking this strip
         // are what tell the customer there is more week either side.
         className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto scrollbar-hide"
       >
         {days.map((day) => {
-          const { weekday, dayOfMonth } = formatStripDay(day.date, timezone);
+          const { weekday, dayOfMonth } = formatStripDay(day.date, timezone, locale);
           const selected = day.date === selectedDate;
 
           return (
@@ -59,16 +63,16 @@ export function DateStrip({
               disabled={!day.bookable || pending}
               onClick={() => onSelect(day.date)}
               className={[
-                "flex min-h-14 min-w-13 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border px-2 py-2.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900",
+                "flex min-h-14 min-w-13 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl border px-2 py-2.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
                 selected
-                  ? "border-zinc-900 bg-zinc-900 text-white"
+                  ? "border-primary bg-primary text-on-primary"
                   : day.bookable
-                    ? "border-zinc-200 bg-white text-zinc-900 hover:border-zinc-400"
-                    : "cursor-not-allowed border-zinc-100 bg-zinc-50 text-zinc-300",
+                    ? "border-line bg-surface text-fg hover:border-line-stronger"
+                    : "cursor-not-allowed border-line-faint bg-canvas text-fg-disabled",
               ].join(" ")}
             >
               <span className="text-xs font-medium uppercase tracking-wide opacity-70">
-                {day.isToday ? "Today" : weekday}
+                {day.isToday ? t("nav.today") : weekday}
               </span>
               <span className="text-base font-semibold tabular-nums">
                 {dayOfMonth}
@@ -79,7 +83,7 @@ export function DateStrip({
       </div>
 
       <PageButton
-        label="Next week"
+        label={t("book.nextWeek")}
         glyph="›"
         disabled={!canGoForward || pending}
         onClick={() => onPage(1)}
@@ -105,7 +109,7 @@ function PageButton({
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="flex min-h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-white text-lg leading-none text-zinc-600 transition-colors hover:border-zinc-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-zinc-200"
+      className="flex min-h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-lg leading-none text-fg-tertiary transition-colors hover:border-line-stronger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-line"
     >
       {glyph}
     </button>

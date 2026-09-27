@@ -75,5 +75,5 @@ export function staffColor(
   colors: Record<string, string>,
   staffId: string,
 ): string {
-  return colors[staffId] ?? "bg-zinc-300";
+  return colors[staffId] ?? "bg-fill";
 }

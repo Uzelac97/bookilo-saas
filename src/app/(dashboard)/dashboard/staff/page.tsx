@@ -4,10 +4,12 @@ import { StaffForm } from "@/components/dashboard/staff-form";
 import { StaffList } from "@/components/dashboard/staff-list";
 import { getCurrentTenant } from "@/lib/auth/session";
 import { getStaffForManagement } from "@/lib/db/staff";
+import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = {
-  title: "Staff",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t("nav.staff") };
+}
 
 type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -33,22 +35,22 @@ export default async function StaffPage({ searchParams }: PageProps) {
   const tenant = await getCurrentTenant();
   const query = await searchParams;
   const staff = await getStaffForManagement(tenant.id, new Date());
+  const t = await getT();
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-          Staff
+        <h1 className="text-2xl font-semibold tracking-tight text-fg">
+          {t("nav.staff")}
         </h1>
-        <p className="text-sm text-zinc-500">
-          Your barbers and the hours each of them works. Any active barber can
-          perform any active service.
+        <p className="text-sm text-fg-muted">
+          {t("staff.intro")}
         </p>
       </header>
 
-      <section className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6">
-        <h2 className="text-sm font-semibold tracking-tight text-zinc-900">
-          Add a barber
+      <section className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-4 sm:p-6">
+        <h2 className="text-sm font-semibold tracking-tight text-fg">
+          {t("staff.addHeading")}
         </h2>
         <StaffForm />
       </section>

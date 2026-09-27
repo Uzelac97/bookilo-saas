@@ -13,6 +13,8 @@ import type { BookableSlot } from "@/lib/availability/booking-options";
 import type { PublicService } from "@/lib/db/services";
 import type { PublicStaff } from "@/lib/db/staff";
 import { formatBookingDate, formatSlotTime } from "@/lib/format";
+import { useLocale, useT } from "@/lib/i18n/client";
+import { translateMessage, type Translator } from "@/lib/i18n/translate";
 import {
   customerDetailsSchema,
   type CustomerDetails,
@@ -59,6 +61,8 @@ export function BookingForm({
   timezone: string;
   onSlotLost: (lost: LostSlotState) => void;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const [clientErrors, setClientErrors] = useState<FieldErrors>({});
   const [state, formAction, pending] = useActionState<
     BookingSubmitState,
@@ -74,6 +78,9 @@ export function BookingForm({
 
   const errors: FieldErrors =
     state.status === "invalid" ? state.fieldErrors : clientErrors;
+  // Errors arrive as message keys from the shared schema (lib/validation).
+  const errorText = (message: string | undefined) =>
+    message ? translateMessage(t, message) : undefined;
 
   // The whole state object goes up, not just its tag: `staff_taken` carries the
   // staffId, and the flow needs it to name the barber who was taken.
@@ -133,35 +140,40 @@ export function BookingForm({
         name="startAt"
         value={slot.startAt.toISOString()}
       />
-      <dl className="flex flex-col gap-1.5 rounded-2xl border border-zinc-200 bg-white p-5 text-sm shadow-sm">
-        <SummaryRow label="Service" value={service.name} />
+      <dl className="flex flex-col gap-1.5 rounded-2xl border border-line bg-surface p-5 text-sm shadow-sm">
+        <SummaryRow label={t("booking.service")} value={service.name} />
         <SummaryRow
-          label="When"
-          value={`${formatBookingDate(date, timezone)} at ${formatSlotTime(slot.startAt, timezone)}`}
+          label={t("booking.when")}
+          value={t("booking.dateAtTime", {
+            date: formatBookingDate(date, timezone, locale),
+            time: formatSlotTime(slot.startAt, timezone),
+          })}
         />
-        {assigned ? <SummaryRow label="Barber" value={assigned.name} /> : null}
+        {assigned ? (
+          <SummaryRow label={t("booking.barber")} value={assigned.name} />
+        ) : null}
       </dl>
 
       <Field
         id="name"
-        label="Your name"
+        label={t("book.yourName")}
         autoComplete="name"
-        error={errors.name}
+        error={errorText(errors.name)}
       />
       <Field
         id="phone"
-        label="Phone"
+        label={t("book.phone")}
         type="tel"
         autoComplete="tel"
-        error={errors.phone}
+        error={errorText(errors.phone)}
       />
       <Field
         id="email"
-        label="Email"
+        label={t("common.email")}
         type="email"
         autoComplete="email"
-        hint="Optional — for your confirmation and cancellation link."
-        error={errors.email}
+        hint={t("book.emailHint")}
+        error={errorText(errors.email)}
       />
 
       {state.status === "rate_limited" ? (
@@ -172,16 +184,15 @@ export function BookingForm({
         // asked to change anything.
         <p
           role="alert"
-          className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          className="rounded-xl border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning"
         >
-          {rateLimitMessage(state.reason, state.shopPhone)}
+          {rateLimitMessage(t, state.reason, state.shopPhone)}
         </p>
       ) : null}
 
       {state.status === "error" ? (
-        <p role="alert" className="text-sm text-red-700">
-          Something went wrong on our end and the booking wasn&rsquo;t saved.
-          Please try again.
+        <p role="alert" className="text-sm text-danger">
+          {t("book.error")}
         </p>
       ) : null}
 
@@ -190,9 +201,9 @@ export function BookingForm({
         disabled={pending}
         // Taller than the 44px minimum the rest of the flow holds to: this is
         // the one button the whole page exists to get pressed.
-        className="mt-1 inline-flex min-h-12 items-center justify-center rounded-lg bg-zinc-900 px-4 text-base font-medium text-white transition-colors hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 disabled:cursor-not-allowed disabled:bg-zinc-400"
+        className="mt-1 inline-flex min-h-12 items-center justify-center rounded-lg bg-primary px-4 text-base font-medium text-on-primary transition-colors hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:bg-fill-strong"
       >
-        {pending ? "Confirming…" : "Confirm booking"}
+        {pending ? t("book.submitting") : t("book.submit")}
       </button>
     </form>
   );
@@ -212,23 +223,28 @@ export function BookingForm({
  * given one would be worse than saying it plainly.
  */
 function rateLimitMessage(
+  t: Translator,
   reason: RateLimitReason,
   shopPhone: string | null,
 ): string {
-  const contact = shopPhone
-    ? `call the shop on ${shopPhone}`
-    : "get in touch with the shop directly";
+  // One whole sentence per case — see the note on the cancel page for why the
+  // "call the shop" part cannot be translated as a fragment.
+  if (reason === "too_many_upcoming") {
+    return shopPhone
+      ? t("book.rateLimitUpcomingPhone", { phone: shopPhone })
+      : t("book.rateLimitUpcoming");
+  }
 
-  return reason === "too_many_upcoming"
-    ? `You already have several appointments booked here. To add another, ${contact}.`
-    : `That's a few bookings in a short time. If you need another appointment, ${contact}.`;
+  return shopPhone
+    ? t("book.rateLimitRecentPhone", { phone: shopPhone })
+    : t("book.rateLimitRecent");
 }
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-4">
-      <dt className="text-zinc-500">{label}</dt>
-      <dd className="text-right font-medium text-zinc-900">{value}</dd>
+      <dt className="text-fg-muted">{label}</dt>
+      <dd className="text-right font-medium text-fg">{value}</dd>
     </div>
   );
 }

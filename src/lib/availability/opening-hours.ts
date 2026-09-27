@@ -38,6 +38,11 @@ const MINUTES_PER_DAY = 24 * 60;
  */
 export const DISPLAY_WEEK = [1, 2, 3, 4, 5, 6, 0] as const;
 
+/**
+ * English weekday names, for the Kastanien marketing page only — shop
+ * content, not translated. The product UI goes through weekdayName() in
+ * lib/i18n/weekdays.ts, which follows the interface language.
+ */
 export const WEEKDAY_LABELS: Record<number, string> = {
   0: "Sunday",
   1: "Monday",

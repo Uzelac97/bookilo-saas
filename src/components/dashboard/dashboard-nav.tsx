@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { useT } from "@/lib/i18n/client";
+import type { MessageKey } from "@/lib/i18n/translate";
+
 /**
  * MODULE-PRIVATE ON PURPOSE — do not export.
  *
@@ -14,12 +17,12 @@ import { usePathname } from "next/navigation";
  * reuse the labels". If a server component ever needs these, they move to a
  * plain module — they do not get an `export` here.
  */
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Today" },
-  { href: "/dashboard/calendar", label: "Calendar" },
-  { href: "/dashboard/services", label: "Services" },
-  { href: "/dashboard/staff", label: "Staff" },
-  { href: "/dashboard/settings", label: "Settings" },
+const NAV_ITEMS: { href: string; label: MessageKey }[] = [
+  { href: "/dashboard", label: "nav.today" },
+  { href: "/dashboard/calendar", label: "nav.calendar" },
+  { href: "/dashboard/services", label: "nav.services" },
+  { href: "/dashboard/staff", label: "nav.staff" },
+  { href: "/dashboard/settings", label: "nav.settings" },
 ];
 
 /**
@@ -32,10 +35,11 @@ const NAV_ITEMS = [
  */
 export function DashboardNav() {
   const pathname = usePathname();
+  const t = useT();
 
   return (
     <nav
-      aria-label="Dashboard"
+      aria-label={t("nav.label")}
       // Same overflow treatment as the public date strip, and scrollbar-hide
       // (app/globals.css) for the same reason: a native bar under five nav items
       // reads as a rendering fault, not as a control. Only ever overflows on a
@@ -56,11 +60,11 @@ export function DashboardNav() {
                 className={[
                   "block rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                   active
-                    ? "bg-zinc-900 text-white"
-                    : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900",
+                    ? "bg-primary text-on-primary"
+                    : "text-fg-tertiary hover:bg-subtle hover:text-fg",
                 ].join(" ")}
               >
-                {item.label}
+                {t(item.label)}
               </Link>
             </li>
           );

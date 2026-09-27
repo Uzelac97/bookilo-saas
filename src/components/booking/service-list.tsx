@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import type { PublicService } from "@/lib/db/services";
 import { formatDuration, formatPrice } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
+import { getLocale } from "@/lib/preferences-server";
 
 type ServiceGroup = {
   /** null = the services with no category set. */
@@ -9,17 +11,19 @@ type ServiceGroup = {
   services: PublicService[];
 };
 
-export function ServiceList({
+export async function ServiceList({
   services,
   slug,
 }: {
   services: PublicService[];
   slug: string;
 }) {
+  const [t, locale] = await Promise.all([getT(), getLocale()]);
+
   if (services.length === 0) {
     return (
-      <p className="rounded-2xl border border-dashed border-zinc-300 px-4 py-8 text-center text-sm text-zinc-500">
-        No services listed yet.
+      <p className="rounded-2xl border border-dashed border-line-strong px-4 py-8 text-center text-sm text-fg-muted">
+        {t("shop.noServices")}
       </p>
     );
   }
@@ -35,8 +39,8 @@ export function ServiceList({
       {groups.map((group) => (
         <div key={group.category ?? "__uncategorized"}>
           {showHeadings ? (
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-              {group.category ?? "Other"}
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-fg-muted">
+              {group.category ?? t("shop.otherCategory")}
             </h3>
           ) : null}
 
@@ -44,7 +48,7 @@ export function ServiceList({
             {group.services.map((service) => (
               <li
                 key={service.id}
-                className="flex items-center justify-between gap-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm"
+                className="flex items-center justify-between gap-4 rounded-2xl border border-line bg-surface p-4 shadow-sm"
               >
                 {/* min-w-0 is what lets the name truncate instead of pushing
                     the price and the button off a narrow screen. The row no
@@ -52,11 +56,11 @@ export function ServiceList({
                     at around 380px, which put a full-width black bar under
                     every service on a phone. */}
                 <div className="flex min-w-0 flex-col gap-0.5">
-                  <span className="truncate font-medium text-zinc-900">
+                  <span className="truncate font-medium text-fg">
                     {service.name}
                   </span>
-                  <span className="text-sm text-zinc-500">
-                    {formatDuration(service.durationMinutes)}
+                  <span className="text-sm text-fg-muted">
+                    {formatDuration(service.durationMinutes, locale)}
                   </span>
                 </div>
 
@@ -64,7 +68,7 @@ export function ServiceList({
                     it is the second thing anyone reads on a barbershop's menu
                     and the first thing they compare between two of them. */}
                 <div className="flex shrink-0 items-center gap-3">
-                  <span className="text-sm font-medium tabular-nums text-zinc-900">
+                  <span className="text-sm font-medium tabular-nums text-fg">
                     {formatPrice(service.priceMinorUnits)}
                   </span>
                   {/* min-h-11 is 44px, the smallest comfortable touch target.
@@ -74,9 +78,9 @@ export function ServiceList({
                       min-height on an inline <a> does nothing. */}
                   <Link
                     href={`/b/${slug}/book?service=${service.id}`}
-                    className="inline-flex min-h-11 items-center rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
+                    className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-medium text-on-primary transition-colors hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                   >
-                    Book
+                    {t("shop.book")}
                   </Link>
                 </div>
               </li>

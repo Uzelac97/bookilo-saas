@@ -9,6 +9,8 @@ import {
 } from "@/app/(dashboard)/dashboard/staff/actions";
 import type { TimeOffRow } from "@/lib/db/staff";
 import { formatTimeOffRange } from "@/lib/format";
+import { useLocale, useT } from "@/lib/i18n/client";
+import { translateMessage } from "@/lib/i18n/translate";
 
 /** See the note in service-form.tsx — a "use server" module can't export this. */
 const INITIAL_STATE: TimeOffState = { status: "idle" };
@@ -36,6 +38,8 @@ export function TimeOffEditor({
   timeOff: TimeOffRow[];
   timezone: string;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const [allDay, setAllDay] = useState(true);
   const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState<TimeOffState, FormData>(
@@ -46,22 +50,22 @@ export function TimeOffEditor({
   return (
     <div className="flex flex-col gap-5">
       {timeOff.length === 0 ? (
-        <p className="text-sm text-zinc-500">
-          {staffName} isn&rsquo;t marked away for anything yet.
+        <p className="text-sm text-fg-muted">
+          {t("timeOff.empty", { name: staffName })}
         </p>
       ) : (
-        <ul className="flex flex-col divide-y divide-zinc-100">
+        <ul className="flex flex-col divide-y divide-line-faint">
           {timeOff.map((row) => (
             <li
               key={row.id}
               className="flex flex-wrap items-center justify-between gap-3 py-2.5"
             >
               <div className="flex flex-col">
-                <span className="text-sm font-medium text-zinc-900">
-                  {formatTimeOffRange(row.startAt, row.endAt, timezone)}
+                <span className="text-sm font-medium text-fg">
+                  {formatTimeOffRange(row.startAt, row.endAt, timezone, locale)}
                 </span>
                 {row.reason ? (
-                  <span className="text-sm text-zinc-500">{row.reason}</span>
+                  <span className="text-sm text-fg-muted">{row.reason}</span>
                 ) : null}
               </div>
 
@@ -72,9 +76,9 @@ export function TimeOffEditor({
                 <input type="hidden" name="staffId" value={staffId} />
                 <button
                   type="submit"
-                  className="rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 text-sm text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900"
+                  className="rounded-lg border border-line-strong bg-surface px-2.5 py-1.5 text-sm text-fg-tertiary transition-colors hover:bg-subtle hover:text-fg"
                 >
-                  Remove
+                  {t("staff.remove")}
                 </button>
               </form>
             </li>
@@ -85,41 +89,45 @@ export function TimeOffEditor({
       <form
         ref={formRef}
         action={formAction}
-        className="flex flex-col gap-4 border-t border-zinc-100 pt-5"
+        className="flex flex-col gap-4 border-t border-line-faint pt-5"
       >
         <input type="hidden" name="staffId" value={staffId} />
         {/* The toggle is client state, so its value has to be posted explicitly —
             an unchecked checkbox posts nothing at all. */}
         <input type="hidden" name="allDay" value={String(allDay)} />
 
-        <label className="flex w-fit items-center gap-2 text-sm text-zinc-700">
+        <label className="flex w-fit items-center gap-2 text-sm text-fg-secondary">
           <input
             type="checkbox"
             checked={allDay}
             onChange={(event) => setAllDay(event.target.checked)}
-            className="size-4 rounded border-zinc-300"
+            className="size-4 rounded border-line-strong"
           />
-          Away all day
+          {t("timeOff.allDay")}
         </label>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <DateOrTimeField
             id="startDate"
             type="date"
-            label={allDay ? "First day away" : "Day"}
+            label={allDay ? t("timeOff.firstDay") : t("manual.day")}
           />
 
           {allDay ? (
             <DateOrTimeField
               id="endDate"
               type="date"
-              label="Last day away"
-              hint="Leave empty for a single day."
+              label={t("timeOff.lastDay")}
+              hint={t("timeOff.lastDayHint")}
             />
           ) : (
             <div className="flex items-end gap-2">
-              <DateOrTimeField id="startTime" type="time" label="From" />
-              <DateOrTimeField id="endTime" type="time" label="To" />
+              <DateOrTimeField
+                id="startTime"
+                type="time"
+                label={t("timeOff.from")}
+              />
+              <DateOrTimeField id="endTime" type="time" label={t("timeOff.to")} />
             </div>
           )}
         </div>
@@ -127,8 +135,8 @@ export function TimeOffEditor({
         <DateOrTimeField
           id="reason"
           type="text"
-          label="Note"
-          hint="Optional, and only ever shown to you."
+          label={t("timeOff.note")}
+          hint={t("timeOff.noteHint")}
         />
 
         {state.status === "saved" ? (
@@ -136,42 +144,42 @@ export function TimeOffEditor({
             role="status"
             className={
               state.overlappingBookings > 0
-                ? "rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900"
-                : "rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+                ? "rounded-lg bg-warning-soft px-3 py-2 text-sm text-warning"
+                : "rounded-lg bg-success-soft px-3 py-2 text-sm text-success"
             }
           >
             {state.overlappingBookings === 0
-              ? "Time off saved."
-              : state.overlappingBookings === 1
-                ? "Time off saved — but 1 appointment already booked falls inside it. It stays on the calendar; call that customer to move it."
-                : `Time off saved — but ${state.overlappingBookings} appointments already booked fall inside it. They stay on the calendar; call those customers to move them.`}
+              ? t("timeOff.saved")
+              : t("timeOff.savedWithOverlap", {
+                  count: state.overlappingBookings,
+                })}
           </p>
         ) : null}
 
         {state.status === "invalid" ? (
           <p
             role="alert"
-            className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+            className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger"
           >
-            {state.message}
+            {translateMessage(t, state.message)}
           </p>
         ) : null}
 
         {state.status === "gone" ? (
           <p
             role="alert"
-            className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900"
+            className="rounded-lg bg-warning-soft px-3 py-2 text-sm text-warning"
           >
-            That barber no longer exists. Reload the page.
+            {t("staff.gone")}
           </p>
         ) : null}
 
         {state.status === "error" ? (
           <p
             role="alert"
-            className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+            className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger"
           >
-            Something went wrong and nothing was saved. Please try again.
+            {t("common.saveError")}
           </p>
         ) : null}
 
@@ -179,9 +187,9 @@ export function TimeOffEditor({
           <button
             type="submit"
             disabled={pending}
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {pending ? "Saving…" : "Add time off"}
+            {pending ? t("common.saving") : t("timeOff.submit")}
           </button>
         </div>
       </form>
@@ -210,7 +218,7 @@ function DateOrTimeField({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium text-zinc-700">
+      <label htmlFor={id} className="text-sm font-medium text-fg-secondary">
         {label}
       </label>
       <input
@@ -221,10 +229,10 @@ function DateOrTimeField({
         // Same explicit bg/text as the shared Field and TimeInput: Tailwind's
         // preflight resets form controls to inherited colours, which is how
         // these once rendered near-white on white.
-        className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base text-zinc-900 outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900"
+        className="rounded-lg border border-line-strong bg-surface px-3 py-2 text-base text-fg outline-none focus:border-focus focus:ring-1 focus:ring-focus"
       />
       {hint ? (
-        <p id={`${id}-hint`} className="text-sm text-zinc-500">
+        <p id={`${id}-hint`} className="text-sm text-fg-muted">
           {hint}
         </p>
       ) : null}
