@@ -221,7 +221,7 @@ export default async function KastanienBarbershopPage() {
             alt="Kastanien Barbershop interior"
             fill
             priority
-            sizes="100vw"
+            sizes="(min-width: 2816px) 2816px, 100vw"
             className="-z-10 object-cover"
           />
           {/* The scrim a real photograph would need too: headline text over an
@@ -299,11 +299,19 @@ export default async function KastanienBarbershopPage() {
                   // the block for one 20px icon. Absolute takes it out of flow
                   // entirely, so the row is a single line on a phone.
                   //
-                  // right-1.5/top-1.5 is arithmetic, not taste: the box is 56px
-                  // with a 20px glyph centred in it, so a 6px inset puts the
-                  // *glyph* edges at 24px — exactly the px-6 gutter the rest of
-                  // the page is set to. Nudging the box to a rounder number
-                  // would take the thing you actually see off that grid.
+                  // right-6/top-6 puts the edge of the ring on the px-6 gutter
+                  // the rest of the page is set to. The ring is the thing you
+                  // see, so it is what goes on the grid; aligning the glyph
+                  // instead would leave the ring 6px from the screen edge.
+                  //
+                  // Outlined, not filled, so it reads as a button without
+                  // competing with the one solid brass CTA. The ring is gold
+                  // rather than brass, matched to the gilded mirror frame in
+                  // the hero photograph, and the soft glow makes it look lit by
+                  // the scene rather than pasted on top of it. It is the only
+                  // box-shadow on the page, and it is a glow, not elevation. The
+                  // /20 ink fill keeps the ring legible over light patches of
+                  // the photograph.
                   //
                   // It stays last in DOM order, so on a phone the corner icon
                   // is tabbed to after Book now rather than before it. That is
@@ -315,7 +323,7 @@ export default async function KastanienBarbershopPage() {
                   // — nothing between here and it is positioned. It sits above
                   // the photograph and scrim (both -z-10) on z-auto.
                   //
-                  // min-h-14/min-w-14 is a 56px tap target in both positions —
+                  // size-14 is a 56px tap target in both positions —
                   // an icon link that is merely icon-sized is a 20px target on
                   // the device most likely to dial it.
                   //
@@ -327,7 +335,7 @@ export default async function KastanienBarbershopPage() {
                   <a
                     href={telHref}
                     aria-label={`Call ${tenant.phone}`}
-                    className="absolute right-1.5 top-1.5 inline-flex min-h-14 min-w-14 items-center justify-center text-shop-brass transition-colors hover:text-shop-bone focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-shop-brass sm:static"
+                    className="absolute right-6 top-6 inline-flex size-14 items-center justify-center rounded-full border border-[#c9a227] bg-shop-ink/20 shadow-[0_0_12px_rgba(201,162,39,0.4)] text-shop-brass transition-colors hover:border-shop-bone hover:text-shop-bone focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-shop-brass sm:static"
                   >
                     <svg
                       viewBox="0 0 24 24"
@@ -596,7 +604,10 @@ export default async function KastanienBarbershopPage() {
         {/* ---------------------------------------------------------------
             Visit — address, phone, and the merged opening hours.
             --------------------------------------------------------------- */}
-        <section id="visit" className="scroll-mt-24 border-t border-shop-leather/60">
+        <section
+          id="visit"
+          className="scroll-mt-24 border-t border-shop-leather/60"
+        >
           <div className="mx-auto w-full max-w-6xl px-6 py-24 sm:py-32">
             <div className="grid gap-14 lg:grid-cols-2 lg:gap-20">
               <div>
