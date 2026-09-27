@@ -451,6 +451,7 @@ describe("buildDayGrid", () => {
       workingHours,
       timezone: TZ,
       locale: "en",
+      vertical: "BARBERSHOP",
     });
   }
 
@@ -617,6 +618,7 @@ describe("buildDayGrid", () => {
       workingHours: [],
       timezone: TZ,
       locale: "en",
+      vertical: "BARBERSHOP",
     });
 
     expect(grid.columns).toEqual([]);
@@ -895,6 +897,7 @@ function blockOfDuration(minutes: number) {
     workingHours: [hours(TUESDAY_DOW)],
     timezone: TZ,
     locale: "en",
+    vertical: "BARBERSHOP",
   });
 
   return grid.columns[0].bookings[0];
@@ -971,6 +974,7 @@ describe("block geometry across durations", () => {
         workingHours: [hours(TUESDAY_DOW, open, close)],
         timezone: TZ,
         locale: "en",
+        vertical: "BARBERSHOP",
       });
 
       return grid.columns[0].bookings[0];
@@ -987,6 +991,7 @@ describe("block geometry across durations", () => {
       workingHours: [hours(TUESDAY_DOW)],
       timezone: TZ,
       locale: "en",
+      vertical: "BARBERSHOP",
     });
 
     // 09:00-18:00 is nine hours.
@@ -1006,6 +1011,7 @@ describe("block geometry across durations", () => {
       workingHours: [hours(TUESDAY_DOW)],
       timezone: TZ,
       locale: "en",
+      vertical: "BARBERSHOP",
     });
 
     const block = grid.columns[0].bookings[0];

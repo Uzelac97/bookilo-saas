@@ -285,7 +285,14 @@ export async function getBookingByCancelToken(
       status: true,
       cancelToken: true,
       service: {
-        select: { name: true, durationMinutes: true, priceMinorUnits: true },
+        // nameEn for the booked and cancel pages in English. The emails stay on
+        // `name` — they are always German (EXECUTION-PLAN.md, decision 11).
+        select: {
+          name: true,
+          nameEn: true,
+          durationMinutes: true,
+          priceMinorUnits: true,
+        },
       },
       staff: { select: { name: true } },
       customer: { select: { name: true, email: true } },

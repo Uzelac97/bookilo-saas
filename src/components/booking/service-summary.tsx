@@ -3,7 +3,9 @@ import Link from "next/link";
 import type { PublicService } from "@/lib/db/services";
 import { formatDuration, formatPrice } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
+import { serviceName } from "@/lib/i18n/service-text";
 import { getLocale } from "@/lib/preferences-server";
+import type { Vertical } from "@/lib/vertical";
 
 /**
  * The chosen service, with a way back. Server-rendered — nothing here is
@@ -12,11 +14,13 @@ import { getLocale } from "@/lib/preferences-server";
 export async function ServiceSummary({
   service,
   slug,
+  vertical,
 }: {
   service: PublicService;
   slug: string;
+  vertical: Vertical;
 }) {
-  const [t, locale] = await Promise.all([getT(), getLocale()]);
+  const [t, locale] = await Promise.all([getT(vertical), getLocale()]);
 
   return (
     // Laid out to match a row of the service list this was chosen from — same
@@ -26,7 +30,7 @@ export async function ServiceSummary({
     <div className="flex items-center justify-between gap-4 rounded-2xl border border-line bg-surface p-4 shadow-sm">
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="truncate font-medium text-fg">
-          {service.name}
+          {serviceName(service, locale)}
         </span>
         <span className="text-sm text-fg-muted">
           {formatDuration(service.durationMinutes, locale)}

@@ -14,6 +14,7 @@ import type { PublicService } from "@/lib/db/services";
 import type { PublicStaff } from "@/lib/db/staff";
 import { formatBookingDate, formatSlotTime } from "@/lib/format";
 import { useLocale, useT } from "@/lib/i18n/client";
+import { serviceName } from "@/lib/i18n/service-text";
 import { translateMessage, type Translator } from "@/lib/i18n/translate";
 import {
   customerDetailsSchema,
@@ -141,7 +142,10 @@ export function BookingForm({
         value={slot.startAt.toISOString()}
       />
       <dl className="flex flex-col gap-1.5 rounded-2xl border border-line bg-surface p-5 text-sm shadow-sm">
-        <SummaryRow label={t("booking.service")} value={service.name} />
+        <SummaryRow
+          label={t("booking.service")}
+          value={serviceName(service, locale)}
+        />
         <SummaryRow
           label={t("booking.when")}
           value={t("booking.dateAtTime", {

@@ -12,7 +12,10 @@ import {
   formatSlotTime,
 } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
+import { serviceName } from "@/lib/i18n/service-text";
 import { getLocale } from "@/lib/preferences-server";
+
+import { getShop } from "../../shop";
 
 /**
  * The URL contains a bearer secret, so this page is never indexed and never
@@ -21,7 +24,9 @@ import { getLocale } from "@/lib/preferences-server";
  * circulates the better.
  */
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getT();
+  // No tenant here: metadata never resolves the token (see above), and the
+  // title is the same in every vertical.
+  const t = await getT(null);
   return {
     title: t("booked.metaTitle"),
     robots: { index: false, follow: false },
@@ -42,7 +47,14 @@ export default async function BookedPage({ params }: PageProps) {
   if (!booking || booking.tenant.slug !== slug) notFound();
 
   const { tenant, service } = booking;
-  const [t, locale] = await Promise.all([getT(), getLocale()]);
+  // The vertical comes from the slug's tenant, which the layout has already
+  // resolved (a per-request memo hit, not a second query) and which the check
+  // above has just proven is the booking's own.
+  const shop = await getShop(slug);
+  const [t, locale] = await Promise.all([
+    getT(shop?.businessType ?? null),
+    getLocale(),
+  ]);
   const date = DateTime.fromJSDate(booking.startAt)
     .setZone(tenant.timezone)
     .toISODate();
@@ -92,7 +104,10 @@ export default async function BookedPage({ params }: PageProps) {
         </header>
 
         <dl className="flex flex-col gap-1.5 rounded-2xl border border-line bg-surface p-5 text-sm shadow-sm">
-          <Row label={t("booking.service")} value={service.name} />
+          <Row
+            label={t("booking.service")}
+            value={serviceName(service, locale)}
+          />
           <Row label={t("booking.barber")} value={booking.staff.name} />
           <Row
             label={t("booking.when")}

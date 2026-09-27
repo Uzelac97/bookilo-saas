@@ -1,38 +1,21 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { cache } from "react";
 
 import { OpeningHours } from "@/components/booking/opening-hours";
 import { ServiceList } from "@/components/booking/service-list";
 import { mergeOpeningHours } from "@/lib/availability/opening-hours";
 import { getActiveServices } from "@/lib/db/services";
 import { getWorkingHoursForActiveStaff } from "@/lib/db/staff";
-import { getTenantBySlug } from "@/lib/db/tenant";
 import { getT } from "@/lib/i18n/server";
 import type { MessageKey } from "@/lib/i18n/translate";
+import type { Vertical } from "@/lib/vertical";
 
-/**
- * generateMetadata and the page component both need the tenant, and Next's
- * automatic request deduplication only covers fetch() — a Prisma call gets none
- * of it. React's cache() gives the second caller a per-request memo hit instead
- * of a second query.
- *
- * Measured, because the failure mode here is subtler than "two round trips":
- * without the wrapper both lookups really are issued, but Prisma's findUnique
- * dataloader coalesces them into one round trip
- * (`WHERE slug IN ($1,$2)` — the same slug twice) as long as they land in the
- * same tick. So this is not the difference between one query and two; it's the
- * difference between deduplicating explicitly and relying on that batching
- * heuristic to keep holding. With cache(): `WHERE slug = $1 LIMIT 1`, once.
- *
- * It lives here rather than in lib/db/tenant.ts on purpose — that layer is
- * plain async functions that also run from scripts and server actions, where a
- * React render scope doesn't exist. Framework machinery stays in the route file.
- */
-const getShop = cache(async (slug: string) => getTenantBySlug(slug));
+import { getShop } from "./shop";
 
-const BUSINESS_TYPE_LABELS: Record<string, MessageKey> = {
+/** Exhaustive over Vertical, so a new vertical without a label fails tsc. */
+const BUSINESS_TYPE_LABELS: Record<Vertical, MessageKey> = {
   BARBERSHOP: "shop.businessTypeBarbershop",
+  SALON: "shop.businessTypeSalon",
 };
 
 type PageProps = { params: Promise<{ slug: string }> };
@@ -41,7 +24,8 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const [tenant, t] = await Promise.all([getShop(slug), getT()]);
+  const tenant = await getShop(slug);
+  const t = await getT(tenant?.businessType ?? null);
 
   if (!tenant) {
     return { title: t("shop.notFoundTitle") };
@@ -73,7 +57,7 @@ export default async function BusinessPage({ params }: PageProps) {
   ]);
 
   const openingHours = mergeOpeningHours(workingHours);
-  const t = await getT();
+  const t = await getT(tenant.businessType);
   const businessType = BUSINESS_TYPE_LABELS[tenant.businessType];
 
   return (
@@ -82,7 +66,7 @@ export default async function BusinessPage({ params }: PageProps) {
         <header className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium text-fg-muted">
-              {t(businessType ?? "shop.businessTypeFallback")}
+              {t(businessType)}
             </p>
             {/* Larger than the h1 on the three transactional pages, and the
                 only place that differs. This is the shop's front door and the
@@ -114,7 +98,11 @@ export default async function BusinessPage({ params }: PageProps) {
           <h2 className="text-lg font-semibold tracking-tight text-fg">
             {t("shop.services")}
           </h2>
-          <ServiceList services={services} slug={tenant.slug} />
+          <ServiceList
+            services={services}
+            slug={tenant.slug}
+            vertical={tenant.businessType}
+          />
         </section>
 
         <section className="flex flex-col gap-4">
@@ -122,7 +110,10 @@ export default async function BusinessPage({ params }: PageProps) {
             {t("shop.openingHours")}
           </h2>
           <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
-            <OpeningHours days={openingHours} />
+            <OpeningHours
+              days={openingHours}
+              vertical={tenant.businessType}
+            />
           </div>
         </section>
       </main>

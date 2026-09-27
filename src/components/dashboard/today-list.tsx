@@ -4,7 +4,7 @@ import { STATUS_LABELS } from "@/lib/dashboard/booking-status";
 import type { DashboardBooking } from "@/lib/db/bookings";
 import type { Translator } from "@/lib/i18n/translate";
 import { formatPrice, formatSlotTime, formatTimeRange } from "@/lib/format";
-import { getT } from "@/lib/i18n/server";
+import { getDashboardT } from "@/lib/i18n/server";
 
 /**
  * How each status is badged here. The words are shared with the calendar via
@@ -40,7 +40,7 @@ export async function TodayList({
 }) {
   if (bookings.length === 0) return null;
 
-  const t = await getT();
+  const t = await getDashboardT();
 
   return (
     <ul className="flex flex-col gap-2">
@@ -154,7 +154,7 @@ export async function TodaySummary({
   revenueMinorUnits: number;
   timezone: string;
 }) {
-  const t = await getT();
+  const t = await getDashboardT();
 
   return (
     <dl className="grid grid-cols-3 gap-px overflow-hidden rounded-2xl border border-line bg-subtle-strong">
@@ -227,7 +227,7 @@ export function SummaryCell({
 
 /** Shown when nothing is on the books — the default view of a brand-new shop. */
 export async function TodayEmptyState({ slug }: { slug: string }) {
-  const t = await getT();
+  const t = await getDashboardT();
 
   return (
     <div className="rounded-2xl border border-dashed border-line-strong bg-surface p-8 text-center">

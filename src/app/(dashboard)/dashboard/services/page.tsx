@@ -4,10 +4,10 @@ import { ServiceForm } from "@/components/dashboard/service-form";
 import { ServiceList } from "@/components/dashboard/service-list";
 import { getCurrentTenant } from "@/lib/auth/session";
 import { getServicesForTenant } from "@/lib/db/services";
-import { getT } from "@/lib/i18n/server";
+import { getDashboardT } from "@/lib/i18n/server";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getT();
+  const t = await getDashboardT();
   return { title: t("nav.services") };
 }
 
@@ -36,7 +36,7 @@ export default async function ServicesPage({ searchParams }: PageProps) {
   const tenant = await getCurrentTenant();
   const query = await searchParams;
   const services = await getServicesForTenant(tenant.id);
-  const t = await getT();
+  const t = await getDashboardT();
 
   const editingId = first(query.edit);
 

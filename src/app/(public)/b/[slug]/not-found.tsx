@@ -6,7 +6,7 @@ import { getT } from "@/lib/i18n/server";
  * that gets printed on a card and handed to real customers.
  */
 export default async function ShopNotFound() {
-  const t = await getT();
+  const t = await getT(null);
 
   return (
     <div className="flex flex-1 items-center justify-center bg-canvas px-4 py-16">

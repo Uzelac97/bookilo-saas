@@ -149,7 +149,7 @@ export async function setServiceActiveAction(formData: FormData): Promise<void> 
 }
 
 /**
- * Validates the four service fields, shared by create and edit so the two can't
+ * Validates the service fields, shared by create and edit so the two can't
  * disagree about what a valid service is.
  *
  * Returns a discriminated result rather than throwing: an invalid form is an
@@ -165,6 +165,12 @@ function parseForm(
     durationMinutes: formData.get("durationMinutes"),
     priceMinorUnits: formData.get("priceMinorUnits"),
     category: formData.get("category"),
+    // `?? undefined` because a missing field is null from FormData, and the
+    // English fields are the ones a form rendered before they existed (a tab
+    // left open across a deploy) won't send. Absent means "not set", the same
+    // as blank, rather than an invalid form the owner can't see the cause of.
+    nameEn: formData.get("nameEn") ?? undefined,
+    categoryEn: formData.get("categoryEn") ?? undefined,
   });
 
   if (parsed.success) return { ok: true, input: parsed.data };

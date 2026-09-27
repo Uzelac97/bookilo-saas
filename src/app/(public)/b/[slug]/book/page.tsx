@@ -1,7 +1,6 @@
 import { DateTime } from "luxon";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { cache } from "react";
 
 import { BookingFlow } from "@/components/booking/booking-flow";
 import { ServiceSummary } from "@/components/booking/service-summary";
@@ -19,17 +18,11 @@ import { computeSlots } from "@/lib/availability/slots";
 import { getStaffAvailability } from "@/lib/db/availability";
 import { getActiveServices } from "@/lib/db/services";
 import { getActiveStaff } from "@/lib/db/staff";
-import { getTenantBySlug } from "@/lib/db/tenant";
 import { formatBookingDate } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
 import { getLocale } from "@/lib/preferences-server";
 
-/**
- * Same per-request memo as the business page next door: generateMetadata and the
- * page component both need the tenant, and React's cache() is what turns that
- * into one query instead of relying on Prisma's dataloader batching.
- */
-const getShop = cache(async (slug: string) => getTenantBySlug(slug));
+import { getShop } from "../shop";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -40,7 +33,8 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const [tenant, t] = await Promise.all([getShop(slug), getT()]);
+  const tenant = await getShop(slug);
+  const t = await getT(tenant?.businessType ?? null);
 
   if (!tenant) return { title: t("shop.notFoundTitle") };
 
@@ -122,7 +116,10 @@ export default async function BookPage({ params, searchParams }: PageProps) {
     ? "FULLY_BOOKED"
     : "CLOSED";
 
-  const [t, locale] = await Promise.all([getT(), getLocale()]);
+  const [t, locale] = await Promise.all([
+    getT(tenant.businessType),
+    getLocale(),
+  ]);
 
   return (
     <div className="flex flex-1 flex-col bg-canvas px-4 py-10 sm:py-16">
@@ -134,7 +131,11 @@ export default async function BookPage({ params, searchParams }: PageProps) {
           </h1>
         </header>
 
-        <ServiceSummary service={service} slug={slug} />
+        <ServiceSummary
+          service={service}
+          slug={slug}
+          vertical={tenant.businessType}
+        />
 
         <BookingFlow
           slug={slug}

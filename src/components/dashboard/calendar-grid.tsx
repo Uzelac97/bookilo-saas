@@ -22,7 +22,7 @@ import {
   formatTimeRange,
   initials,
 } from "@/lib/format";
-import { getT } from "@/lib/i18n/server";
+import { getDashboardT } from "@/lib/i18n/server";
 import type { Translator } from "@/lib/i18n/translate";
 
 /**
@@ -127,7 +127,7 @@ export async function CalendarGrid({
   // Resolved once and handed down: the helpers below are plain functions
   // rendered many times over, and one translator for the whole grid keeps
   // them synchronous.
-  const t = await getT();
+  const t = await getDashboardT();
 
   if (grid.columns.length === 0) return <CalendarEmptyState t={t} />;
 

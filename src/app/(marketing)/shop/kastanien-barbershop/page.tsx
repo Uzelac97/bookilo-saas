@@ -16,6 +16,11 @@ import { getActiveServices, type PublicService } from "@/lib/db/services";
 import { getWorkingHoursForActiveStaff } from "@/lib/db/staff";
 import { getTenantBySlug } from "@/lib/db/tenant";
 import { formatDuration, formatMinuteOfDay, formatPrice } from "@/lib/format";
+import {
+  categoryLabel,
+  groupCategoryEn,
+  serviceName,
+} from "@/lib/i18n/service-text";
 
 /**
  * Kastanien Barbershop's marketing page.
@@ -96,12 +101,16 @@ const BOOKING_HREF = `/b/${SHOP_SLUG}`;
  * duplicate the Haircuts slot), Line-up (a 15-minute add-on), Kids cut (a
  * segment, not the lead), Hot towel shave and The full works (premium).
  *
- * MATCHED BY NAME AGAINST LIVE ROWS, never transcribed. There is no `featured`
- * flag on Service and this page doesn't add one, so the *selection* has to live
- * somewhere — but every name, price and duration a visitor reads comes from the
- * database, so an owner editing a price in the dashboard cannot leave this page
- * quoting a stale one. A renamed service drops out of the trio rather than
- * rendering text that is no longer true; see pickFeatured.
+ * MATCHED BY ENGLISH NAME AGAINST LIVE ROWS, never transcribed. English
+ * because this page is the shop's English copy (EXECUTION-PLAN.md, decision
+ * 12): `nameEn` where the service has one, `name` where it doesn't.
+ *
+ * There is no `featured` flag on Service and this page doesn't add one, so the
+ * *selection* has to live somewhere — but every name, price and duration a
+ * visitor reads comes from the database, so an owner editing a price in the
+ * dashboard cannot leave this page quoting a stale one. A renamed service drops
+ * out of the trio rather than rendering text that is no longer true; see
+ * pickFeatured.
  */
 const FEATURED_SERVICE_NAMES = ["Haircut", "Beard trim", "Cut & beard"];
 
@@ -524,7 +533,7 @@ export default async function KastanienBarbershopPage() {
                             reading as a missing element rather than as
                             breathing room. */}
                         <h3 className="font-display text-3xl leading-tight text-shop-bone">
-                          {service.name}
+                          {serviceName(service, "en")}
                         </h3>
                         <p className="mt-3 text-sm text-shop-muted">
                           {formatDuration(service.durationMinutes, "en")}
@@ -567,7 +576,13 @@ export default async function KastanienBarbershopPage() {
                   {menu.map((group) => (
                     <div key={group.category ?? "__uncategorized"}>
                       <h4 className="text-xs font-semibold uppercase tracking-[0.25em] text-shop-brass">
-                        {group.category ?? "Other"}
+                        {categoryLabel(
+                          {
+                            category: group.category,
+                            categoryEn: groupCategoryEn(group.services),
+                          },
+                          "en",
+                        ) ?? "Other"}
                       </h4>
                       <ul className="mt-6 flex flex-col gap-5">
                         {group.services.map((service) => (
@@ -581,7 +596,7 @@ export default async function KastanienBarbershopPage() {
                                 service rows. */}
                             <div className="min-w-0">
                               <p className="truncate text-lg text-shop-bone">
-                                {service.name}
+                                {serviceName(service, "en")}
                               </p>
                               <p className="mt-1 text-sm text-shop-muted">
                                 {formatDuration(service.durationMinutes, "en")}
@@ -818,7 +833,7 @@ function OpeningHoursTable({ days }: { days: DayOpeningHours[] }) {
  */
 function pickFeatured(services: PublicService[]): PublicService[] {
   return FEATURED_SERVICE_NAMES.map((name) =>
-    services.find((service) => service.name === name),
+    services.find((service) => serviceName(service, "en") === name),
   ).filter((service): service is PublicService => service !== undefined);
 }
 

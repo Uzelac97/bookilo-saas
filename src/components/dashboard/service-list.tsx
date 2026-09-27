@@ -4,7 +4,7 @@ import { setServiceActiveAction } from "@/app/(dashboard)/dashboard/services/act
 import { ServiceForm } from "@/components/dashboard/service-form";
 import type { ManagedService } from "@/lib/db/services";
 import { formatDuration, formatPrice } from "@/lib/format";
-import { getT } from "@/lib/i18n/server";
+import { getDashboardT } from "@/lib/i18n/server";
 import type { Translator } from "@/lib/i18n/translate";
 import type { Locale } from "@/lib/preferences";
 import { getLocale } from "@/lib/preferences-server";
@@ -30,7 +30,7 @@ export async function ServiceList({
 }) {
   const active = services.filter((service) => service.active);
   const retired = services.filter((service) => !service.active);
-  const [t, locale] = await Promise.all([getT(), getLocale()]);
+  const [t, locale] = await Promise.all([getDashboardT(), getLocale()]);
 
   return (
     <div className="flex flex-col gap-8">

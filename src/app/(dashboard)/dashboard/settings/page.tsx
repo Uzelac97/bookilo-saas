@@ -4,10 +4,10 @@ import Link from "next/link";
 import { BookingRulesForm } from "@/components/dashboard/booking-rules-form";
 import { getCurrentTenant } from "@/lib/auth/session";
 import { BOOKING_HORIZON_DAYS } from "@/lib/availability/booking-options";
-import { getT } from "@/lib/i18n/server";
+import { getDashboardT } from "@/lib/i18n/server";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getT();
+  const t = await getDashboardT();
   return { title: t("nav.settings") };
 }
 
@@ -25,7 +25,7 @@ export async function generateMetadata(): Promise<Metadata> {
  * getCurrentTenant, so reading it here costs nothing on top of the layout's read.
  */
 export default async function SettingsPage() {
-  const [tenant, t] = await Promise.all([getCurrentTenant(), getT()]);
+  const [tenant, t] = await Promise.all([getCurrentTenant(), getDashboardT()]);
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6">

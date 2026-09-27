@@ -11,11 +11,11 @@ import { getCurrentTenant } from "@/lib/auth/session";
 import { summariseDay } from "@/lib/dashboard/today-summary";
 import { getBookingsForDay } from "@/lib/db/bookings";
 import { formatBookingDate } from "@/lib/format";
-import { getT } from "@/lib/i18n/server";
+import { getDashboardT } from "@/lib/i18n/server";
 import { getLocale } from "@/lib/preferences-server";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getT();
+  const t = await getDashboardT();
   return { title: t("nav.today") };
 }
 
@@ -33,7 +33,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function DashboardPage() {
   const [tenant, t, locale] = await Promise.all([
     getCurrentTenant(),
-    getT(),
+    getDashboardT(),
     getLocale(),
   ]);
   const now = new Date();

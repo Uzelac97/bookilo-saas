@@ -18,9 +18,12 @@ datasource db {
 
 // ---------- Enums ----------
 
+// The vertical. Changes wording and demo data only, never structure — see
+// "Standing boundary: which industries this product serves" in
+// EXECUTION-PLAN.md, which also closes the list at these two.
 enum BusinessType {
   BARBERSHOP
-  // future: SALON, MASSAGE, WELLNESS — additive, no rebuild needed
+  SALON
 }
 
 enum UserRole {
@@ -103,10 +106,12 @@ model Staff {
 model Service {
   id              String   @id @default(cuid())
   tenantId        String
-  name            String
+  name            String // canonical, and what every German surface shows
+  nameEn          String? // English display name; null -> `name` in every language
   durationMinutes Int
   priceMinorUnits Int // EUR cents
   category        String? // plain grouping label, not a taxonomy table
+  categoryEn      String? // English label for `category`; null -> `category`
   active          Boolean  @default(true)
   createdAt       DateTime @default(now())
 

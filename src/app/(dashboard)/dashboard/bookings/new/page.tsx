@@ -8,12 +8,12 @@ import { getStaffAvailability } from "@/lib/db/availability";
 import { getActiveServices } from "@/lib/db/services";
 import { getActiveStaff } from "@/lib/db/staff";
 import { formatBookingDate } from "@/lib/format";
-import { getT } from "@/lib/i18n/server";
+import { getDashboardT } from "@/lib/i18n/server";
 import type { MessageKey } from "@/lib/i18n/translate";
 import { getLocale } from "@/lib/preferences-server";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getT();
+  const t = await getDashboardT();
   return { title: t("dashboard.newBooking") };
 }
 
@@ -59,7 +59,7 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
   ]);
 
   const missing = missingPrerequisite(staff.length, services.length);
-  const [t, locale] = await Promise.all([getT(), getLocale()]);
+  const [t, locale] = await Promise.all([getDashboardT(), getLocale()]);
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8 sm:px-6">

@@ -36,11 +36,11 @@ import {
   formatDateRange,
   formatMinuteOfDay,
 } from "@/lib/format";
-import { getT } from "@/lib/i18n/server";
+import { getDashboardT } from "@/lib/i18n/server";
 import { getLocale } from "@/lib/preferences-server";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getT();
+  const t = await getDashboardT();
   return { title: t("nav.calendar") };
 }
 
@@ -104,7 +104,7 @@ const MAX_PAGE_WIDTH_WITH_ASIDE = "140rem";
 export default async function CalendarPage({ searchParams }: PageProps) {
   const [tenant, t, locale] = await Promise.all([
     getCurrentTenant(),
-    getT(),
+    getDashboardT(),
     getLocale(),
   ]);
   const query = await searchParams;
@@ -188,6 +188,7 @@ export default async function CalendarPage({ searchParams }: PageProps) {
           workingHours: relevantHours,
           timezone: tenant.timezone,
           locale,
+          vertical: tenant.businessType,
         });
 
   // Two container widths, one per breakpoint — see the note on the wrapper.

@@ -70,6 +70,46 @@ export function parsePriceToMinorUnits(input: string): number | null {
   return euros * 100 + cents;
 }
 
+/** A service name's rules — shared by `name` and its optional English twin. */
+const serviceName = () =>
+  z
+    .string()
+    .trim()
+    .min(2, "validation.serviceNameRequired")
+    .max(60, "validation.nameTooLong")
+    .refine(
+      (name) => !hasControlCharacters(name),
+      "validation.nameSingleLineGeneric",
+    );
+
+/** A category's rules — shared by `category` and `categoryEn`. */
+const categoryText = () =>
+  z
+    .string()
+    .trim()
+    .max(40, "validation.categoryTooLong")
+    .refine(
+      (category) => !hasControlCharacters(category),
+      "validation.categorySingleLine",
+    );
+
+/**
+ * An optional text field: an untouched input becomes undefined rather than an
+ * empty string, because each column is nullable and null is what "not set"
+ * means to the public pages' fallback (lib/i18n/service-text.ts). A field of
+ * spaces counts as untouched.
+ *
+ * A preprocess rather than `z.union([z.literal(""), field])`, which is what
+ * `category` used to be: when every branch of a union fails, Zod reports one
+ * generic "Invalid input" and the branch's own message key never arrives, so a
+ * too-long category showed the owner an untranslated library string.
+ */
+const optional = <T extends z.ZodType<string>>(field: T) =>
+  z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    field.optional(),
+  );
+
 /**
  * A service as the owner's form submits it.
  *
@@ -78,74 +118,70 @@ export function parsePriceToMinorUnits(input: string): number | null {
  * write helper scopes by tenant in the same `where` clause. Neither is ordinary
  * form input and neither is accepted here.
  */
-export const serviceInputSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(2, "validation.serviceNameRequired")
-    .max(60, "validation.nameTooLong")
-    .refine(
-      (name) => !hasControlCharacters(name),
-      "validation.nameSingleLineGeneric",
-    ),
-  /**
-   * Arrives as a string from the form. `coerce` would turn "" into 0 and "abc"
-   * into NaN, so this parses explicitly and rejects anything that isn't a whole
-   * number of minutes.
-   */
-  durationMinutes: z
-    .string()
-    .trim()
-    .min(1, "validation.durationRequired")
-    .transform((value) => (/^\d+$/.test(value) ? Number(value) : Number.NaN))
-    .refine(
-      (value) => Number.isInteger(value),
-      "validation.durationWhole",
-    )
-    .refine(
-      (value) => value >= MIN_DURATION_MINUTES && value <= MAX_DURATION_MINUTES,
-      encodeMessage("validation.durationRange", {
-        min: MIN_DURATION_MINUTES,
-        maxHours: MAX_DURATION_MINUTES / 60,
-      }),
-    ),
-  /**
-   * Typed in euros, stored in cents. The field is named for what the owner
-   * types; the transform is what makes the rest of the app's `priceMinorUnits`
-   * true.
-   */
-  priceMinorUnits: z
-    .string()
-    .trim()
-    .min(1, "validation.priceRequired")
-    .transform((value) => parsePriceToMinorUnits(value) ?? Number.NaN)
-    .refine(
-      (value) => Number.isInteger(value),
-      "validation.priceFormat",
-    )
-    .refine(
-      (value) => value <= MAX_PRICE_MINOR_UNITS,
-      "validation.priceTooHigh",
-    ),
-  /**
-   * A plain grouping label, not a taxonomy (EXECUTION-PLAN.md). Optional, and an
-   * untouched field becomes undefined rather than an empty string — the column
-   * is nullable and "" would sort as its own group on the public page.
-   */
-  category: z
-    .union([
-      z.literal(""),
-      z
-        .string()
-        .trim()
-        .max(40, "validation.categoryTooLong")
-        .refine(
-          (category) => !hasControlCharacters(category),
-          "validation.categorySingleLine",
-        ),
-    ])
-    .optional()
-    .transform((value) => (value ? value : undefined)),
-});
+export const serviceInputSchema = z
+  .object({
+    name: serviceName(),
+    /**
+     * Shown instead of `name` on the public pages when a customer has switched
+     * to English. Optional: without it, `name` is shown in both languages.
+     */
+    nameEn: optional(serviceName()),
+    /**
+     * Arrives as a string from the form. `coerce` would turn "" into 0 and "abc"
+     * into NaN, so this parses explicitly and rejects anything that isn't a whole
+     * number of minutes.
+     */
+    durationMinutes: z
+      .string()
+      .trim()
+      .min(1, "validation.durationRequired")
+      .transform((value) => (/^\d+$/.test(value) ? Number(value) : Number.NaN))
+      .refine(
+        (value) => Number.isInteger(value),
+        "validation.durationWhole",
+      )
+      .refine(
+        (value) => value >= MIN_DURATION_MINUTES && value <= MAX_DURATION_MINUTES,
+        encodeMessage("validation.durationRange", {
+          min: MIN_DURATION_MINUTES,
+          maxHours: MAX_DURATION_MINUTES / 60,
+        }),
+      ),
+    /**
+     * Typed in euros, stored in cents. The field is named for what the owner
+     * types; the transform is what makes the rest of the app's `priceMinorUnits`
+     * true.
+     */
+    priceMinorUnits: z
+      .string()
+      .trim()
+      .min(1, "validation.priceRequired")
+      .transform((value) => parsePriceToMinorUnits(value) ?? Number.NaN)
+      .refine(
+        (value) => Number.isInteger(value),
+        "validation.priceFormat",
+      )
+      .refine(
+        (value) => value <= MAX_PRICE_MINOR_UNITS,
+        "validation.priceTooHigh",
+      ),
+    /**
+     * A plain grouping label, not a taxonomy (EXECUTION-PLAN.md). Optional, and
+     * an untouched field becomes undefined rather than an empty string — the
+     * column is nullable and "" would sort as its own group on the public page.
+     */
+    category: optional(categoryText()),
+    /**
+     * The category's English label. Grouping stays keyed on `category`; this
+     * only relabels the group's heading in English.
+     */
+    categoryEn: optional(categoryText()),
+  })
+  // An English label with no category has no group to label — it would be
+  // saved and never shown, which is worse than saying so.
+  .refine((service) => !(service.categoryEn && !service.category), {
+    message: "validation.categoryEnWithoutCategory",
+    path: ["categoryEn"],
+  });
 
 export type ServiceInput = z.infer<typeof serviceInputSchema>;

@@ -4,10 +4,10 @@ import { StaffForm } from "@/components/dashboard/staff-form";
 import { StaffList } from "@/components/dashboard/staff-list";
 import { getCurrentTenant } from "@/lib/auth/session";
 import { getStaffForManagement } from "@/lib/db/staff";
-import { getT } from "@/lib/i18n/server";
+import { getDashboardT } from "@/lib/i18n/server";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getT();
+  const t = await getDashboardT();
   return { title: t("nav.staff") };
 }
 
@@ -35,7 +35,7 @@ export default async function StaffPage({ searchParams }: PageProps) {
   const tenant = await getCurrentTenant();
   const query = await searchParams;
   const staff = await getStaffForManagement(tenant.id, new Date());
-  const t = await getT();
+  const t = await getDashboardT();
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6">

@@ -72,6 +72,16 @@ export function ServiceForm({ service }: { service?: ManagedService }) {
           placeholder={t("services.namePlaceholder")}
           error={errorText(errors.name)}
         />
+        {/* Each German field beside its English twin, so the grid's rows read
+            as pairs: name, then category, then length and price. */}
+        <Field
+          id="nameEn"
+          label={t("services.nameEn")}
+          defaultValue={service?.nameEn ?? ""}
+          placeholder="Haircut"
+          hint={t("services.englishHint")}
+          error={errorText(errors.nameEn)}
+        />
         <Field
           id="category"
           label={t("services.category")}
@@ -79,6 +89,14 @@ export function ServiceForm({ service }: { service?: ManagedService }) {
           placeholder={t("services.categoryPlaceholder")}
           hint={t("services.categoryHint")}
           error={errorText(errors.category)}
+        />
+        <Field
+          id="categoryEn"
+          label={t("services.categoryEn")}
+          defaultValue={service?.categoryEn ?? ""}
+          placeholder="Hair"
+          hint={t("services.englishHint")}
+          error={errorText(errors.categoryEn)}
         />
         <Field
           id="durationMinutes"

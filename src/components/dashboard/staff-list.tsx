@@ -4,7 +4,7 @@ import { setStaffActiveAction } from "@/app/(dashboard)/dashboard/staff/actions"
 import { DISPLAY_WEEK } from "@/lib/availability/opening-hours";
 import type { ManagedStaff } from "@/lib/db/staff";
 import { initials } from "@/lib/format";
-import { getT } from "@/lib/i18n/server";
+import { getDashboardT } from "@/lib/i18n/server";
 import type { Translator } from "@/lib/i18n/translate";
 import { weekdayName } from "@/lib/i18n/weekdays";
 
@@ -29,7 +29,7 @@ export async function StaffList({
 }) {
   const active = staff.filter((member) => member.active);
   const retired = staff.filter((member) => !member.active);
-  const t = await getT();
+  const t = await getDashboardT();
 
   return (
     <div className="flex flex-col gap-8">

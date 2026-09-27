@@ -7,7 +7,7 @@ import { TimeOffEditor } from "@/components/dashboard/time-off-editor";
 import { WorkingHoursEditor } from "@/components/dashboard/working-hours-editor";
 import { getCurrentTenant } from "@/lib/auth/session";
 import { getStaffMember } from "@/lib/db/staff";
-import { getT } from "@/lib/i18n/server";
+import { getDashboardT } from "@/lib/i18n/server";
 
 type PageProps = { params: Promise<{ staffId: string }> };
 
@@ -17,7 +17,7 @@ export async function generateMetadata({
   const { staffId } = await params;
   const tenant = await getCurrentTenant();
   const member = await getStaffMember(tenant.id, staffId, new Date());
-  const t = await getT();
+  const t = await getDashboardT();
 
   return { title: member ? member.name : t("staff.notFound") };
 }
@@ -42,7 +42,7 @@ export default async function StaffMemberPage({ params }: PageProps) {
 
   if (!member) notFound();
 
-  const t = await getT();
+  const t = await getDashboardT();
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6">

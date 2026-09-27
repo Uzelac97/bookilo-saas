@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:seed": "prisma db seed",
+    "db:seed:salon": "tsx prisma/seed-salon.ts",
     "reset-password": "tsx scripts/reset-password.ts",
     "probe:constraint": "tsx scripts/probe-exclusion-constraint.ts",
     "probe:rate-limit": "tsx scripts/probe-rate-limit.ts",

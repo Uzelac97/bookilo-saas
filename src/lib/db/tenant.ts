@@ -1,6 +1,17 @@
+import type { BusinessType } from "@prisma/client";
+
 import type { BookingRulesInput } from "@/lib/validation/settings";
+import type { Vertical } from "@/lib/vertical";
 
 import { prisma } from "./prisma";
+
+/**
+ * Pins lib/vertical.ts to the Prisma enum it restates. Mutual assignability, so
+ * a value added to either side alone fails here — see the note in that file.
+ */
+type Equal<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+const verticalMatchesBusinessType: Equal<Vertical, BusinessType> = true;
+void verticalMatchesBusinessType;
 
 /**
  * Loads a tenant by its id. The caller must have obtained the id from the

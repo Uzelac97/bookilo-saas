@@ -3,7 +3,13 @@ import Link from "next/link";
 import type { PublicService } from "@/lib/db/services";
 import { formatDuration, formatPrice } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
+import {
+  categoryLabel,
+  groupCategoryEn,
+  serviceName,
+} from "@/lib/i18n/service-text";
 import { getLocale } from "@/lib/preferences-server";
+import type { Vertical } from "@/lib/vertical";
 
 type ServiceGroup = {
   /** null = the services with no category set. */
@@ -14,11 +20,13 @@ type ServiceGroup = {
 export async function ServiceList({
   services,
   slug,
+  vertical,
 }: {
   services: PublicService[];
   slug: string;
+  vertical: Vertical;
 }) {
-  const [t, locale] = await Promise.all([getT(), getLocale()]);
+  const [t, locale] = await Promise.all([getT(vertical), getLocale()]);
 
   if (services.length === 0) {
     return (
@@ -40,7 +48,13 @@ export async function ServiceList({
         <div key={group.category ?? "__uncategorized"}>
           {showHeadings ? (
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-fg-muted">
-              {group.category ?? t("shop.otherCategory")}
+              {categoryLabel(
+                {
+                  category: group.category,
+                  categoryEn: groupCategoryEn(group.services),
+                },
+                locale,
+              ) ?? t("shop.otherCategory")}
             </h3>
           ) : null}
 
@@ -57,7 +71,7 @@ export async function ServiceList({
                     every service on a phone. */}
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <span className="truncate font-medium text-fg">
-                    {service.name}
+                    {serviceName(service, locale)}
                   </span>
                   <span className="text-sm text-fg-muted">
                     {formatDuration(service.durationMinutes, locale)}

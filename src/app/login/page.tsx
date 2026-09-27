@@ -10,7 +10,7 @@ import { getTheme } from "@/lib/preferences-server";
 // Spelled out rather than relying on a template: /login sits outside the
 // (dashboard) group, so it inherits the root layout's untemplated title.
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getT();
+  const t = await getT(null);
   return { title: `${t("login.title")} · Bookilo` };
 }
 
@@ -25,7 +25,7 @@ export default async function LoginPage({
   if (await getSession()) redirect("/dashboard");
 
   const { callbackUrl } = await searchParams;
-  const [t, theme] = await Promise.all([getT(), getTheme()]);
+  const [t, theme] = await Promise.all([getT(null), getTheme()]);
 
   return (
     <div className="relative flex flex-1 items-center justify-center bg-canvas px-4 py-16">

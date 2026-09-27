@@ -1,6 +1,6 @@
 import type { DaySummary } from "@/lib/dashboard/today-summary";
 import { formatPrice, formatSlotTime } from "@/lib/format";
-import { getT } from "@/lib/i18n/server";
+import { getDashboardT } from "@/lib/i18n/server";
 
 import { SummaryCell } from "./today-list";
 
@@ -41,7 +41,7 @@ export async function CalendarSummary({
   summary: DaySummary;
   timezone: string;
 }) {
-  const t = await getT();
+  const t = await getDashboardT();
 
   return (
     <div className="flex flex-col gap-px overflow-hidden rounded-2xl border border-line bg-subtle-strong">

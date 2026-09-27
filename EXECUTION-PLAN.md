@@ -80,7 +80,9 @@ inventory. Serving both costs nothing — the data model is already identical.
 **What differs between them is terminology, branding and seed data. Never
 structure.** A `vertical` field on `Tenant` plus a label map is the entire
 mechanism. Internal names stay generic (`Staff`, `Service`, `Booking`);
-only owner-facing strings change.
+only owner-facing strings change. (As built in Phase 16, the field is the existing
+`Tenant.businessType` and the label map is a per-vertical message overlay, and the
+public booking pages switch wording too. See decisions 13 and 14.)
 
 **Why the generic platform was rejected.** The differentiator over Fresha and
 Shore is that this product is _not_ generic — that is the entire wedge.
@@ -283,7 +285,7 @@ de-risks the project; a slightly later demo does not.
 | 14.3 | Prod verification: exclusion constraint re-proven under Neon pooled connections, Auth.js edge/Node split on real Vercel runtime, root-URL fix, full owner + customer click-through on the live URL from a phone                                                                                                                                                                                                                                                                                 |
 | 15   | Security and tenant-isolation audit — the only pre-launch review that runs. Narrow accessibility pass on the public booking page only                                                                                                                                                                                                                                                                                                                                                           |
 | 15a  | i18n (German default, English toggle) + light/dark mode toggle + ~~drag-to-select booking on the calendar~~ (cut, decision 9). Inserted 13 Aug 2026; i18n is a reversal of an exclusion, the other two are new. See "Decisions recorded after 14.3" and "Recorded during Phase 15a"                                                                                                                                                                                                              |
-| 16   | `Tenant.vertical` + terminology map, salon demo tenant seed, `DEMO.md`                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 16   | Salon vertical (`Tenant.businessType`, decision 13) + terminology map, salon demo tenant seed, ~~`DEMO.md`~~ (cut, decision 15)                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | 16a  | Landing page — deliberately last, and deliberately not an SEO surface                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | 17   | Code quality pass — **runs after the first 3–5 real demos, not before**                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
@@ -747,7 +749,7 @@ and time, at 30-minute granularity.
 the root layout, so the first byte already has the right `lang` and `data-theme`. No
 flash, and no inline script. The toggles appear in the dashboard header and on the
 login page only. A customer on `/b/[slug]` gets German and their OS theme, with no
-switch.
+switch. *(Reversed in part by 17: the public pages now carry the switches too.)*
 
 *Cost:* the choice doesn't follow an owner to another device, because storing it per
 user would be a schema change. Per-tenant language is excluded under item 1. A browser
@@ -769,6 +771,94 @@ own copy, written in English, on a fixed dark palette (`shop-*` tokens, not
 wrapper so screen readers don't read it with German pronunciation, and looks the same
 in both themes. Translating a shop's marketing copy is content work for that shop, not
 app chrome.
+
+### Recorded during Phase 16
+
+Recorded 27 Sep 2026, while implementing the salon vertical. Same format as the
+entries above: what was decided, what it costs.
+
+**13. The vertical is `Tenant.businessType`, not a new `Tenant.vertical`.** The plan
+called for a `vertical` field (`BARBER | SALON`). `Tenant.businessType` already existed
+for exactly this, as an enum with one value and a schema comment reserving `SALON` as
+additive. A second column would have been two sources of truth for one fact. The
+migration `add_salon_business_type` is one line, `ALTER TYPE "BusinessType" ADD VALUE
+'SALON'`: no new column, no backfill, and existing tenants keep `BARBERSHOP` through the
+default. Client code can't import `@prisma/client`, so `src/lib/vertical.ts` restates
+the union, and `lib/db/tenant.ts` pins it to the Prisma enum at compile time. The
+vertical is set at tenant creation (today, only by the seeds). No settings screen edits
+it.
+
+*Cost:* the name reads as a category, not the plan's word "vertical". And Postgres can't
+drop an enum value without recreating the type, so `SALON` is effectively permanent.
+
+**14. The terminology map is whole messages per vertical, not a swapped noun.** German
+can't take a `staffLabel` spliced into a sentence. "Dieser Barber" and "des Barbers"
+carry article and case, and "Stylist:in" fits neither. So a vertical is an overlay of
+complete messages (`lib/i18n/messages/salon.{de,en}.ts`) over the base dictionaries,
+which remain the barbershop's wording. German salon copy uses "Stylist:in" where the
+noun stands alone, and rephrases around "diese Person" / "das Team" where a sentence
+would need a gendered article. Both the dashboard and the public booking pages switch
+by vertical. `getT(vertical)` requires the argument on public pages, `getDashboardT()`
+resolves it from the session, and a context supplies it to client components.
+`translate.test.ts` fails if any salon-rendered message still says barber or shop,
+except an explicit list of tenantless keys, or if an override drops a placeholder.
+Emails are unchanged: their only staff reference is the staff member's name.
+
+*Cost:* a new message with barbershop wording needs a salon version too. The test names
+the missing key rather than letting it ship.
+
+**15. `DEMO.md` is cut from Phase 16.** Its contents were a pitch script: walkthrough
+order, what to say at each screen, the pre-meeting reset, and email deliverability
+during a live demo. That serves in-person selling, and this is a portfolio project
+(`CLAUDE.md`, Project context). The two reset commands are documented at the top of
+`prisma/seed.ts` and `prisma/seed-salon.ts`.
+
+*Cost:* the deliverability warning (a new sending domain can land in spam) is recorded
+only in `V1-LAUNCH-PLAN.md`, not next to the demo it would affect.
+
+**16. Known salon gap: colour processing time.** A salon books the stylist a second
+client while colour develops. Here a service blocks its stylist for its whole
+duration. Modelling it would split a service into active and processing segments,
+which changes `slots.ts` and the exclusion constraint, the most correctness-dense code
+in the project. Not built. The salon demo books colour services for their full length,
+and says so in `prisma/seed-salon.ts`.
+
+*Cost:* a real salon would lose bookable time on every colour appointment. It is the
+first thing a salon owner would raise.
+
+**17. The public shop pages get the language and theme switches.** This reverses the
+part of decision 10 that gave a customer on `/b/[slug]` no switch. The reason is 18:
+with per-service English names, a customer's language choice changes the tenant's own
+content, not just the interface, so the switch now does something for a customer. The
+switches sit in `(public)/b/[slug]/layout.tsx`, above every page under it, including
+the 404. That is safe because their actions set only the visitor's own cookies and read
+no tenant data. The Kastanien marketing page is outside `/b/` and keeps decision 12.
+
+*Cost:* one more row of chrome above the shop's own header, on every public page.
+
+**18. `Service.nameEn` and `Service.categoryEn`: optional English columns, German
+canonical.** The migration `add_service_english_names` adds two nullable text columns.
+It has no backfill and doesn't touch `Booking`. `name` and `category` stay the
+canonical German values, and every German surface shows them. In English,
+`lib/i18n/service-text.ts` shows `nameEn` / `categoryEn` where set and falls back to
+the German otherwise, so an owner who never fills them in loses nothing. Owners edit
+both in the dashboard service form. The validation rejects `categoryEn` without a
+`category`, because there is no group for it to label.
+
+- **Columns, not a translation map.** `category` is free text the owner types per
+  service, not an enum, so a fixed map can't cover categories an owner invents. A
+  group's English label is the first non-null `categoryEn` among its services.
+- **Kastanien's names became German.** They had been English ("Haircut"), which
+  contradicted German being the default. The English marketing page now finds its
+  featured services by `nameEn`.
+- **Sort order stays German.** Groups and services are ordered by `category` and then
+  `name` in both languages. So English groups aren't alphabetical (the salon reads
+  "Women, Colour & highlights, Men & kids, Care & styling").
+- **Emails keep `name`.** They are always German (decision 11).
+- **The dashboard lists keep `name`.** They show the owner's canonical value.
+
+*Cost:* a menu can be half-translated. A service with no `nameEn` shows German inside
+an English page. Nothing flags a missing English value to the owner.
 
 ### Deferred out of Day 14
 

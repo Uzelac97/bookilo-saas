@@ -23,6 +23,9 @@ export type PublicService = {
   durationMinutes: number;
   priceMinorUnits: number;
   category: string | null;
+  /** English display values; null means "same as the German". See lib/i18n/service-text.ts. */
+  nameEn: string | null;
+  categoryEn: string | null;
 };
 
 /**
@@ -50,6 +53,8 @@ export async function getActiveServices(
       durationMinutes: true,
       priceMinorUnits: true,
       category: true,
+      nameEn: true,
+      categoryEn: true,
     },
   });
 }
@@ -85,6 +90,8 @@ export async function getServicesForTenant(
       durationMinutes: true,
       priceMinorUnits: true,
       category: true,
+      nameEn: true,
+      categoryEn: true,
       active: true,
     },
   });
@@ -99,7 +106,8 @@ export async function createService(
   tenantId: string,
   input: ServiceInput,
 ): Promise<{ id: string }> {
-  const { name, durationMinutes, priceMinorUnits, category } = input;
+  const { name, nameEn, durationMinutes, priceMinorUnits, category, categoryEn } =
+    input;
 
   return prisma.service.create({
     data: {
@@ -110,6 +118,8 @@ export async function createService(
       // Explicit null rather than omitted: this is also the update path's shape,
       // where clearing a category has to actually clear it.
       category: category ?? null,
+      nameEn: nameEn ?? null,
+      categoryEn: categoryEn ?? null,
     },
     select: { id: true },
   });
@@ -144,7 +154,8 @@ export async function updateService(
   serviceId: string,
   input: ServiceInput,
 ): Promise<ServiceWriteResult> {
-  const { name, durationMinutes, priceMinorUnits, category } = input;
+  const { name, nameEn, durationMinutes, priceMinorUnits, category, categoryEn } =
+    input;
 
   const { count } = await prisma.service.updateMany({
     where: { id: serviceId, tenantId },
@@ -153,6 +164,8 @@ export async function updateService(
       durationMinutes,
       priceMinorUnits,
       category: category ?? null,
+      nameEn: nameEn ?? null,
+      categoryEn: categoryEn ?? null,
     },
   });
 

@@ -27,7 +27,7 @@ const geistMono = Geist_Mono({
  * instead, which is the only place it belongs.
  */
 export async function generateMetadata(): Promise<Metadata> {
-  const t = await getT();
+  const t = await getT(null);
   return {
     title: "Bookilo",
     description: t("meta.description"),

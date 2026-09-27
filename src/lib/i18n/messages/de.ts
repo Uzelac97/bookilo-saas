@@ -64,7 +64,7 @@ export const de = {
 
   // ─── Public shop page ─────────────────────────────────────────────────────
   "shop.businessTypeBarbershop": "Barbershop",
-  "shop.businessTypeFallback": "Termine",
+  "shop.businessTypeSalon": "Friseursalon",
   "shop.metaDescription": "Termin buchen bei {shop}.",
   "shop.metaDescriptionWithAddress": "Termin buchen bei {shop}, {address}.",
   "shop.notFoundTitle": "Shop nicht gefunden",
@@ -290,6 +290,10 @@ export const de = {
   "services.categoryPlaceholder": "Haare",
   "services.categoryHint":
     "Optional – gruppiert Leistungen auf der öffentlichen Seite.",
+  "services.nameEn": "Name auf Englisch",
+  "services.categoryEn": "Kategorie auf Englisch",
+  "services.englishHint":
+    "Optional – wird auf der öffentlichen Seite gezeigt, wenn jemand auf Englisch umschaltet.",
   "services.length": "Dauer in Minuten",
   "services.lengthHint": "So lange ist der Stuhl belegt.",
   "services.price": "Preis in €",
@@ -435,6 +439,8 @@ export const de = {
   "validation.categoryTooLong": "Dieser Kategoriename ist zu lang.",
   "validation.categorySingleLine":
     "Bitte die Kategorie in einer Zeile eingeben.",
+  "validation.categoryEnWithoutCategory":
+    "Eine englische Kategorie braucht eine Kategorie, die sie übersetzt.",
   "validation.bufferMissing": "Bitte eine Pause eingeben, oder 0 für keine.",
   "validation.bufferInvalid": "Bitte die Pause in ganzen Minuten eingeben.",
   "validation.bufferRange":

@@ -120,3 +120,57 @@ describe("serviceInputSchema", () => {
     ).toBe(false);
   });
 });
+
+describe("serviceInputSchema — English values", () => {
+  /** The message key a field fails with — what the form translates and shows. */
+  const errorFor = (overrides: Record<string, unknown>, field: string) =>
+    serviceInputSchema
+      .safeParse(input(overrides))
+      .error?.issues.find((issue) => issue.path[0] === field)?.message;
+
+  it("keeps an English name and category when given", () => {
+    expect(
+      serviceInputSchema.parse(
+        input({ name: "Haarschnitt", nameEn: "Haircut", category: "Haare", categoryEn: "Hair" }),
+      ),
+    ).toMatchObject({ nameEn: "Haircut", categoryEn: "Hair" });
+  });
+
+  it("treats both as optional, and a field of spaces as not set", () => {
+    // Undefined is what becomes null in the column, and null is what the public
+    // pages fall back on — a stored "" would render as a blank service name.
+    for (const blank of [undefined, "", "   "]) {
+      const parsed = serviceInputSchema.parse(input({ nameEn: blank, categoryEn: blank }));
+      expect(parsed.nameEn).toBeUndefined();
+      expect(parsed.categoryEn).toBeUndefined();
+    }
+  });
+
+  it("holds the English name to the same rules as the name", () => {
+    expect(errorFor({ nameEn: "H" }, "nameEn")).toBe("validation.serviceNameRequired");
+    expect(errorFor({ nameEn: "H".repeat(61) }, "nameEn")).toBe("validation.nameTooLong");
+    expect(errorFor({ nameEn: "Hair\ncut" }, "nameEn")).toBe(
+      "validation.nameSingleLineGeneric",
+    );
+  });
+
+  it("reports a too-long category by its message key, not \"Invalid input\"", () => {
+    // Regression: category used to be a union, and a failed union loses the
+    // branch's message, so the owner saw an untranslated library string.
+    expect(errorFor({ category: "C".repeat(41) }, "category")).toBe(
+      "validation.categoryTooLong",
+    );
+  });
+
+  it("holds the English category to the same rules as the category", () => {
+    expect(errorFor({ categoryEn: "C".repeat(41) }, "categoryEn")).toBe(
+      "validation.categoryTooLong",
+    );
+  });
+
+  it("rejects an English category with no category to label", () => {
+    expect(errorFor({ category: "", categoryEn: "Hair" }, "categoryEn")).toBe(
+      "validation.categoryEnWithoutCategory",
+    );
+  });
+});

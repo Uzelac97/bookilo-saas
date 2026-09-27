@@ -1,6 +1,6 @@
 import type { DashboardBooking } from "@/lib/db/bookings";
 import { formatBookingDate } from "@/lib/format";
-import { getT } from "@/lib/i18n/server";
+import { getDashboardT } from "@/lib/i18n/server";
 import { getLocale } from "@/lib/preferences-server";
 
 import { TodayList } from "./today-list";
@@ -36,7 +36,7 @@ export async function WeekAgenda({
   todayDate: string;
   now: Date;
 }) {
-  const [t, locale] = await Promise.all([getT(), getLocale()]);
+  const [t, locale] = await Promise.all([getDashboardT(), getLocale()]);
 
   return (
     <div className="flex flex-col gap-5">

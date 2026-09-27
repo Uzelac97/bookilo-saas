@@ -28,6 +28,7 @@ import type { CalendarStaff } from "@/lib/db/staff";
 import { formatMinuteOfDay, formatStripDay } from "@/lib/format";
 import { createTranslator } from "@/lib/i18n/translate";
 import type { Locale } from "@/lib/preferences";
+import type { Vertical } from "@/lib/vertical";
 
 const MINUTES_PER_DAY = 24 * 60;
 const MINUTES_PER_HOUR = 60;
@@ -369,10 +370,14 @@ export type BuildGridInput = {
  * forever. See getStaffForCalendar for why they can't simply be dropped.
  */
 export function buildDayGrid(
-  input: BuildGridInput & { staff: CalendarStaff[] },
+  input: BuildGridInput & {
+    staff: CalendarStaff[];
+    /** The tenant's vertical, for the "Unknown barber" / "Unknown stylist" header. */
+    vertical: Vertical;
+  },
 ): CalendarGrid {
   const { bookings, staff, workingHours, timezone } = input;
-  const t = createTranslator(input.locale);
+  const t = createTranslator(input.locale, input.vertical);
 
   const spans = bookings.map((booking) => ({
     booking,

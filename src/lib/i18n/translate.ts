@@ -10,9 +10,12 @@
  * email templates and tests alike.
  */
 import type { Locale } from "@/lib/preferences";
+import type { Vertical } from "@/lib/vertical";
 
 import { de } from "./messages/de";
 import { en } from "./messages/en";
+import { salonDe } from "./messages/salon.de";
+import { salonEn } from "./messages/salon.en";
 
 export type MessageKey = keyof typeof de;
 
@@ -31,6 +34,35 @@ export type Translator = (key: MessageKey | PluralKey, params?: MessageParams) =
 
 const DICTIONARIES: Record<Locale, Record<MessageKey, string>> = { de, en };
 
+type Overlay = Partial<Record<MessageKey, string>>;
+
+/**
+ * The terminology map: per vertical, the messages that read differently.
+ *
+ * Whole messages layered over the base dictionary, rather than a `staffLabel`
+ * spliced into sentences — German can't be assembled that way (see
+ * messages/salon.de.ts). The base dictionaries are the barbershop's wording,
+ * so BARBERSHOP overlays nothing and renders exactly as before verticals
+ * existed.
+ */
+const OVERLAYS: Record<Vertical, Record<Locale, Overlay>> = {
+  BARBERSHOP: { de: {}, en: {} },
+  SALON: { de: salonDe, en: salonEn },
+};
+
+/** Merged once per (vertical, locale) — four objects, built on first use. */
+const merged = new Map<string, Record<MessageKey, string>>();
+
+function messagesFor(locale: Locale, vertical: Vertical): Record<MessageKey, string> {
+  const cacheKey = `${vertical}:${locale}`;
+  let messages = merged.get(cacheKey);
+  if (!messages) {
+    messages = { ...DICTIONARIES[locale], ...OVERLAYS[vertical][locale] };
+    merged.set(cacheKey, messages);
+  }
+  return messages;
+}
+
 /** BCP 47 tags for Intl and Luxon, per interface language. */
 export const INTL_LOCALES: Record<Locale, string> = {
   de: "de-DE",
@@ -39,8 +71,16 @@ export const INTL_LOCALES: Record<Locale, string> = {
   en: "en-GB",
 };
 
-export function createTranslator(locale: Locale): Translator {
-  const messages = DICTIONARIES[locale];
+/**
+ * `vertical` defaults to the base wording for surfaces that belong to no
+ * tenant — login, the root layout, a shop that doesn't exist. Anything that
+ * renders for a tenant passes that tenant's vertical.
+ */
+export function createTranslator(
+  locale: Locale,
+  vertical: Vertical = "BARBERSHOP",
+): Translator {
+  const messages = messagesFor(locale, vertical);
   const plurals = new Intl.PluralRules(INTL_LOCALES[locale]);
 
   return (key, params) => {

@@ -17,7 +17,7 @@
 | **14** | First production deploy | Blocks everything — you cannot demo from localhost |
 | **15** | Security & tenant-isolation audit | Blocks real customer data |
 | **15a** | i18n (DE default, EN toggle) + light/dark mode + ~~drag-to-select booking~~ (cut) | Blocks the German in-person demo |
-| **16** | Salon vertical + DEMO.md | Blocks salon demos |
+| **16** | Salon vertical + ~~DEMO.md~~ (cut) | Blocks salon demos |
 | **16a** | Landing page | Blocks nothing — deliberately last |
 | **17** | Code quality pass | **After** first 3–5 demos |
 
@@ -164,7 +164,14 @@ seconds of a pitch and this one is not.
 
 - `Tenant.vertical` enum (`BARBER | SALON`) + terminology map (`staffLabel`, `serviceLabel`, etc.)
 - Second seed file: salon demo tenant with authentic services and staff names
-- `DEMO.md` in the repo
+- ~~`DEMO.md` in the repo~~
+
+**Built 27 Sep 2026 without DEMO.md.** The vertical became the existing
+`Tenant.businessType`, and the terminology map became whole-message overlays rather
+than label variables. DEMO.md was cut. The reasons are decisions 13–15 under "Recorded
+during Phase 16" in `EXECUTION-PLAN.md`. The two paragraphs below are kept as the
+record of what DEMO.md was for, and the deliverability warning in the first still
+holds for any live demo.
 
 **DEMO.md and email during a demo.** The sandbox restriction is gone — `bookilo.de` is verified, so a prospect's own address will actually receive mail, and booking with their address is now the stronger demo. What remains true and belongs in DEMO.md: a new domain has no sending reputation, so the first emails can land in spam. Check where a test send lands before a meeting, and if it's spam, book with your own address in front of them instead of gambling on their inbox.
 

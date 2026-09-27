@@ -55,7 +55,7 @@ export const en = {
 
   // ─── Public shop page ─────────────────────────────────────────────────────
   "shop.businessTypeBarbershop": "Barbershop",
-  "shop.businessTypeFallback": "Appointments",
+  "shop.businessTypeSalon": "Hair salon",
   "shop.metaDescription": "Book an appointment at {shop}.",
   "shop.metaDescriptionWithAddress":
     "Book an appointment at {shop}, {address}.",
@@ -277,6 +277,10 @@ export const en = {
   "services.category": "Category",
   "services.categoryPlaceholder": "Hair",
   "services.categoryHint": "Optional — groups services on your public page.",
+  "services.nameEn": "English name",
+  "services.categoryEn": "English category",
+  "services.englishHint":
+    "Optional — shown on your public page when a customer switches to English.",
   "services.length": "Length in minutes",
   "services.lengthHint": "How long the chair is taken for.",
   "services.price": "Price in €",
@@ -416,6 +420,8 @@ export const en = {
     "That price looks too high — check the decimal point.",
   "validation.categoryTooLong": "That category name is too long.",
   "validation.categorySingleLine": "Enter the category on a single line.",
+  "validation.categoryEnWithoutCategory":
+    "Add a category first — the English one is its translation.",
   "validation.bufferMissing": "Enter a gap, or 0 for none.",
   "validation.bufferInvalid": "Enter the gap in whole minutes.",
   "validation.bufferRange": "Keep the gap between 0 and {max} minutes.",

@@ -2,14 +2,21 @@ import type { DayOpeningHours } from "@/lib/availability/opening-hours";
 import { formatMinuteOfDay } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
 import { weekdayName } from "@/lib/i18n/weekdays";
+import type { Vertical } from "@/lib/vertical";
 
 /**
  * The seven-day hours table. `days` arrives already merged and in display
  * order from mergeOpeningHours — this component does no weekday arithmetic of
  * its own, which is the point of that split.
  */
-export async function OpeningHours({ days }: { days: DayOpeningHours[] }) {
-  const t = await getT();
+export async function OpeningHours({
+  days,
+  vertical,
+}: {
+  days: DayOpeningHours[];
+  vertical: Vertical;
+}) {
+  const t = await getT(vertical);
 
   return (
     <dl className="flex flex-col gap-1.5 text-sm">

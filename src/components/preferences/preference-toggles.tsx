@@ -8,9 +8,9 @@ import type { MessageKey } from "@/lib/i18n/translate";
 import { LOCALES, THEMES, type Locale, type Theme } from "@/lib/preferences";
 
 /**
- * Language and theme switches, shown in the dashboard header and on the login
- * page — owner-facing surfaces only. A customer on /b/[slug] gets the defaults
- * (German, their OS theme) and no switch.
+ * Language and theme switches, shown in the dashboard header, on the login
+ * page, and above every public shop page (/b/[slug]). The marketing page has
+ * none: it is English only (EXECUTION-PLAN.md, decisions 12 and 17).
  */
 export function PreferenceToggles({ theme }: { theme: Theme }) {
   return (
