@@ -36,13 +36,15 @@
    THE PRODUCT PALETTE — every colour the dashboard, login and booking flow use.
 
    The whole palette, not two variables: each token below replaces one Tailwind
-   shade the app used to name directly, one to one. Both themes are grounded in
-   warm stone rather than zinc: in light the ground and body text (surface,
-   canvas, fg), in dark the ground, its hovers and chips, the dividers, and
-   body text. So neither theme reads clinical, and a dark card's border isn't
-   blue-grey on brown. Muted and faint text and the strong borders were tuned
-   for contrast (below). Every other value is still the zinc shade it
-   replaced, noted where it isn't obvious.
+   shade the app used to name directly, one to one. Light is grounded in warm
+   stone rather than zinc (surface, canvas, fg), so it doesn't read clinical.
+   Dark is neutral grey with a faint cool cast — ground, hovers and chips,
+   dividers — so it reads quiet rather than brown, and its body text is a
+   muted off-white rather than near-white, which glared against the ground.
+   The grounds and dividers share that one cast, so a dark card's border
+   never sits a different hue from the card. Muted and faint text and the
+   strong borders were tuned for contrast (below). Every other value is still
+   the zinc shade it replaced, noted where it isn't obvious.
 
    Components name these tokens (bg-surface, text-fg, border-line) and never a
    raw zinc/white/red/amber/emerald shade; src/app/theme-tokens.test.ts fails the
@@ -69,34 +71,37 @@
    ------------------------------------------------------------------------ */
 @theme {
   /* Surfaces. In light, cards (surface) sit lighter than the page (canvas); in
-     dark the order is kept — cards lift off a darker ground, at 1.18:1 (the
-     zinc pair before it managed 1.10:1, and cards all but vanished). Dark
-     subtle stays a step above surface (1.13:1), so a hover still shows. */
-  --color-surface: light-dark(#fefefe, #211d1a);
-  --color-canvas: light-dark(#f5f5f4, #0c0a09); /* stone-100 / stone-950 */
-  --color-subtle: light-dark(#f4f4f5, #2c2724); /* zinc-100: hovers, chips */
-  --color-subtle-strong: light-dark(#e4e4e7, #36302c); /* zinc-200 */
+     dark the order is kept — cards lift off a darker ground, at 1.17:1 (an
+     earlier zinc pair managed 1.10:1, and cards all but vanished). Dark
+     canvas is not near-black, so surface has to sit well above it to clear
+     the 1.15 floor. Dark subtle stays a step above surface (1.14:1), so a
+     hover still shows. */
+  --color-surface: light-dark(#fefefe, #242427);
+  --color-canvas: light-dark(#f5f5f4, #161618); /* light: stone-100 */
+  --color-subtle: light-dark(#f4f4f5, #2e2e32); /* zinc-100: hovers, chips */
+  --color-subtle-strong: light-dark(#e4e4e7, #38383d); /* zinc-200 */
   --color-fill: light-dark(#d4d4d8, #52525b); /* zinc-300: neutral marks */
   --color-fill-strong: light-dark(#a1a1aa, #71717a); /* zinc-400 */
 
   /* Text, strongest to weakest. */
-  --color-fg: light-dark(#292524, #fafaf9); /* stone-800 / stone-50 */
+  --color-fg: light-dark(#292524, #e4e4e7); /* stone-800 / zinc-200 */
   --color-fg-secondary: light-dark(#3f3f46, #d4d4d8); /* zinc-700 */
   --color-fg-tertiary: light-dark(#52525b, #b8b8c0); /* zinc-600 */
   /* Light: between zinc-500 and -600. ≥6.0:1 on all three grounds, well clear
      of AA and of faint below it. */
   --color-fg-muted: light-dark(#5c5c65, #a1a1aa);
   /* Between zinc-400 and -500 in both themes. ≥4.65:1 on all three grounds in
-     light, ≥5.03:1 in dark, and still a step below muted in each. */
-  --color-fg-faint: light-dark(#6d6d76, #96969f);
+     light, ≥4.91:1 in dark (its lowest is on subtle), and still a step below
+     muted in each. */
+  --color-fg-faint: light-dark(#6d6d76, #9b9ba4);
   --color-fg-disabled: light-dark(#d4d4d8, #52525b); /* zinc-300 */
 
   /* Borders and dividers. */
-  --color-line-faint: light-dark(#f4f4f5, #292421); /* zinc-100 */
-  --color-line: light-dark(#e4e4e7, #36302c); /* zinc-200 */
+  --color-line-faint: light-dark(#f4f4f5, #2a2a2e); /* zinc-100 */
+  --color-line: light-dark(#e4e4e7, #38383d); /* zinc-200 */
   /* Form-field and button outlines: ≥3.1:1 on surface and canvas, both themes
-     (dark: 3.31 on surface, 3.91 on canvas). */
-  --color-line-strong: light-dark(#8a8a93, #6e6e77);
+     (dark: 3.34 on surface, 3.90 on canvas). */
+  --color-line-strong: light-dark(#8a8a93, #74747b);
   --color-line-stronger: light-dark(#71717a, #78787f); /* light: zinc-500 */
 
   /* The primary action and selected state. Inverts in dark — a light button on
