@@ -418,7 +418,8 @@ export type DashboardBooking = {
   endAt: Date;
   status: BookingStatus;
   source: BookingSource;
-  service: { name: string; priceMinorUnits: number };
+  // nameEn so the dashboard can follow the DE/EN toggle (lib/i18n/service-text.ts).
+  service: { name: string; nameEn: string | null; priceMinorUnits: number };
   // `id` is here for the calendar, which groups bookings into one column per
   // barber and cannot do that by name — two barbers called Marco would collapse
   // into one column, and a renamed barber would split into two.
@@ -481,7 +482,7 @@ export async function getBookingsForRange(
       endAt: true,
       status: true,
       source: true,
-      service: { select: { name: true, priceMinorUnits: true } },
+      service: { select: { name: true, nameEn: true, priceMinorUnits: true } },
       staff: { select: { id: true, name: true } },
       customer: { select: { name: true, phone: true, email: true } },
     },

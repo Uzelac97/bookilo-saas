@@ -19,6 +19,7 @@ import type { PublicService } from "@/lib/db/services";
 import type { PublicStaff } from "@/lib/db/staff";
 import { formatDuration, formatPrice, formatSlotTime } from "@/lib/format";
 import { useLocale, useT } from "@/lib/i18n/client";
+import { serviceName } from "@/lib/i18n/service-text";
 import { translateMessage, type MessageKey } from "@/lib/i18n/translate";
 
 /** See the note in service-form.tsx — a "use server" module can't export this. */
@@ -145,7 +146,7 @@ export function ManualBookingForm({
           onChange={setServiceId}
           options={services.map((item) => ({
             value: item.id,
-            label: `${item.name} · ${formatDuration(item.durationMinutes, locale)} · ${formatPrice(item.priceMinorUnits)}`,
+            label: `${serviceName(item, locale)} · ${formatDuration(item.durationMinutes, locale)} · ${formatPrice(item.priceMinorUnits)}`,
           }))}
         />
 

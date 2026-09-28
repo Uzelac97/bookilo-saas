@@ -23,7 +23,10 @@ import {
   initials,
 } from "@/lib/format";
 import { getDashboardT } from "@/lib/i18n/server";
+import { serviceName } from "@/lib/i18n/service-text";
 import type { Translator } from "@/lib/i18n/translate";
+import type { Locale } from "@/lib/preferences";
+import { getLocale } from "@/lib/preferences-server";
 
 /**
  * The chrome and text metrics each density tier is allowed, and the content it
@@ -126,8 +129,9 @@ export async function CalendarGrid({
 }) {
   // Resolved once and handed down: the helpers below are plain functions
   // rendered many times over, and one translator for the whole grid keeps
-  // them synchronous.
-  const t = await getDashboardT();
+  // them synchronous. The locale travels with it for the service names, which
+  // are tenant content rather than dictionary text (lib/i18n/service-text.ts).
+  const [t, locale] = await Promise.all([getDashboardT(), getLocale()]);
 
   if (grid.columns.length === 0) return <CalendarEmptyState t={t} />;
 
@@ -222,6 +226,7 @@ export async function CalendarGrid({
               showBarber={showBarber}
               slotHref={slotHref}
               t={t}
+              locale={locale}
             />
           ))}
         </div>
@@ -282,6 +287,7 @@ function ColumnBody({
   showBarber,
   slotHref,
   t,
+  locale,
 }: {
   column: GridColumn;
   grid: CalendarGridModel;
@@ -290,6 +296,7 @@ function ColumnBody({
   showBarber: boolean;
   slotHref: ((columnKey: string, minute: number) => string) | undefined;
   t: Translator;
+  locale: Locale;
 }) {
   return (
     <div
@@ -314,6 +321,7 @@ function ColumnBody({
             staffColors={staffColors}
             showBarber={showBarber}
             t={t}
+            locale={locale}
           />
         ))}
       </ol>
@@ -397,14 +405,17 @@ function BookingBlock({
   staffColors,
   showBarber,
   t,
+  locale,
 }: {
   placed: PlacedBooking;
   timezone: string;
   staffColors: Record<string, string>;
   showBarber: boolean;
   t: Translator;
+  locale: Locale;
 }) {
   const { booking, lane, laneCount } = placed;
+  const service = serviceName(booking.service, locale);
   const statusLabel = STATUS_LABELS[booking.status];
   // MANUAL means the owner typed it in at the counter rather than a customer
   // booking online.
@@ -422,7 +433,7 @@ function BookingBlock({
   const description = [
     formatTimeRange(booking.startAt, booking.endAt, timezone),
     booking.customer.name,
-    booking.service.name,
+    service,
     statusLabel ? t(statusLabel) : null,
     walkIn ? t("dashboard.walkIn") : null,
   ]
@@ -514,7 +525,7 @@ function BookingBlock({
                 {booking.customer.name}
               </span>
               <span className="truncate opacity-75">
-                {booking.service.name}
+                {service}
               </span>
             </>
           ) : placed.density === "compact" ? (
@@ -527,7 +538,7 @@ function BookingBlock({
                 <span className="font-medium">{booking.customer.name}</span>
               </span>
               <span className="truncate opacity-75">
-                {booking.service.name}
+                {service}
               </span>
             </>
           ) : placed.density === "minimal" ? (

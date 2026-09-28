@@ -5,6 +5,9 @@ import type { DashboardBooking } from "@/lib/db/bookings";
 import type { Translator } from "@/lib/i18n/translate";
 import { formatPrice, formatSlotTime, formatTimeRange } from "@/lib/format";
 import { getDashboardT } from "@/lib/i18n/server";
+import { serviceName } from "@/lib/i18n/service-text";
+import type { Locale } from "@/lib/preferences";
+import { getLocale } from "@/lib/preferences-server";
 
 /**
  * How each status is badged here. The words are shared with the calendar via
@@ -40,7 +43,7 @@ export async function TodayList({
 }) {
   if (bookings.length === 0) return null;
 
-  const t = await getDashboardT();
+  const [t, locale] = await Promise.all([getDashboardT(), getLocale()]);
 
   return (
     <ul className="flex flex-col gap-2">
@@ -51,6 +54,7 @@ export async function TodayList({
           timezone={timezone}
           now={now}
           t={t}
+          locale={locale}
         />
       ))}
     </ul>
@@ -62,11 +66,13 @@ function BookingRow({
   timezone,
   now,
   t,
+  locale,
 }: {
   booking: DashboardBooking;
   timezone: string;
   now: Date;
   t: Translator;
+  locale: Locale;
 }) {
   const cancelled = booking.status === "CANCELLED";
   // Past by end time, not start: an appointment in progress is still today's
@@ -121,7 +127,7 @@ function BookingRow({
 
       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-fg-tertiary">
         <span className={cancelled ? "line-through" : ""}>
-          {booking.service.name}
+          {serviceName(booking.service, locale)}
         </span>
         <span aria-hidden="true" className="text-fg-disabled">
           ·

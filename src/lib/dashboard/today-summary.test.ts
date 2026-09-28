@@ -33,7 +33,7 @@ function booking(
     endAt: new Date(startAt.getTime() + 30 * 60_000),
     status,
     source,
-    service: { name: "Haircut", priceMinorUnits: price },
+    service: { name: "Haircut", nameEn: null, priceMinorUnits: price },
     staff: { id: "staff-marco", name: "Marco Rossi" },
     customer: { name: "Luka M.", phone: "+4930111", email: null },
   };

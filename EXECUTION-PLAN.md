@@ -856,6 +856,7 @@ both in the dashboard service form. The validation rejects `categoryEn` without 
   "Women, Colour & highlights, Men & kids, Care & styling").
 - **Emails keep `name`.** They are always German (decision 11).
 - **The dashboard lists keep `name`.** They show the owner's canonical value.
+  *(Amended by 20: only the Services management screen still does.)*
 
 *Cost:* a menu can be half-translated. A service with no `nameEn` shows German inside
 an English page. Nothing flags a missing English value to the owner.
@@ -882,6 +883,33 @@ It is not a per-tenant layout.
 earlier than §1 says to build this tier. An owner can't set or change the photo
 themselves. Doing that needs an upload flow and storage, and that would be a new
 dependency (rule 5), not just a text field.
+
+### Recorded after Phase 16
+
+Recorded 28 Sep 2026. Same format as the entries above: what was decided, what it
+costs.
+
+**20. Dashboard booking surfaces follow the language toggle for service names.** This
+amends the bullet in 18 that kept the dashboard lists on `name`. The calendar's day
+and week blocks, including the `title` and accessible description built from them, the
+Today list, and the manual booking form's service dropdown now show
+`serviceName(service, locale)` from `lib/i18n/service-text.ts`, with the same fallback
+the public pages use. `DashboardBooking.service` selects `nameEn` for this, and nothing
+else about that query changes.
+
+- **The reason.** Everything else on a dashboard switched to English is English, so a
+  German service name next to it reads as a missed translation, not as a canonical
+  value.
+- **The Services management screen keeps `name` and `category`.** It is where both
+  languages are edited, and its form shows `name` and `nameEn` side by side.
+- **No category change.** No dashboard booking surface shows a category, so
+  `categoryLabel` gets no dashboard call site.
+- **Unchanged:** emails stay German (11), sort order stays German (18), and staff and
+  customer names are never translated.
+
+*Cost:* one appointment can carry two names for the owner: English in the calendar,
+German on the Services screen and in the notification email. A half-translated menu
+now shows mixed languages in the calendar too, not only on the public pages.
 
 ### Deferred out of Day 14
 

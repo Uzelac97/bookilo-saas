@@ -1,5 +1,8 @@
 /**
- * Which of a service's two names a customer reads.
+ * Which of a service's two names a reader sees: a customer on the public pages,
+ * or the owner on the dashboard's booking surfaces (calendar, Today list,
+ * manual booking form). The Services management screen is the exception and
+ * shows `name` itself, because that is where both values are edited.
  *
  * The tenant's own content, not interface text, so it can't live in the
  * dictionaries: `name` and `category` are what the owner typed, in German, and
@@ -7,7 +10,7 @@
  * the English value where there is one and falls back to the German where
  * there isn't — an untranslated service is still a bookable service.
  *
- * Plain and directive-free, so server components, the client booking form and
+ * Plain and directive-free, so server components, the client booking forms and
  * the marketing page all share one rule. Emails don't call this: they are
  * always German (EXECUTION-PLAN.md, decision 11) and use `name` directly.
  */

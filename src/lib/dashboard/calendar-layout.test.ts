@@ -54,7 +54,7 @@ function booking(
     endAt,
     status: overrides.status ?? "CONFIRMED",
     source: "ONLINE",
-    service: { name: "Haircut", priceMinorUnits: 2500 },
+    service: { name: "Haircut", nameEn: null, priceMinorUnits: 2500 },
     staff: overrides.staff ?? MARCO,
     customer: { name: "Luka M.", phone: "+4930111", email: null },
   };
