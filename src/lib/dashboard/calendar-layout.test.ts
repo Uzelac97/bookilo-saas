@@ -15,6 +15,7 @@ import {
   groupByLocalDate,
   positionBooking,
   weekdaysOf,
+  type BlockDensity,
   type BookingSpan,
 } from "./calendar-layout";
 
@@ -806,6 +807,46 @@ describe("buildWeekGrid", () => {
 
     expect(grid.columns.every((c) => c.muted === false)).toBe(true);
   });
+
+  // Tuesday to Saturday, the usual barbershop week: Sunday (0) and Monday (1)
+  // have no rows.
+  const TUE_TO_SAT = [2, 3, 4, 5, 6].map((d) => hours(d));
+
+  it("marks a day nobody works as closed", () => {
+    const grid = weekGrid([], { workingHours: TUE_TO_SAT });
+
+    expect(grid.columns.filter((c) => c.closed).map((c) => c.key)).toEqual([
+      "2026-07-27",
+      "2026-08-02",
+    ]);
+  });
+
+  it("keeps a day with no hours open when something is booked on it", () => {
+    // A walk-in the owner entered on a Monday is a real appointment, and a
+    // 3.5rem column has no room to draw it.
+    const grid = weekGrid([at("2026-07-27", "10:00", "10:30", { id: "walk-in" })], {
+      workingHours: TUE_TO_SAT,
+    });
+
+    expect(grid.columns[0].closed).toBe(false);
+    expect(grid.columns[6].closed).toBe(true);
+  });
+
+  it("closes nothing when every day has hours", () => {
+    const grid = weekGrid([]);
+
+    expect(grid.columns.some((c) => c.closed)).toBe(false);
+  });
+
+  it("reads the weekday from the tenant's calendar, not UTC", () => {
+    // Only Sunday (0) is worked. Were the weekday taken off a UTC reading or
+    // Luxon's 7 = Sunday unconverted, Sunday would come out closed.
+    const grid = weekGrid([], { workingHours: [hours(0)] });
+
+    expect(grid.columns.filter((c) => !c.closed).map((c) => c.key)).toEqual([
+      "2026-08-02",
+    ]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -872,19 +913,26 @@ describe("weekdaysOf", () => {
 /**
  * What each tier costs, in the units the CSS actually uses.
  *
- * Mirrors DENSITY_STYLES in components/dashboard/calendar-grid.tsx: `li`
- * pb-px (1px) + the block's 1px border top and bottom (2px) + that tier's
- * vertical padding, against N lines at that tier's font size and line height.
- * If someone changes the padding in the component without moving the
- * thresholds in calendar-layout.ts, the fit assertion below is what fails.
+ * Mirrors DENSITY_STYLES and the line classes in
+ * components/dashboard/calendar-grid.tsx: `li` pb-px (1px) + the block's 1px
+ * border top and bottom (2px) + that tier's vertical padding, against each
+ * line's own height — its font size times the tier's leading (tight = 1.25,
+ * none = 1). If someone changes a size or the padding in the component without
+ * moving the thresholds in calendar-layout.ts, the fit assertion below fails.
  */
-const TIER_METRICS = {
-  full: { chromePx: 1 + 2 + 8, lines: 3, lineHeightPx: 11 * 1.25 },
-  compact: { chromePx: 1 + 2 + 4, lines: 2, lineHeightPx: 11 * 1.25 },
-  minimal: { chromePx: 1 + 2 + 0, lines: 1, lineHeightPx: 10 },
+const TIER_METRICS: Record<
+  BlockDensity,
+  { chromePx: number; lineHeightsPx: number[] }
+> = {
+  // time 12px / customer 13px / service 12px
+  full: { chromePx: 1 + 2 + 8, lineHeightsPx: [12 * 1.25, 13 * 1.25, 12 * 1.25] },
+  // time + customer 13px / service 12px
+  compact: { chromePx: 1 + 2 + 4, lineHeightsPx: [13 * 1.25, 12 * 1.25] },
+  // time + customer, 13px leading-none
+  minimal: { chromePx: 1 + 2 + 0, lineHeightsPx: [13] },
   // Renders no text, so it fits by construction at any height.
-  sliver: { chromePx: 1 + 2 + 0, lines: 0, lineHeightPx: 0 },
-} as const;
+  sliver: { chromePx: 1 + 2 + 0, lineHeightsPx: [] },
+};
 
 /** Builds a one-booking day grid and returns the placed block. */
 function blockOfDuration(minutes: number) {
@@ -905,31 +953,35 @@ function blockOfDuration(minutes: number) {
 
 describe("blockDensity", () => {
   it("puts each tier boundary where the text stops fitting", () => {
-    expect(blockDensity(56)).toBe("full");
-    expect(blockDensity(55.9)).toBe("compact");
-    expect(blockDensity(36)).toBe("compact");
-    expect(blockDensity(35.9)).toBe("minimal");
-    expect(blockDensity(13)).toBe("minimal");
-    expect(blockDensity(12.9)).toBe("sliver");
+    expect(blockDensity(58)).toBe("full");
+    expect(blockDensity(57.9)).toBe("compact");
+    expect(blockDensity(40)).toBe("compact");
+    expect(blockDensity(39.9)).toBe("minimal");
+    expect(blockDensity(16)).toBe("minimal");
+    expect(blockDensity(15.9)).toBe("sliver");
     expect(blockDensity(0)).toBe("sliver");
   });
 });
 
 describe("block geometry across durations", () => {
-  // 80px an hour, so height is duration and nothing else. The reported bug had
+  // 96px an hour, so height is duration and nothing else. The reported bug had
   // these depending on the shop's opening hours too, which is why a booking
   // could be legible for one tenant and garbled for another.
+  //
+  // The short end is the point of the 96: a 15-minute trim still carries its
+  // customer's name, and a 30-minute cut its service too.
   it.each([
-    [5, 6.67, "sliver"],
-    [10, 13.33, "minimal"],
-    [15, 20, "minimal"],
-    [20, 26.67, "minimal"],
-    [25, 33.33, "minimal"],
-    [30, 40, "compact"],
-    [40, 53.33, "compact"],
-    [45, 60, "full"],
-    [60, 80, "full"],
-    [90, 120, "full"],
+    [5, 8, "sliver"],
+    [10, 16, "minimal"],
+    [15, 24, "minimal"],
+    [20, 32, "minimal"],
+    [25, 40, "compact"],
+    [30, 48, "compact"],
+    [35, 56, "compact"],
+    [40, 64, "full"],
+    [45, 72, "full"],
+    [60, 96, "full"],
+    [90, 144, "full"],
   ])("a %i-minute booking is %fpx and renders %s", (minutes, px, density) => {
     const block = blockOfDuration(minutes as number);
 
@@ -946,12 +998,13 @@ describe("block geometry across durations", () => {
     const block = blockOfDuration(minutes);
     const tier = TIER_METRICS[block.density];
     const contentPx = block.heightPx - tier.chromePx;
+    const textPx = tier.lineHeightsPx.reduce((sum, line) => sum + line, 0);
 
     expect(
       contentPx,
       `${minutes}min -> ${block.heightPx.toFixed(1)}px, tier "${block.density}" needs ` +
-        `${tier.lines} x ${tier.lineHeightPx}px + ${tier.chromePx}px chrome`,
-    ).toBeGreaterThanOrEqual(tier.lines * tier.lineHeightPx);
+        `${tier.lineHeightsPx.join(" + ")}px + ${tier.chromePx}px chrome`,
+    ).toBeGreaterThanOrEqual(textPx);
   });
 
   it("scales an hour identically however long the shop's day is", () => {

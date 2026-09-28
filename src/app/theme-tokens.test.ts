@@ -38,9 +38,9 @@ function sourceFiles(): { path: string; text: string }[] {
 describe("theme tokens", () => {
   it("no product UI names a raw colour shade instead of a theme token", () => {
     // A raw shade is fixed in both themes: text-zinc-900 is near-black on a
-    // dark page too. The staff accent bars (sky-500 and friends in
-    // lib/dashboard/staff-colors.ts) are mid-tones chosen to read on either
-    // ground, and are the one deliberate exception, so they are not matched.
+    // dark page too. The staff accents are fixed as well, but they are named
+    // palette tokens (`--color-staff-*` in globals.css) whose contrast
+    // theme-contrast.test.ts checks, so they never reach this pattern.
     const RAW =
       /\b(?:bg|text|border|ring|divide|outline|fill|stroke|placeholder)-(?:white|black|zinc|gray|slate|neutral|stone|red|amber|emerald)(?:-\d{2,3})?\b/g;
 

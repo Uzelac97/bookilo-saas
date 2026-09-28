@@ -136,6 +136,23 @@
   --color-success-soft: light-dark(#ecfdf5, #0b2a20); /* emerald-50 */
   --color-success-muted: light-dark(#d1fae5, #0f3a2b); /* emerald-100 */
   --color-success-line: light-dark(#a7f3d0, #065f46); /* emerald-200 */
+
+  /* Staff identity on the calendar (lib/dashboard/staff-colors.ts): a solid
+     accent bar, plus the same colour washed over the block at
+     STAFF_TINT_ALPHA. Fixed rather than light-dark() pairs — mid-tones chosen
+     to read as a bar on either ground, and faint enough as a wash that the
+     block's text keeps AA on every status ground in both themes, which
+     theme-contrast.test.ts computes from these values. The Tailwind shade
+     each one started as is noted; none is emerald or amber, which are
+     COMPLETED and NO_SHOW. */
+  --color-staff-sky: #0ea5e9; /* sky-500 */
+  --color-staff-violet: #8b5cf6; /* violet-500 */
+  --color-staff-rose: #f43f5e; /* rose-500 */
+  --color-staff-teal: #14b8a6; /* teal-500 */
+  --color-staff-indigo: #6366f1; /* indigo-500 */
+  --color-staff-fuchsia: #d946ef; /* fuchsia-500 */
+  --color-staff-lime: #65a30d; /* lime-600 */
+  --color-staff-cyan: #0891b2; /* cyan-600 */
 }
 
 @theme inline {

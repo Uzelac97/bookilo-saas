@@ -71,3 +71,21 @@ describe("calendarCardWidth", () => {
     expect(bare).toBeLessThan(resolvePx(calendarCardWidth(1)));
   });
 });
+
+describe("calendarCardWidth with closed days", () => {
+  it("sizes a closed day narrower than an open one", () => {
+    // Five open days and two closed must want less width than seven open —
+    // that difference is the space the closed days hand to the open ones.
+    const withClosed = resolvePx(calendarCardWidth(5, 2));
+
+    expect(withClosed).toBeLessThan(resolvePx(calendarCardWidth(7)));
+    expect(withClosed).toBeGreaterThan(resolvePx(calendarCardWidth(5)));
+  });
+
+  it("adds the same fixed width for every closed day", () => {
+    const base = resolvePx(calendarCardWidth(5, 0));
+    const perClosed = resolvePx(calendarCardWidth(5, 1)) - base;
+
+    expect(resolvePx(calendarCardWidth(5, 2))).toBe(base + 2 * perClosed);
+  });
+});

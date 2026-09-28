@@ -12,6 +12,12 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import {
+  STAFF_COLORS,
+  STAFF_TINT_ALPHA,
+  STAFF_TINT_CLASS,
+} from "@/lib/dashboard/staff-colors";
+
 type Theme = "light" | "dark";
 type Palette = Record<Theme, Map<string, string>>;
 
@@ -31,6 +37,12 @@ function readPalette(): Palette {
     palette.light.set(name, light);
     palette.dark.set(name, dark);
   }
+  // A fixed value (the staff accents) is the same colour in both themes.
+  const fixed = /--color-([a-z-]+):\s*(#[0-9a-f]{6})\s*;/gi;
+  for (const [, name, hex] of block.matchAll(fixed)) {
+    palette.light.set(name, hex);
+    palette.dark.set(name, hex);
+  }
   return palette;
 }
 
@@ -41,6 +53,21 @@ function luminance(hex: string): number {
     return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
   };
   return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+}
+
+/**
+ * `top` composited over `bottom` at `alpha`, in sRGB — the space the browser
+ * blends an element's opacity in, so this is the colour actually painted.
+ */
+function over(top: string, alpha: number, bottom: string): string {
+  const mix = (offset: number) => {
+    const t = parseInt(top.slice(offset, offset + 2), 16);
+    const b = parseInt(bottom.slice(offset, offset + 2), 16);
+    return Math.round(t * alpha + b * (1 - alpha))
+      .toString(16)
+      .padStart(2, "0");
+  };
+  return `#${mix(1)}${mix(3)}${mix(5)}`;
 }
 
 function contrast(a: string, b: string): number {
@@ -89,5 +116,51 @@ describe("dark card separation", () => {
     // Not a WCAG rule: a floor so cards can't sink back into the page, as they
     // had at 1.10:1 when both were near-identical zinc.
     expect(ratio("dark", "surface", "canvas")).toBeGreaterThanOrEqual(1.15);
+  });
+});
+
+/**
+ * The calendar's booking blocks: a status ground with the barber's colour
+ * washed over it, and the text colours drawn on top. Mirrors
+ * STATUS_BLOCK_STYLES and STATUS_SECONDARY_TEXT in
+ * components/dashboard/calendar-grid.tsx — the strong colour carries the time
+ * and the customer, the secondary one the service and the barber's initials.
+ * CANCELLED is left out: the page filters it before the grid is built.
+ */
+const BLOCK_STATUSES = [
+  { status: "CONFIRMED", ground: "surface", text: ["fg", "fg-secondary"] },
+  { status: "COMPLETED", ground: "success-soft", text: ["success-strong", "success"] },
+  { status: "NO_SHOW", ground: "warning-muted", text: ["warning", "warning-secondary"] },
+];
+
+/** Every accent the map can hand out, plus the fallback for an unknown barber. */
+const TINTS = [...STAFF_COLORS, "bg-fill"].map((cls) => cls.replace(/^bg-/, ""));
+
+describe("staff tint", () => {
+  it("the tint class and the fraction the checks below use are one number", () => {
+    expect(STAFF_TINT_CLASS).toBe(`opacity-${Math.round(STAFF_TINT_ALPHA * 100)}`);
+  });
+
+  it("every accent resolves to a palette token", () => {
+    for (const tint of TINTS) {
+      expect(palette.light.get(tint), tint).toBeDefined();
+    }
+  });
+});
+
+describe.each<Theme>(["light", "dark"])("calendar block text, %s theme", (theme) => {
+  const cases = BLOCK_STATUSES.flatMap(({ status, ground, text }) =>
+    TINTS.flatMap((tint) => text.map((fg) => [status, fg, tint, ground])),
+  );
+
+  it.each(cases)("%s: %s on %s over %s meets AA (4.5:1)", (_status, fg, tint, ground) => {
+    const pick = (name: string) => {
+      const hex = palette[theme].get(name);
+      if (!hex) throw new Error(`missing token: ${name}`);
+      return hex;
+    };
+    const tinted = over(pick(tint), STAFF_TINT_ALPHA, pick(ground));
+
+    expect(contrast(pick(fg), tinted)).toBeGreaterThanOrEqual(4.5);
   });
 });

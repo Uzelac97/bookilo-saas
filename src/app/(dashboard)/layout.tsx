@@ -47,14 +47,15 @@ export default async function DashboardLayout({
 
               This was max-w-5xl, which lined the shop name and nav up with the
               content column on four of the five dashboard pages. The calendar is
-              the fifth: it sizes itself to its own column count and runs out to
-              max-w-[120rem], so on a wide monitor the grid visibly overhung the
+              the fifth: it sizes itself to its own column count and runs far
+              past max-w-5xl, so on a wide monitor the grid visibly overhung the
               bar above it and the alignment read as broken rather than absent.
 
               Two ways to keep the alignment, both rejected. Widening the header to
               the calendar's width breaks it on the other four pages instead.
               Widening all five pages to match puts settings forms and the services
-              list on a 120rem line, which is worse to read than any misalignment.
+              list on a calendar-width line, which is worse to read than any
+              misalignment.
 
               So the alignment is abandoned on purpose: the header is now app
               chrome that spans the viewport and lines up with nothing, which is

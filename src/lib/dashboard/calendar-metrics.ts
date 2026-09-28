@@ -41,8 +41,28 @@ export const MIN_COLUMN_WIDTH = "9rem";
  * empty.
  *
  * Bounding the column instead makes it self-correcting at any staff count.
+ *
+ * 24rem rather than the original 16rem. At 16 a seven-day week stopped growing
+ * at ~1860px, and a week column is where several barbers' overlapping
+ * appointments split one column into lanes — each lane a third of 16rem was
+ * too narrow for a name at the calendar's current type size. The cap still
+ * binds on an ultrawide screen and in a two-barber day, which is what it is for.
  */
-export const MAX_COLUMN_WIDTH = "16rem";
+export const MAX_COLUMN_WIDTH = "24rem";
+
+/**
+ * A closed day in the week view (GridColumn.closed): wide enough for its
+ * weekday and date in the header and the vertical "Closed" label below, and no
+ * wider. Fixed rather than a minmax so its space goes to the open days.
+ */
+export const CLOSED_COLUMN_WIDTH = "3.5rem";
+
+/** One column's grid track. */
+export function columnTrack(closed: boolean): string {
+  return closed
+    ? CLOSED_COLUMN_WIDTH
+    : `minmax(${MIN_COLUMN_WIDTH}, ${MAX_COLUMN_WIDTH})`;
+}
 
 /**
  * The card's 1px border, left and right.
@@ -55,12 +75,21 @@ export const MAX_COLUMN_WIDTH = "16rem";
 const CARD_BORDER = "2px";
 
 /**
- * How wide the calendar card wants to be, given its column count — border
+ * How wide the calendar card wants to be, given its column counts — border
  * included.
  *
  * The page sizes and centres the whole calendar column from this, rather than
  * leaving a wide container with a small card adrift at one end of it.
  */
-export function calendarCardWidth(columnCount: number): string {
-  return `calc(${AXIS_WIDTH} + ${columnCount} * ${MAX_COLUMN_WIDTH} + ${CARD_BORDER})`;
+export function calendarCardWidth(openCount: number, closedCount = 0): string {
+  return `calc(${AXIS_WIDTH} + ${openCount} * ${MAX_COLUMN_WIDTH} + ${closedCount} * ${CLOSED_COLUMN_WIDTH} + ${CARD_BORDER})`;
+}
+
+/**
+ * The narrowest the grid can get before it scrolls: every open column at its
+ * floor, every closed one at its fixed width. Border excluded — this is the
+ * grid's own min-width, inside the card.
+ */
+export function calendarMinGridWidth(openCount: number, closedCount = 0): string {
+  return `calc(${AXIS_WIDTH} + ${openCount} * ${MIN_COLUMN_WIDTH} + ${closedCount} * ${CLOSED_COLUMN_WIDTH})`;
 }

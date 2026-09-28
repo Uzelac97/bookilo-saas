@@ -65,8 +65,14 @@ const MIN_VISIBLE_MINUTES = 10;
  *
  * The grid grows taller for a shop that opens longer. That's correct: it has
  * more day to show.
+ *
+ * 96 rather than the original 80 so the short appointments a barber sells most
+ * of carry their customer: at 80 a 15-minute trim was 20px and a 30-minute cut
+ * 40px, too little once the block text went up to 12–13px. At 96 those are 24px
+ * (time and name) and 48px (plus the service). A 9-hour day is 864px, which
+ * still fits a 1080p screen under the dashboard header with little scrolling.
  */
-export const CALENDAR_PX_PER_HOUR = 80;
+export const CALENDAR_PX_PER_HOUR = 96;
 
 /**
  * How much of a booking's detail fits in its block.
@@ -86,12 +92,15 @@ export const CALENDAR_PX_PER_HOUR = 80;
  */
 export type BlockDensity = "full" | "compact" | "minimal" | "sliver";
 
-/** 3 lines (13.75px each) + 11px of border/padding = 52.25px. */
-const FULL_MIN_PX = 56;
-/** 2 lines (13.75px each) + 7px of border/padding = 34.5px. */
-const COMPACT_MIN_PX = 36;
-/** 1 line (10px) + 3px of border/padding = 13px. */
-const MINIMAL_MIN_PX = 13;
+/**
+ * Time (12px) + customer (13px) + service (12px) at leading-tight — 15 + 16.25 +
+ * 15 — plus 11px of border/padding = 57.25px.
+ */
+const FULL_MIN_PX = 58;
+/** Time and customer (13px) + service (12px) at leading-tight, + 7px = 38.25px. */
+const COMPACT_MIN_PX = 40;
+/** Time and customer, one line at 13px leading-none, + 3px = 16px. */
+const MINIMAL_MIN_PX = 16;
 
 /**
  * Which tier a block of this pixel height can carry.
@@ -101,7 +110,7 @@ const MINIMAL_MIN_PX = 13;
  * component's job is to render a tier, not to work out which one applies.
  *
  * `sliver` renders no text at all. Nothing stops an owner creating a 5-minute
- * service, and at 80px an hour that is a 6.7px block — under half a line of the
+ * service, and at 96px an hour that is an 8px block — under half a line of the
  * smallest type on the grid. A coloured bar with its full detail on hover and in
  * the accessible description is honest about having no room; half a line of
  * sliced glyphs is the bug this tier exists to close off rather than shrink.
@@ -153,6 +162,12 @@ export type GridColumn = {
   muted: boolean;
   /** Drawn with emphasis: today, in the week view. */
   highlight: boolean;
+  /**
+   * Drawn narrow: a week-view day nobody works and nothing is booked on, so its
+   * width goes to the days that have something to show. Never set in the day
+   * view, where a column is a barber rather than a day.
+   */
+  closed: boolean;
   bookings: PlacedBooking[];
 };
 
@@ -404,6 +419,7 @@ export function buildDayGrid(
       sublabel: member.active ? null : t("calendar.staffInactive"),
       muted: !member.active,
       highlight: false,
+      closed: false,
     });
   }
 
@@ -423,6 +439,7 @@ export function buildDayGrid(
       sublabel: t("calendar.staffUnknown"),
       muted: true,
       highlight: false,
+      closed: false,
     });
   }
 
@@ -445,6 +462,13 @@ export function buildDayGrid(
  * Merging the barbers is exactly why assignLanes matters here — four
  * simultaneous 10:00 appointments are the normal case in this view, not an edge
  * one.
+ *
+ * A day is `closed` when no working-hours row falls on its weekday *and*
+ * nothing is booked on it. Both halves matter: hours alone would narrow a
+ * Sunday the owner squeezed a walk-in into, and that booking needs a full-width
+ * column like any other. `workingHours` is whatever the caller passes — the
+ * page passes active staff's rows only, so a weekday only a retired barber
+ * worked counts as closed, which is what the public opening hours say too.
  */
 export function buildWeekGrid(
   input: BuildGridInput & { dates: string[]; now: Date },
@@ -459,8 +483,12 @@ export function buildWeekGrid(
 
   const today = localParts(now, timezone).date;
 
+  const openWeekdays = new Set(workingHours.map((row) => row.dayOfWeek));
+
   const columns = dates.map((date) => {
     const { weekday, dayOfMonth } = formatStripDay(date, timezone, locale);
+    const daySpans = spans.filter((span) => span.date === date);
+    const [dayOfWeek] = weekdaysOf([date], timezone);
 
     return {
       column: {
@@ -469,8 +497,9 @@ export function buildWeekGrid(
         sublabel: dayOfMonth,
         muted: false,
         highlight: date === today,
+        closed: !openWeekdays.has(dayOfWeek) && daySpans.length === 0,
       },
-      spans: spans.filter((span) => span.date === date),
+      spans: daySpans,
     };
   });
 

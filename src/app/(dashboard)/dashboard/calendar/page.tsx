@@ -64,8 +64,13 @@ function first(value: string | string[] | undefined): string | undefined {
  * MIN is a floor on how narrow the whole column may get. Without it a two-barber
  * day collapses the page to ~626px, which stops reading as compact and starts
  * reading as broken. MAX is the widest the grid can reach — a 4rem axis plus
- * seven columns at their cap — past which a larger container would only stretch
- * the header row, pushing the view toggle away from the heading it belongs to.
+ * seven columns at their 24rem cap, ~172rem — past which a larger container
+ * would only stretch the header row, pushing the view toggle away from the
+ * heading it belongs to.
+ *
+ * This is the one dashboard page that runs past max-w-5xl, on purpose: the
+ * other pages are forms and lists, where a long line is harder to read, and
+ * this is a grid whose columns get more legible with every rem they are given.
  *
  * The base breakpoint's `px-4` is 1rem narrower than PAGE_GUTTER, so below `sm`
  * this over-allocates by 1rem. That never binds: MIN alone is already wider than
@@ -73,15 +78,15 @@ function first(value: string | string[] | undefined): string | undefined {
  */
 const PAGE_GUTTER = "3rem";
 const MIN_PAGE_WIDTH = "64rem";
-const MAX_PAGE_WIDTH = "120rem";
+const MAX_PAGE_WIDTH = "176rem";
 
 /**
- * The ceiling when the sidebar is showing — the widest grid plus the sidebar
- * beside it. Without raising it, a seven-column week and an 18rem aside would
- * total ~139rem, hit the 120rem cap, and push the grid into a scroll on a
- * monitor wide enough to have shown both.
+ * The ceiling when the sidebar is showing — the widest grid plus the 18rem
+ * sidebar and its gap beside it. Without the extra, a grid at MAX_PAGE_WIDTH
+ * plus the aside would hit the cap and push the grid into a scroll on a monitor
+ * wide enough to have shown both.
  */
-const MAX_PAGE_WIDTH_WITH_ASIDE = "140rem";
+const MAX_PAGE_WIDTH_WITH_ASIDE = "196rem";
 
 /**
  * The owner's calendar: a day grid with one column per barber, or a week grid
@@ -195,7 +200,14 @@ export default async function CalendarPage({ searchParams }: PageProps) {
   // The week view keeps the narrow value in both slots: its grid already fills
   // a 1920px screen, so giving it a sidebar would buy 18rem of figures at the
   // cost of pushing the seven columns into a horizontal scroll.
-  const cardWidth = calendarCardWidth(grid.columns.length);
+  // Closed days (week view only) are narrow fixed columns, so they are counted
+  // apart — sizing them at the open-column cap would hand the page width back
+  // to empty space instead of to the open days.
+  const closedCount = grid.columns.filter((column) => column.closed).length;
+  const cardWidth = calendarCardWidth(
+    grid.columns.length - closedCount,
+    closedCount,
+  );
   const narrowWidth = `clamp(${MIN_PAGE_WIDTH}, calc(${cardWidth} + ${PAGE_GUTTER}), ${MAX_PAGE_WIDTH})`;
   const wideWidth =
     view === "week"

@@ -11,10 +11,10 @@ import type {
 } from "@/lib/dashboard/calendar-layout";
 import {
   AXIS_WIDTH,
-  MAX_COLUMN_WIDTH,
-  MIN_COLUMN_WIDTH,
+  calendarMinGridWidth,
+  columnTrack,
 } from "@/lib/dashboard/calendar-metrics";
-import { staffColor } from "@/lib/dashboard/staff-colors";
+import { STAFF_TINT_CLASS, staffColor } from "@/lib/dashboard/staff-colors";
 import type { DashboardBooking } from "@/lib/db/bookings";
 import {
   formatMinuteOfDay,
@@ -36,19 +36,24 @@ import { getLocale } from "@/lib/preferences-server";
  * FULL_MIN_PX/COMPACT_MIN_PX are derived from exactly this padding and this
  * line height. Change the padding here and the thresholds there are wrong.
  *
- *   full     3 lines, py-1     (8px)  — time range / customer / service
- *   compact  2 lines, py-0.5   (4px)  — time + customer / service
- *   minimal  1 line,  py-0     (0px)  — time + customer, at 10px
+ *   full     3 lines, py-1     (8px)  — time 12px / customer 13px / service 12px
+ *   compact  2 lines, py-0.5   (4px)  — time + customer 13px / service 12px
+ *   minimal  1 line,  py-0     (0px)  — time + customer, 13px leading-none
  *   sliver   no text                  — a bar, with everything on hover
+ *
+ * The font sizes are on the lines themselves, below, and each line computes its
+ * own leading from them — which is what the thresholds assume.
  *
  * Detail is dropped from the bottom up because that is the order it stops
  * earning its space: the block's position on the axis already says roughly when
- * the appointment is, so the customer's name is the last thing to go.
+ * the appointment is, so the customer's name is the last thing to go. It is
+ * also the most prominent line at every tier — the largest size, semibold, in
+ * the strong colour — because it is the one an owner scans a column for.
  */
 const DENSITY_STYLES: Record<PlacedBooking["density"], string> = {
-  full: "pr-1.5 pl-2.5 py-1 text-[11px] leading-tight",
-  compact: "pr-1.5 pl-2.5 py-0.5 text-[11px] leading-tight",
-  minimal: "pr-1.5 pl-2.5 text-[10px] leading-none",
+  full: "pr-1.5 pl-2.5 py-1 leading-tight",
+  compact: "pr-1.5 pl-2.5 py-0.5 leading-tight",
+  minimal: "pr-1.5 pl-2.5 leading-none",
   sliver: "",
 };
 
@@ -82,6 +87,24 @@ const STATUS_BLOCK_STYLES: Record<DashboardBooking["status"], string> = {
   CANCELLED: "border-line bg-canvas text-fg-muted line-through",
   COMPLETED: "border-success-line bg-success-soft text-success-strong",
   NO_SHOW: "border-warning-line-soft bg-warning-muted text-warning",
+};
+
+/**
+ * The quieter text in a block — time, service, the barber's initials — as a
+ * named colour one step below the status's strong one.
+ *
+ * A token rather than `opacity-75` on the strong colour. The opacity version
+ * was too dim on the dark ground, and it could not be checked: its effective
+ * colour depended on whatever sat beneath it. These are, in
+ * src/app/theme-contrast.test.ts, against every status ground with every
+ * barber's tint over it, in both themes. That test mirrors this table and
+ * STATUS_BLOCK_STYLES above, so a change here belongs there too.
+ */
+const STATUS_SECONDARY_TEXT: Record<DashboardBooking["status"], string> = {
+  CONFIRMED: "text-fg-secondary",
+  CANCELLED: "text-fg-muted",
+  COMPLETED: "text-success",
+  NO_SHOW: "text-warning-secondary",
 };
 
 /**
@@ -135,7 +158,11 @@ export async function CalendarGrid({
 
   if (grid.columns.length === 0) return <CalendarEmptyState t={t} />;
 
-  const template = `${AXIS_WIDTH} repeat(${grid.columns.length}, minmax(${MIN_COLUMN_WIDTH}, ${MAX_COLUMN_WIDTH}))`;
+  const template = [
+    AXIS_WIDTH,
+    ...grid.columns.map((column) => columnTrack(column.closed)),
+  ].join(" ");
+  const closedCount = grid.columns.filter((column) => column.closed).length;
 
   return (
     // No scrollbar-hide here, deliberately — see the note on that utility in
@@ -162,7 +189,10 @@ export async function CalendarGrid({
         // hour rules and all — grows past the viewport into the scroll above,
         // instead of each row overflowing on its own and tearing when scrolled.
         style={{
-          minWidth: `calc(${AXIS_WIDTH} + ${grid.columns.length} * ${MIN_COLUMN_WIDTH})`,
+          minWidth: calendarMinGridWidth(
+            grid.columns.length - closedCount,
+            closedCount,
+          ),
         }}
         // Breathing room under the last hour label, which now sits fully inside
         // the grid rather than half below it.
@@ -219,6 +249,7 @@ export async function CalendarGrid({
           {grid.columns.map((column) => (
             <ColumnBody
               key={column.key}
+              closedLabel={t("shop.closed")}
               column={column}
               grid={grid}
               timezone={timezone}
@@ -240,14 +271,17 @@ function ColumnHeader({ column }: { column: GridColumn }) {
     <div
       id={headerId(column.key)}
       className={[
-        "flex min-w-0 flex-col gap-0.5 px-2 py-2.5 text-sm",
+        "flex min-w-0 flex-col gap-0.5 py-2.5 text-sm",
+        // A closed day is 3.5rem, so its weekday and date are centred in it
+        // rather than hanging off a left gutter it hasn't the width for.
+        column.closed ? "items-center px-1 text-center" : "px-2",
         // `highlight` is today in the week view.
         column.highlight ? "bg-subtle font-semibold text-fg" : "",
         // `muted` is a barber who no longer works at the shop but still has
         // appointments on the books — those bookings are real and cannot be
         // hidden, so the column is dimmed rather than dropped.
-        column.muted ? "text-fg-faint" : "",
-        !column.highlight && !column.muted ? "text-fg" : "",
+        column.muted || column.closed ? "text-fg-faint" : "",
+        !column.highlight && !column.muted && !column.closed ? "text-fg" : "",
       ].join(" ")}
     >
       <span className="truncate">{column.label}</span>
@@ -255,7 +289,7 @@ function ColumnHeader({ column }: { column: GridColumn }) {
         <span
           className={[
             "truncate text-xs",
-            column.muted ? "text-fg-faint" : "text-fg-muted",
+            column.muted || column.closed ? "text-fg-faint" : "text-fg-muted",
           ].join(" ")}
         >
           {column.sublabel}
@@ -280,6 +314,7 @@ function ColumnHeader({ column }: { column: GridColumn }) {
  * its hover `title` — the only thing identifying a `sliver` — still appears.
  */
 function ColumnBody({
+  closedLabel,
   column,
   grid,
   timezone,
@@ -289,6 +324,7 @@ function ColumnBody({
   t,
   locale,
 }: {
+  closedLabel: string;
   column: GridColumn;
   grid: CalendarGridModel;
   timezone: string;
@@ -302,9 +338,24 @@ function ColumnBody({
     <div
       className={[
         "relative border-r border-line last:border-r-0",
-        column.highlight ? "bg-canvas" : "",
+        column.highlight || column.closed ? "bg-canvas" : "",
       ].join(" ")}
     >
+      {/* Says what the narrow column is. Vertical because the column is 3.5rem
+          and "Geschlossen" is not. The slot links stay underneath: a closed
+          day can still take a walk-in from the booking form, and a column
+          that quietly stopped being clickable would read as broken. */}
+      {column.closed ? (
+        // Two elements because the writing mode has to stay off the positioned
+        // one: on it, the inline axis turns vertical, so justify-center centres
+        // the label down the whole column instead of across it.
+        <span className="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center">
+          <span className="text-xs tracking-wide text-fg-faint [writing-mode:vertical-rl]">
+            {closedLabel}
+          </span>
+        </span>
+      ) : null}
+
       {slotHref ? (
         <SlotLinks column={column} grid={grid} slotHref={slotHref} t={t} />
       ) : null}
@@ -341,8 +392,8 @@ const SLOT_TARGET_MINUTES = 30;
  * round time instead of 14:23. The owner can still type any time on the form it
  * opens — this only has to get them close.
  *
- * 30 minutes rather than the 15-minute slot step: at 80px an hour a half hour is
- * a 40px target, which is a comfortable tap, and 15 would halve that for a
+ * 30 minutes rather than the 15-minute slot step: at 96px an hour a half hour is
+ * a 48px target, which is a comfortable tap, and 15 would halve that for a
  * precision nobody needs from a shortcut.
  *
  * Deliberately drawn under the appointments and never over them, so this stays
@@ -416,6 +467,8 @@ function BookingBlock({
 }) {
   const { booking, lane, laneCount } = placed;
   const service = serviceName(booking.service, locale);
+  const accent = staffColor(staffColors, booking.staff.id);
+  const secondary = STATUS_SECONDARY_TEXT[booking.status];
   const statusLabel = STATUS_LABELS[booking.status];
   // MANUAL means the owner typed it in at the counter rather than a customer
   // booking online.
@@ -453,7 +506,7 @@ function BookingBlock({
    * barbers' accents can end up adjacent in a single column.
    */
   const barber = showBarber ? (
-    <span className="pr-1 font-semibold opacity-70">
+    <span className={`pr-1 font-semibold ${secondary}`}>
       {initials(booking.staff.name)}
     </span>
   ) : null;
@@ -486,7 +539,11 @@ function BookingBlock({
         // the only thing standing between a sliver and an unidentifiable bar.
         title={description}
         className={[
-          "relative flex h-full flex-col overflow-hidden rounded-lg border",
+          // `isolate` makes the block its own stacking context, which is what
+          // lets the tint below sit at -z-10 — above this element's background
+          // but beneath its text. Without it the tint would paint over the text
+          // and dim it, by an amount the contrast test never sees.
+          "relative isolate flex h-full flex-col overflow-hidden rounded-lg border",
           DENSITY_STYLES[placed.density],
           STATUS_BLOCK_STYLES[booking.status],
           // A dashed outline, now that the left edge belongs to the barber's
@@ -501,7 +558,15 @@ function BookingBlock({
             no text and this bar is the only thing identifying whose it is. */}
         <span
           aria-hidden="true"
-          className={`absolute inset-y-0 left-0 ${ACCENT_WIDTH} ${staffColor(staffColors, booking.staff.id)}`}
+          className={`absolute inset-y-0 left-0 ${ACCENT_WIDTH} ${accent}`}
+        />
+        {/* The barber again, as a wash over the whole block — what makes whose
+            appointment it is readable at a glance in a week column that holds
+            several barbers. Over the status ground rather than instead of it,
+            so a completed or no-show block still reads as one. */}
+        <span
+          aria-hidden="true"
+          className={`absolute inset-0 -z-10 ${accent} ${STAFF_TINT_CLASS}`}
         />
         {/* The complete description at every density, so what a screen reader
             gets never depends on how long the appointment happens to be. The
@@ -515,39 +580,39 @@ function BookingBlock({
         <span aria-hidden="true" className="contents">
           {placed.density === "full" ? (
             <>
-              <span className="truncate">
+              <span className={`truncate text-[12px] ${secondary}`}>
                 {barber}
                 <span className="font-mono tabular-nums">
                   {formatTimeRange(booking.startAt, booking.endAt, timezone)}
                 </span>
               </span>
-              <span className="truncate font-medium">
+              <span className="truncate text-[13px] font-semibold">
                 {booking.customer.name}
               </span>
-              <span className="truncate opacity-75">
+              <span className={`truncate text-[12px] ${secondary}`}>
                 {service}
               </span>
             </>
           ) : placed.density === "compact" ? (
             <>
-              <span className="truncate">
+              <span className="truncate text-[13px]">
                 {barber}
-                <span className="font-mono tabular-nums">
+                <span className={`font-mono tabular-nums ${secondary}`}>
                   {formatSlotTime(booking.startAt, timezone)}
                 </span>{" "}
-                <span className="font-medium">{booking.customer.name}</span>
+                <span className="font-semibold">{booking.customer.name}</span>
               </span>
-              <span className="truncate opacity-75">
+              <span className={`truncate text-[12px] ${secondary}`}>
                 {service}
               </span>
             </>
           ) : placed.density === "minimal" ? (
-            <span className="truncate">
+            <span className="truncate text-[13px]">
               {barber}
-              <span className="font-mono tabular-nums">
+              <span className={`font-mono tabular-nums ${secondary}`}>
                 {formatSlotTime(booking.startAt, timezone)}
               </span>{" "}
-              <span className="font-medium">{booking.customer.name}</span>
+              <span className="font-semibold">{booking.customer.name}</span>
             </span>
           ) : null /* sliver: the accent bar is the whole of it */}
         </span>

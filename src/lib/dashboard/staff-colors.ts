@@ -10,6 +10,11 @@
  * It earns its place in the week view, where a column is a *day* and the barber
  * is otherwise only discoverable by reading truncated text. In the day view the
  * column header already says it, so there the colour is reinforcement.
+ *
+ * Two channels from one class: the accent bar at full strength, and a wash over
+ * the whole block at STAFF_TINT_ALPHA, so a glance at a crowded week column says
+ * whose each block is without finding its 4px edge. The wash is laid over the
+ * status ground rather than replacing it, so the status still reads underneath.
  */
 import type { CalendarStaff } from "@/lib/db/staff";
 
@@ -22,6 +27,10 @@ import type { CalendarStaff } from "@/lib/db/staff";
  * won would come down to Tailwind's stylesheet ordering rather than anything
  * stated here — the kind of thing that works until a version bump reorders it.
  *
+ * Theme tokens (`--color-staff-*` in app/globals.css) rather than Tailwind's
+ * own shades, so src/app/theme-contrast.test.ts can read the exact values and
+ * prove the tinted grounds keep the block text at AA.
+ *
  * Deliberately excludes the emerald and amber families: those are COMPLETED and
  * NO_SHOW, and a barber whose accent is the same hue as a status would undo the
  * separation this module exists to keep.
@@ -30,15 +39,29 @@ import type { CalendarStaff } from "@/lib/db/staff";
  * backstop, not a plan.
  */
 export const STAFF_COLORS = [
-  "bg-sky-500",
-  "bg-violet-500",
-  "bg-rose-500",
-  "bg-teal-500",
-  "bg-indigo-500",
-  "bg-fuchsia-500",
-  "bg-lime-600",
-  "bg-cyan-600",
+  "bg-staff-sky",
+  "bg-staff-violet",
+  "bg-staff-rose",
+  "bg-staff-teal",
+  "bg-staff-indigo",
+  "bg-staff-fuchsia",
+  "bg-staff-lime",
+  "bg-staff-cyan",
 ] as const;
+
+/**
+ * How strongly the barber's colour washes over a block, as a fraction and as
+ * the class that applies it. Two forms of one number because Tailwind only
+ * generates classes it can see written out whole: the class is for the
+ * component, the fraction for theme-contrast.test.ts, and that test asserts
+ * the two agree.
+ *
+ * 14% is enough for the hue to name the barber at a glance and faint enough
+ * that the block's text stays AA on every status ground in both themes —
+ * which the test checks for every hue, rather than this comment asserting it.
+ */
+export const STAFF_TINT_ALPHA = 0.14;
+export const STAFF_TINT_CLASS = "opacity-14";
 
 /**
  * Maps every barber to an accent class, keyed by staff id.
