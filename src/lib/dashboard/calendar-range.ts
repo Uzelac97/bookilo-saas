@@ -13,8 +13,14 @@
  * would type-check, look right in review, and silently pin the calendar to
  * today-or-later — a bug with no error and no failing test. Hence a second,
  * deliberately unclamped module rather than a flag on the first.
+ *
+ * The one helper shared with it is todayInZone, which clamps nothing — it only
+ * answers what day it is at the shop, and the overview, the calendar and the
+ * booking flow must all agree on that.
  */
 import { DateTime } from "luxon";
+
+import { todayInZone } from "@/lib/availability/booking-options";
 
 /** Day view or week view. Carried in `?view=`. */
 export type CalendarView = "day" | "week";
@@ -128,16 +134,6 @@ export function shiftCalendarDate(
       : anchor.plus({ days: steps });
 
   return shifted.toISODate() ?? date;
-}
-
-/** The tenant-local calendar day containing `now`. */
-export function todayInZone(now: Date, timezone: string): string {
-  const local = DateTime.fromJSDate(now).setZone(timezone);
-  if (!local.isValid) {
-    throw new Error(`todayInZone: invalid timezone "${timezone}"`);
-  }
-
-  return local.toISODate() as string;
 }
 
 /**

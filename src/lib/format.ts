@@ -29,14 +29,14 @@ const PRICE_CURRENCY = "EUR";
  * The locale every date in this file renders in, and the day-first patterns
  * that go with it.
  *
- * ALWAYS PASSED, NEVER TAKEN FROM THE RUNTIME. Until Day 13 the Luxon calls
- * below passed no locale at all, so weekday and month names came out in
- * whatever the server happened to default to. A confirmation email quotes a
- * date to a customer as a promise; that string must not depend on which region
- * a function booted in, on an LC_ALL somewhere, or on a future self-hosted box.
+ * ALWAYS PASSED, NEVER TAKEN FROM THE RUNTIME. A Luxon call with no locale
+ * renders weekday and month names in whatever the server happens to default
+ * to. A confirmation email quotes a date to a customer as a promise; that
+ * string must not depend on which region a function booted in, on an LC_ALL
+ * somewhere, or on a future self-hosted box.
  *
- * Since Phase 15a the locale is the interface language (lib/preferences.ts),
- * so a German page says "Di, 28. Jul" and an English one "Tue, 28 Jul". Each
+ * The locale is the interface language (lib/preferences.ts), so a German page
+ * says "Di, 28. Jul" and an English one "Tue, 28 Jul". Each
  * function takes it as a required argument, the same contract as `timezone`:
  * a caller cannot forget it, and a client component cannot silently fall back
  * to the browser's.
@@ -117,10 +117,9 @@ const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
  * THE DAYS TIER EXISTS FOR THE CANCELLATION WINDOW, not for service lengths. A
  * service is capped at 480 minutes by serviceInputSchema, so nothing on a
  * booking, a menu or an email can reach a day — that tier is unreachable from
- * every caller except `Tenant.cancellationWindowMinutes`, which Day 12 made
- * owner-settable up to a week. Before that it was a seed-time 120 and always
- * read "2 h"; the moment an owner could type 10080 this started rendering
- * "168 h" at customers.
+ * every caller except `Tenant.cancellationWindowMinutes`, which an owner can
+ * set up to a week. Without a days tier, a window of 10080 would render as
+ * "168 h" to customers.
  *
  * Builds from the largest unit down and drops empty parts, so nothing is ever
  * rounded away: 1441 is "1 day 1 min", not "1 day". A window an owner set is a
@@ -154,10 +153,10 @@ export function formatDuration(minutes: number, locale: Locale): string {
  * How long before an appointment a customer can still cancel, as the whole
  * sentence: "You can cancel online up to 2 h before your appointment."
  *
- * A WHOLE SENTENCE, NOT A FRAGMENT, since Phase 15a. This used to return just
- * "up to 2 h before" for callers to wrap in English on either side, and German
- * cannot be assembled that way — the verb goes to the end ("…vor deinem Termin
- * online stornieren"). Each language gets its own complete sentence instead.
+ * A WHOLE SENTENCE, NOT A FRAGMENT. A fragment like "up to 2 h before" for
+ * callers to wrap in English on either side cannot work in German, where the
+ * verb goes to the end ("…vor deinem Termin online stornieren"). Each language
+ * gets its own complete sentence instead.
  *
  * A WINDOW OF 0 GETS ITS OWN WORDING, and this is the whole reason the function
  * exists. `formatDuration(0)` is "0 min", so composing it into that sentence

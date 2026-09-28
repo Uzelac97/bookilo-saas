@@ -21,6 +21,7 @@ import { getActiveStaff } from "@/lib/db/staff";
 import { formatBookingDate } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
 import { getLocale } from "@/lib/preferences-server";
+import { firstParam } from "@/lib/search-params";
 
 import { getShop } from "../shop";
 
@@ -46,11 +47,6 @@ export async function generateMetadata({
   };
 }
 
-/** searchParams values are `string | string[]`; a repeated key takes the first. */
-function first(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
-
 export default async function BookPage({ params, searchParams }: PageProps) {
   const { slug } = await params;
   const query = await searchParams;
@@ -69,15 +65,15 @@ export default async function BookPage({ params, searchParams }: PageProps) {
   // belonging to another tenant entirely, should land the customer on the
   // business page where they can pick a real one. This is also what guarantees
   // a foreign serviceId never reaches computeSlots.
-  const service = services.find((entry) => entry.id === first(query.service));
+  const service = services.find((entry) => entry.id === firstParam(query.service));
   if (!service) redirect(`/b/${slug}`);
 
   // One `now` for the whole render — reading the clock twice could straddle
   // midnight and produce a strip that disagrees with the date it resolved.
   const now = new Date();
-  const date = resolveBookingDate(first(query.date), now, tenant.timezone);
+  const date = resolveBookingDate(firstParam(query.date), now, tenant.timezone);
 
-  const requestedStaffId = first(query.staff);
+  const requestedStaffId = firstParam(query.staff);
   // An unknown or inactive staff id degrades to "any" rather than erroring —
   // same reasoning as clamping the date.
   const selectedStaffId =

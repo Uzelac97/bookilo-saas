@@ -61,6 +61,9 @@ export const de = {
   "booking.dateAtTime": "{date} um {time}",
   "booking.cancelledHeading": "Dieser Termin ist storniert",
   "booking.backTo": "Zurück zu {shop}",
+  "booking.linkInvalidTitle": "Dieser Link ist ungültig",
+  "booking.linkInvalidBody":
+    "Vielleicht ist er unvollständig oder veraltet. Prüf den Link in deiner Bestätigungs-E-Mail oder melde dich direkt dort, wo du gebucht hast.",
 
   // ─── Public shop page ─────────────────────────────────────────────────────
   "shop.businessTypeBarbershop": "Barbershop",

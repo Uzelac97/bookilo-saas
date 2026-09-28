@@ -9,13 +9,8 @@ import {
   serviceName,
 } from "@/lib/i18n/service-text";
 import { getLocale } from "@/lib/preferences-server";
+import { groupByCategory } from "@/lib/service-groups";
 import type { Vertical } from "@/lib/vertical";
-
-type ServiceGroup = {
-  /** null = the services with no category set. */
-  category: string | null;
-  services: PublicService[];
-};
 
 export async function ServiceList({
   services,
@@ -104,27 +99,4 @@ export async function ServiceList({
       ))}
     </div>
   );
-}
-
-/**
- * An order-preserving fold, not a sort: getActiveServices already returns rows
- * ordered by category (nulls last) then name, so every category arrives as one
- * contiguous run and re-sorting here would only be a second opinion that can
- * disagree.
- */
-function groupByCategory(services: PublicService[]): ServiceGroup[] {
-  const groups: ServiceGroup[] = [];
-
-  for (const service of services) {
-    const current = groups[groups.length - 1];
-
-    if (current && current.category === service.category) {
-      current.services.push(service);
-      continue;
-    }
-
-    groups.push({ category: service.category, services: [service] });
-  }
-
-  return groups;
 }

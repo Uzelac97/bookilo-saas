@@ -182,6 +182,23 @@ describe("resolveBookingDate", () => {
   });
 });
 
+// Shared by the booking flow, the dashboard overview and the calendar, so these
+// cover all three.
+describe("todayInZone", () => {
+  it("uses the shop's day, not the server's", () => {
+    // 22:30 UTC is already tomorrow in Berlin (UTC+2 in July). A Vercel function
+    // running in UTC must not roll the shop's calendar over at the wrong moment.
+    expect(todayInZone(new Date("2026-07-27T22:30:00Z"), ZONE)).toBe("2026-07-28");
+    expect(todayInZone(new Date("2026-07-27T21:30:00Z"), ZONE)).toBe("2026-07-27");
+  });
+
+  it("rejects a timezone it cannot resolve rather than guessing one", () => {
+    expect(() =>
+      todayInZone(new Date("2026-07-27T10:00:00Z"), "Mars/Olympus"),
+    ).toThrow(/invalid timezone/);
+  });
+});
+
 describe("dateStrip", () => {
   const now = at("2026-07-28T10:00");
 

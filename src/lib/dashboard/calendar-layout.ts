@@ -295,10 +295,10 @@ export function gridBounds(
  * uniqueness would stack them exactly on top of each other — hiding the newer
  * appointment behind the one it replaced.
  *
- * CANCELLED is outside the constraint too and used to be cited here, but it can
- * no longer reach this function: the calendar page filters cancellations out
- * before building a grid, because a released slot is not occupied time. NO_SHOW
- * alone is what keeps this necessary.
+ * CANCELLED is outside the constraint too, but it never reaches this function:
+ * the calendar page filters cancellations out before building a grid, because a
+ * released slot is not occupied time. NO_SHOW alone is what keeps this
+ * necessary.
  *
  * Lanes are counted per *cluster* of mutually overlapping bookings, not per
  * column: one 09:00 clash must not squeeze a lone 17:00 appointment into half
@@ -379,7 +379,8 @@ export type BuildGridInput = {
  * but no longer works here.
  *
  * Active barbers always get a column, empty or not — an empty column is the
- * honest picture of a quiet day and is where Day 11's click-to-book will live.
+ * honest picture of a quiet day, and it is where the click-to-book slot links
+ * sit (SlotLinks in components/dashboard/calendar-grid.tsx).
  * Inactive ones appear only when they actually have something on the books, so a
  * shop that has been through five barbers doesn't carry five dead columns
  * forever. See getStaffForCalendar for why they can't simply be dropped.

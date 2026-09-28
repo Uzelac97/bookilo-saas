@@ -54,9 +54,9 @@ export function summariseDay(
       // Service row as it stands right now — there is no price snapshot on
       // Booking — so this is "what these appointments would cost at today's
       // prices", not "what was quoted when they were booked". The two diverge
-      // the moment anyone edits a service's price, which the Day 11 services
-      // CRUD is precisely the feature that enables: change a price at noon and
-      // this morning's completed cuts silently re-value themselves.
+      // the moment the owner edits a service's price on the services screen:
+      // change a price at noon and this morning's completed cuts silently
+      // re-value themselves.
       //
       // That's an acceptable approximation only while this number is a glanceable
       // indicator with no money moving behind it. IF YOU ARE HERE BUILDING

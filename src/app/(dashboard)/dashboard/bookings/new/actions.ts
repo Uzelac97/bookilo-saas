@@ -11,6 +11,7 @@ import {
 } from "@/lib/db/bookings";
 import { findOrCreateCustomer } from "@/lib/db/customers";
 import { sendBookingEmails } from "@/lib/email/booking-emails";
+import { fieldErrorsFrom } from "@/lib/validation/field-errors";
 import {
   manualBookingSchema,
   type ManualBooking,
@@ -82,13 +83,7 @@ export async function createManualBooking(
   });
 
   if (!parsed.success) {
-    const fieldErrors: ManualBookingFieldErrors = {};
-    for (const issue of parsed.error.issues) {
-      const field = issue.path[0] as keyof ManualBooking;
-      fieldErrors[field] ??= issue.message;
-    }
-
-    return { status: "invalid", fieldErrors };
+    return { status: "invalid", fieldErrors: fieldErrorsFrom(parsed.error) };
   }
 
   const { staffId, serviceId, date, time, ...customer } = parsed.data;

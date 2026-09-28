@@ -22,7 +22,7 @@ import { BOOKING_HORIZON_DAYS } from "@/lib/availability/booking-options";
  *   than the notice a customer had to give to book is incoherent anyway.
  *
  * ZERO IS LEGAL FOR ALL THREE and each zero means something a real shop wants:
- * no gap between appointments (the case the Day 3 exclusion-constraint probe
+ * no gap between appointments (the case scripts/probe-exclusion-constraint.ts
  * asserts must stay bookable), same-day online booking, and "cancel any time".
  */
 const MAX_BUFFER_MINUTES = 60;

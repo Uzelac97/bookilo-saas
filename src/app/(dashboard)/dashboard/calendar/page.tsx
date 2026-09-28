@@ -11,6 +11,7 @@ import {
 } from "@/components/dashboard/calendar-summary";
 import { WeekAgenda } from "@/components/dashboard/week-agenda";
 import { getCurrentTenant } from "@/lib/auth/session";
+import { todayInZone } from "@/lib/availability/booking-options";
 import {
   buildDayGrid,
   buildWeekGrid,
@@ -26,7 +27,6 @@ import {
   resolveCalendarDate,
   resolveCalendarView,
   shiftCalendarDate,
-  todayInZone,
   weekDays,
 } from "@/lib/dashboard/calendar-range";
 import { getBookingsForRange } from "@/lib/db/bookings";
@@ -38,6 +38,7 @@ import {
 } from "@/lib/format";
 import { getDashboardT } from "@/lib/i18n/server";
 import { getLocale } from "@/lib/preferences-server";
+import { firstParam } from "@/lib/search-params";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getDashboardT();
@@ -47,11 +48,6 @@ export async function generateMetadata(): Promise<Metadata> {
 type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
-
-/** searchParams values are `string | string[]`; a repeated key takes the first. */
-function first(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
 
 /**
  * The three lengths bounding the calendar column, all border-box.
@@ -115,8 +111,8 @@ export default async function CalendarPage({ searchParams }: PageProps) {
   const query = await searchParams;
   const now = new Date();
 
-  const view = resolveCalendarView(first(query.view));
-  const date = resolveCalendarDate(first(query.date), now, tenant.timezone);
+  const view = resolveCalendarView(firstParam(query.view));
+  const date = resolveCalendarDate(firstParam(query.date), now, tenant.timezone);
   const range = calendarRange(date, view, tenant.timezone);
 
   const [bookings, staff, workingHours] = await Promise.all([
@@ -334,8 +330,9 @@ export default async function CalendarPage({ searchParams }: PageProps) {
         ) : (
           // The day view stays the grid at every width. Its column count is the
           // shop's barbers rather than a fixed seven, so it fits a phone at the
-          // one-to-three chairs this product is aimed at. See the Day 13 note in
-          // EXECUTION-PLAN.md for where that stops being true.
+          // one-to-three chairs this product is aimed at. See "Deliberately not
+          // built: the day view's mobile fallback" in EXECUTION-PLAN.md for where
+          // that stops being true.
           //
           // From 2xl up it gains the summary beside it. That is where the space
           // exists — a two-barber day is 578px of grid, so on anything wider

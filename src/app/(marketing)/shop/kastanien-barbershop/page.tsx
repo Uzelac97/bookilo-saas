@@ -21,6 +21,7 @@ import {
   groupCategoryEn,
   serviceName,
 } from "@/lib/i18n/service-text";
+import { groupByCategory } from "@/lib/service-groups";
 
 /**
  * Kastanien Barbershop's marketing page.
@@ -835,30 +836,4 @@ function pickFeatured(services: PublicService[]): PublicService[] {
   return FEATURED_SERVICE_NAMES.map((name) =>
     services.find((service) => serviceName(service, "en") === name),
   ).filter((service): service is PublicService => service !== undefined);
-}
-
-type ServiceGroup = { category: string | null; services: PublicService[] };
-
-/**
- * An order-preserving fold, not a sort — the same shape as the one in
- * components/booking/service-list.tsx and for the same reason: getActiveServices
- * already orders by category (nulls last) then name, so each category arrives as
- * one contiguous run, and re-sorting here would only be a second opinion that
- * can disagree with the first.
- */
-function groupByCategory(services: PublicService[]): ServiceGroup[] {
-  const groups: ServiceGroup[] = [];
-
-  for (const service of services) {
-    const current = groups[groups.length - 1];
-
-    if (current && current.category === service.category) {
-      current.services.push(service);
-      continue;
-    }
-
-    groups.push({ category: service.category, services: [service] });
-  }
-
-  return groups;
 }

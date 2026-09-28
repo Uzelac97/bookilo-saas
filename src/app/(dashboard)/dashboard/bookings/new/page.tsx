@@ -11,6 +11,7 @@ import { formatBookingDate } from "@/lib/format";
 import { getDashboardT } from "@/lib/i18n/server";
 import type { MessageKey } from "@/lib/i18n/translate";
 import { getLocale } from "@/lib/preferences-server";
+import { firstParam } from "@/lib/search-params";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getDashboardT();
@@ -20,11 +21,6 @@ export async function generateMetadata(): Promise<Metadata> {
 type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
-
-/** searchParams values are `string | string[]`; a repeated key takes the first. */
-function first(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
 
 /**
  * Booking on the owner's behalf — a walk-in, or one taken over the phone.
@@ -48,7 +44,7 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
   const query = await searchParams;
   const now = new Date();
 
-  const date = resolveCalendarDate(first(query.date), now, tenant.timezone);
+  const date = resolveCalendarDate(firstParam(query.date), now, tenant.timezone);
 
   const [staff, services, availability] = await Promise.all([
     getActiveStaff(tenant.id),
@@ -108,9 +104,9 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
             date={date}
             now={now}
             prefill={{
-              staffId: first(query.staffId),
-              serviceId: first(query.serviceId),
-              time: first(query.time),
+              staffId: firstParam(query.staffId),
+              serviceId: firstParam(query.serviceId),
+              time: firstParam(query.time),
             }}
           />
         </section>

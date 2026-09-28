@@ -45,10 +45,10 @@ const MAX_PRICE_MINOR_UNITS = 100_000;
  * and more than two decimal places — that last one because "25,005" is a typo,
  * and silently rounding it writes a price nobody chose.
  *
- * Note this is a *display* concern crossing into validation, and it inherits the
- * open locale question recorded for Day 13 in EXECUTION-PLAN.md: money is pinned
- * to de-DE while dates follow the runtime. Accepting both marks means this
- * function stays correct whichever way that is settled.
+ * Note this is a *display* concern crossing into validation: prices render
+ * pinned to de-DE (lib/format.ts) whatever the interface language, while an
+ * owner may type either decimal mark. Accepting both means this function
+ * doesn't depend on how the price was last shown.
  */
 export function parsePriceToMinorUnits(input: string): number | null {
   const trimmed = input.trim();
@@ -99,10 +99,10 @@ const categoryText = () =>
  * means to the public pages' fallback (lib/i18n/service-text.ts). A field of
  * spaces counts as untouched.
  *
- * A preprocess rather than `z.union([z.literal(""), field])`, which is what
- * `category` used to be: when every branch of a union fails, Zod reports one
- * generic "Invalid input" and the branch's own message key never arrives, so a
- * too-long category showed the owner an untranslated library string.
+ * A preprocess rather than `z.union([z.literal(""), field])`: when every branch
+ * of a union fails, Zod reports one generic "Invalid input" and the branch's
+ * own message key never arrives, so a too-long value would show the owner an
+ * untranslated library string.
  */
 const optional = <T extends z.ZodType<string>>(field: T) =>
   z.preprocess(

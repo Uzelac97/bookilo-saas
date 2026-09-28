@@ -28,8 +28,7 @@ const INITIAL_STATE: WorkingHoursState = { status: "idle" };
  * The names come from the dictionaries via weekdayName() rather than from
  * Luxon, which matters here specifically: these name a recurring weekday, not a
  * real date, so a Luxon rendering would need a made-up date to hang off and
- * would follow whatever locale that date carried — the inconsistency recorded
- * for Day 13 in EXECUTION-PLAN.md.
+ * would follow whatever locale that date carried.
  */
 
 /** A default interval for a day being opened, in the shape the form holds. */

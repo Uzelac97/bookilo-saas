@@ -169,8 +169,38 @@ export async function getStaffForManagement(
   tenantId: string,
   now: Date,
 ): Promise<ManagedStaff[]> {
+  return findManagedStaff(tenantId, now);
+}
+
+/**
+ * One barber, scoped by tenant, for the edit screen. Null when the id belongs to
+ * nobody or to another tenant — the caller renders a 404 for both.
+ *
+ * `tenantId` and the id sit in the same `where`, so a guessed id from another
+ * shop matches nothing rather than being fetched and filtered afterwards.
+ */
+export async function getStaffMember(
+  tenantId: string,
+  staffId: string,
+  now: Date,
+): Promise<ManagedStaff | null> {
+  const [member] = await findManagedStaff(tenantId, now, staffId);
+
+  return member ?? null;
+}
+
+/**
+ * The one query behind both functions above, so the list and the edit screen
+ * can never disagree about what a barber's hours, absences or booking count
+ * are. `staffId` narrows it to one row; omitted, it returns the whole team.
+ */
+async function findManagedStaff(
+  tenantId: string,
+  now: Date,
+  staffId?: string,
+): Promise<ManagedStaff[]> {
   const rows = await prisma.staff.findMany({
-    where: { tenantId },
+    where: { tenantId, ...(staffId ? { id: staffId } : {}) },
     // Active first so the working list isn't pushed below the archive, then the
     // same createdAt ordering as everywhere else in this file.
     orderBy: [{ active: "desc" }, { createdAt: "asc" }],
@@ -214,20 +244,6 @@ export async function getStaffForManagement(
     timeOff: row.timeOff,
     upcomingBookings: row._count.bookings,
   }));
-}
-
-/**
- * One barber, scoped by tenant, for the edit screen. Null when the id belongs to
- * nobody or to another tenant — the caller renders a 404 for both.
- */
-export async function getStaffMember(
-  tenantId: string,
-  staffId: string,
-  now: Date,
-): Promise<ManagedStaff | null> {
-  const all = await getStaffForManagement(tenantId, now);
-
-  return all.find((member) => member.id === staffId) ?? null;
 }
 
 /**

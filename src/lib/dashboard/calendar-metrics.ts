@@ -1,15 +1,13 @@
 /**
  * The calendar grid's horizontal measurements, and the width they add up to.
  *
- * A plain module, and deliberately not part of components/dashboard/calendar-grid
- * where these used to live. The page calls calendarCardWidth during its *server*
- * render to build the container's clamp(), while the grid is heading for
- * interactivity in Day 11 — click-to-book, marking a booking complete. If that
- * arrives as a click handler, the natural next step is `"use client"` on the
- * component file, and that directive rewrites every export in its file into a
- * client reference: calendarCardWidth would reach the page as a throwing proxy
- * instead of a function, with no type error to warn anyone. CLAUDE.md documents
- * that exact failure having already happened here once, with ANY_STAFF.
+ * A plain module, and deliberately not part of components/dashboard/calendar-grid.
+ * The page calls calendarCardWidth during its *server* render to build the
+ * container's clamp(), and the grid is the component most likely to gain a
+ * click handler and with it `"use client"`. That directive rewrites every export
+ * in its file into a client reference: calendarCardWidth would reach the page as
+ * a throwing proxy instead of a function, with no type error to warn anyone —
+ * the failure CLAUDE.md documents with ANY_STAFF.
  *
  * Keeping the lengths here means the directive can land on the component
  * whenever it needs to, and this cannot break. Same reasoning that put ANY_STAFF

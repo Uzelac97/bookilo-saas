@@ -15,5 +15,3 @@ export const loginSchema = z.object({
     .pipe(z.email("validation.emailInvalid")),
   password: z.string().min(1, "validation.passwordRequired"),
 });
-
-export type LoginInput = z.infer<typeof loginSchema>;

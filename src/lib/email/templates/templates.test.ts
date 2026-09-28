@@ -16,7 +16,12 @@ function booking(overrides: Partial<BookingByToken> = {}): BookingByToken {
     endAt: new Date("2026-07-28T13:00:00Z"),
     status: "CONFIRMED",
     cancelToken: "tok-123",
-    service: { name: "Skin fade", durationMinutes: 30, priceMinorUnits: 2500 },
+    service: {
+      name: "Skin fade",
+      nameEn: null,
+      durationMinutes: 30,
+      priceMinorUnits: 2500,
+    },
     staff: { name: "Marco" },
     customer: { name: "Jonas Weber", email: "jonas@example.com" },
     tenant: {

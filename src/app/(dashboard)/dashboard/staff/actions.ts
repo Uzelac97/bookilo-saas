@@ -13,6 +13,7 @@ import {
   setStaffActive,
   updateStaff,
 } from "@/lib/db/staff";
+import { fieldErrorsFrom } from "@/lib/validation/field-errors";
 import {
   staffInputSchema,
   toWorkingHoursRows,
@@ -23,6 +24,8 @@ import {
   timeOffPayloadSchema,
   toTimeOffRange,
 } from "@/lib/validation/time-off";
+
+import { revalidatePublicPages } from "../revalidate-public-pages";
 
 /**
  * What the barber form renders after a submit.
@@ -69,19 +72,12 @@ export type TimeOffState =
 
 const STAFF_PATH = "/dashboard/staff";
 
-/**
- * Drops the public pages from the caches — see the fuller note on the twin of
- * this function in ../services/actions.ts for what that does and doesn't clear.
- *
- * Every write in this file is visible to customers, and the hours are the
- * surprising one: they *are* the shop's opening hours. There is no
- * business-level hours field, so "closed Sunday" is simply the absence of Sunday
- * rows (EXECUTION-PLAN.md) — setting a barber's shift changes what the shop page
- * says it's open, not only what the slot grid offers.
- */
-function revalidatePublicPages() {
-  revalidatePath("/b/[slug]", "layout");
-}
+// Every write in this file is visible to customers, so each one also calls
+// revalidatePublicPages. The hours are the surprising one: they *are* the shop's
+// opening hours. There is no business-level hours field, so "closed Sunday" is
+// simply the absence of Sunday rows (EXECUTION-PLAN.md) — setting a barber's
+// shift changes what the shop page says it's open, not only what the slot grid
+// offers.
 
 /**
  * Adds a barber, then sends the owner straight to their hours.
@@ -327,11 +323,8 @@ function parseStaffForm(
 
   if (parsed.success) return { ok: true, input: parsed.data };
 
-  const fieldErrors: StaffFieldErrors = {};
-  for (const issue of parsed.error.issues) {
-    const field = issue.path[0] as keyof StaffInput;
-    fieldErrors[field] ??= issue.message;
-  }
-
-  return { ok: false, state: { status: "invalid", fieldErrors } };
+  return {
+    ok: false,
+    state: { status: "invalid", fieldErrors: fieldErrorsFrom(parsed.error) },
+  };
 }

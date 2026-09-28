@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireSession } from "@/lib/auth/session";
 import { updateBookingRules } from "@/lib/db/tenant";
+import { fieldErrorsFrom } from "@/lib/validation/field-errors";
 import {
   bookingRulesSchema,
   type BookingRulesInput,
@@ -56,13 +57,7 @@ export async function updateBookingRulesAction(
   });
 
   if (!parsed.success) {
-    const fieldErrors: BookingRulesFieldErrors = {};
-    for (const issue of parsed.error.issues) {
-      const field = issue.path[0] as keyof BookingRulesInput;
-      fieldErrors[field] ??= issue.message;
-    }
-
-    return { status: "invalid", fieldErrors };
+    return { status: "invalid", fieldErrors: fieldErrorsFrom(parsed.error) };
   }
 
   try {

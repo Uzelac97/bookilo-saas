@@ -1,19 +1,13 @@
-import { DateTime } from "luxon";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BookingSummary } from "@/components/booking/booking-summary";
 import { CancelButton } from "@/components/booking/cancel-button";
 import { canCancel } from "@/lib/availability/cancellation";
 import { getBookingByCancelToken } from "@/lib/db/bookings";
-import {
-  formatBookingDate,
-  formatDuration,
-  formatPrice,
-  formatSlotTime,
-} from "@/lib/format";
+import { formatDuration } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
-import { serviceName } from "@/lib/i18n/service-text";
 import { getLocale } from "@/lib/preferences-server";
 
 import { getShop } from "../../shop";
@@ -54,7 +48,7 @@ export default async function CancelPage({ params }: PageProps) {
   const booking = await getBookingByCancelToken(token, new Date());
   if (!booking || booking.tenant.slug !== slug) notFound();
 
-  const { tenant, service } = booking;
+  const { tenant } = booking;
   // The vertical comes from the slug's tenant, which the layout has already
   // resolved (a per-request memo hit, not a second query) and which the check
   // above has just proven is the booking's own.
@@ -63,9 +57,6 @@ export default async function CancelPage({ params }: PageProps) {
     getT(shop?.businessType ?? null),
     getLocale(),
   ]);
-  const date = DateTime.fromJSDate(booking.startAt)
-    .setZone(tenant.timezone)
-    .toISODate();
 
   const cancelled = booking.status === "CANCELLED";
   // COMPLETED or NO_SHOW — the appointment has already been and gone.
@@ -118,32 +109,7 @@ export default async function CancelPage({ params }: PageProps) {
           </p>
         </header>
 
-        <dl className="flex flex-col gap-1.5 rounded-2xl border border-line bg-surface p-5 text-sm shadow-sm">
-          <Row
-            label={t("booking.service")}
-            value={serviceName(service, locale)}
-          />
-          <Row label={t("booking.barber")} value={booking.staff.name} />
-          <Row
-            label={t("booking.when")}
-            value={
-              date
-                ? t("booking.dateAtTime", {
-                    date: formatBookingDate(date, tenant.timezone, locale),
-                    time: formatSlotTime(booking.startAt, tenant.timezone),
-                  })
-                : formatSlotTime(booking.startAt, tenant.timezone)
-            }
-          />
-          <Row
-            label={t("booking.duration")}
-            value={formatDuration(service.durationMinutes, locale)}
-          />
-          <Row
-            label={t("booking.price")}
-            value={formatPrice(service.priceMinorUnits)}
-          />
-        </dl>
+        <BookingSummary booking={booking} t={t} locale={locale} />
 
         {cancelled ? null : closed ? (
           <Notice>{closedNotice}</Notice>
@@ -159,13 +125,9 @@ export default async function CancelPage({ params }: PageProps) {
           </form>
         ) : (
           <Notice>
-            {/* The gaps between these expressions are explicit {" "} rather than
-                plain spaces in the text. A literal space after a closing brace
-                was silently dropped at build time here once already — it
-                rendered as "closes 2 hbefore an appointment" — because a text
+            {/* Explicit {" "} between expressions, never a literal space: a text
                 node sandwiched between two expressions and wrapped across lines
-                gets its leading space trimmed. An explicit space is a real
-                child and can't be. */}
+                has its leading space trimmed at build time (see CLAUDE.md). */}
             {closedReason}{" "}
             {tooLateContact}
           </Notice>
@@ -187,14 +149,5 @@ function Notice({ children }: { children: React.ReactNode }) {
     <p className="rounded-xl border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning">
       {children}
     </p>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-4">
-      <dt className="text-fg-muted">{label}</dt>
-      <dd className="text-right font-medium text-fg">{value}</dd>
-    </div>
   );
 }

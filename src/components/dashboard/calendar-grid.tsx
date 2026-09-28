@@ -194,16 +194,9 @@ export async function CalendarGrid({
             closedCount,
           ),
         }}
-        // Breathing room under the last hour label, which now sits fully inside
-        // the grid rather than half below it.
-        //
-        // This used to be structural. The first and last labels were centred on
-        // rules flush against the top and bottom of the body, so both hung half
-        // outside it and this padding was what kept the bottom one from being
-        // clipped. Nothing performed the equivalent job at the top, where the
-        // header's border-b sits on that same edge — which is exactly how that
-        // border came to run through the middle of the 09:00 label. labelShift
-        // clamps both ends inward now, so this is spacing and no more.
+        // Breathing room under the last hour label. Spacing only: labelShift
+        // already keeps the first and last labels inside the grid, so nothing
+        // depends on this padding to avoid clipping.
         className="pb-3"
       >
         <div
@@ -396,9 +389,9 @@ const SLOT_TARGET_MINUTES = 30;
  * a 48px target, which is a comfortable tap, and 15 would halve that for a
  * precision nobody needs from a shortcut.
  *
- * Deliberately drawn under the appointments and never over them, so this stays
- * out of the way of the Day 13 question about interacting with short blocks —
- * clicking a booking is still not a gesture this calendar has.
+ * Deliberately drawn under the appointments and never over them, so a click on
+ * a booking never lands on a slot link instead — clicking a booking is not a
+ * gesture this calendar has.
  */
 function SlotLinks({
   column,

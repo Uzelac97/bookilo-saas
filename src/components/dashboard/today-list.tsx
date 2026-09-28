@@ -24,9 +24,9 @@ const STATUS_BADGE_STYLES: Record<DashboardBooking["status"], string> = {
 /**
  * Today's appointments for one shop.
  *
- * Read-only. Marking someone complete or a no-show from here is Day 11 — the
- * statuses render because the data has them, not because this screen can set
- * them yet.
+ * Read-only. The statuses render because the data has them; nothing in the
+ * dashboard can set them — see "No status actions from the dashboard" in
+ * EXECUTION-PLAN.md.
  *
  * `now` is passed in rather than read here so the whole page renders against one
  * instant: a component that called new Date() itself could classify a booking as

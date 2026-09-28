@@ -4,8 +4,6 @@ import { z } from "zod";
 // ./auth.ts. Tests read them back through the English dictionary.
 
 import { normalizePhone, phoneDigitCount } from "./phone";
-// Moved to ./text.ts on Day 11, when the services and staff screens needed the
-// same single-line rule for the names an owner types. Same function, one home.
 import { hasControlCharacters } from "./text";
 
 /**
@@ -18,9 +16,9 @@ const MIN_PHONE_DIGITS = 6;
 /**
  * The customer-supplied half of a public booking.
  *
- * Written on Day 6 for the form; Day 7's submission action validates against
- * the same schema, so "valid" has one definition rather than a client-side
- * opinion and a server-side one that drift.
+ * The form and the submission action validate against this same schema, so
+ * "valid" has one definition rather than a client-side opinion and a
+ * server-side one that drift.
  *
  * Deliberately absent: staffId, serviceId, startAt, and above all tenantId.
  * Those are resolved server-side from the slug and re-verified against the
@@ -118,5 +116,3 @@ export const bookingSubmissionSchema = customerDetailsSchema.extend({
    */
   startAt: z.iso.datetime().pipe(z.coerce.date()),
 });
-
-export type BookingSubmission = z.infer<typeof bookingSubmissionSchema>;

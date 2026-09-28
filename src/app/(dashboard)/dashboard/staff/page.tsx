@@ -5,6 +5,7 @@ import { StaffList } from "@/components/dashboard/staff-list";
 import { getCurrentTenant } from "@/lib/auth/session";
 import { getStaffForManagement } from "@/lib/db/staff";
 import { getDashboardT } from "@/lib/i18n/server";
+import { firstParam } from "@/lib/search-params";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getDashboardT();
@@ -14,11 +15,6 @@ export async function generateMetadata(): Promise<Metadata> {
 type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
-
-/** searchParams values are `string | string[]`; a repeated key takes the first. */
-function first(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
 
 /**
  * The shop's barbers.
@@ -55,7 +51,7 @@ export default async function StaffPage({ searchParams }: PageProps) {
         <StaffForm />
       </section>
 
-      <StaffList staff={staff} confirmingId={first(query.deactivate)} />
+      <StaffList staff={staff} confirmingId={firstParam(query.deactivate)} />
     </div>
   );
 }

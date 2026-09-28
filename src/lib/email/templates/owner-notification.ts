@@ -22,9 +22,8 @@ import { localDate } from "./when";
  * customer's name and number come first: the two things needed to act on it —
  * to call and move an appointment, or to recognise a name walking in.
  *
- * No link to the dashboard, because there isn't one until Day 9. That's a
- * deliberate omission rather than an oversight; when the calendar exists, a
- * deep link to the day belongs here.
+ * No link to the dashboard yet. A deep link to the booking's day in the
+ * calendar (`/dashboard/calendar?date=…`) would fit here; it isn't built.
  */
 export function renderOwnerNotification(
   booking: BookingByToken,

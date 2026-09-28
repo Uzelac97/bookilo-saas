@@ -32,7 +32,7 @@ const cancelArgsSchema = z.object({
  *
  * That revalidate is required, not defensive: a Server Action that doesn't call
  * it sends back only its return value and never re-invokes the page's server
- * component — measured on Day 6 and written up in booking-flow.tsx. Without it,
+ * component (the measurement is written up in booking-flow.tsx). Without it,
  * pressing "Cancel appointment" would leave the page insisting the booking is
  * still confirmed.
  *

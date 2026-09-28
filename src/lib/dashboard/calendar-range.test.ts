@@ -6,7 +6,6 @@ import {
   resolveCalendarDate,
   resolveCalendarView,
   shiftCalendarDate,
-  todayInZone,
   weekDays,
 } from "./calendar-range";
 
@@ -162,18 +161,5 @@ describe("rangeContainsToday", () => {
     expect(
       rangeContainsToday(calendarRange("2026-08-05", "week", TZ), NOW, TZ),
     ).toBe(false);
-  });
-});
-
-describe("todayInZone", () => {
-  it("uses the shop's day, not the server's", () => {
-    // 22:30 UTC is already tomorrow in Berlin (UTC+2 in July). A Vercel function
-    // running in UTC must not roll the shop's calendar over at the wrong moment.
-    expect(todayInZone(utc("2026-07-27T22:30:00"), TZ)).toBe("2026-07-28");
-    expect(todayInZone(utc("2026-07-27T21:30:00"), TZ)).toBe("2026-07-27");
-  });
-
-  it("rejects a timezone it cannot resolve rather than guessing one", () => {
-    expect(() => todayInZone(NOW, "Mars/Olympus")).toThrow(/invalid timezone/);
   });
 });

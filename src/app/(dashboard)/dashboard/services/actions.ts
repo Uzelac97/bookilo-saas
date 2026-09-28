@@ -9,7 +9,10 @@ import {
   setServiceActive,
   updateService,
 } from "@/lib/db/services";
+import { fieldErrorsFrom } from "@/lib/validation/field-errors";
 import { serviceInputSchema, type ServiceInput } from "@/lib/validation/service";
+
+import { revalidatePublicPages } from "../revalidate-public-pages";
 
 /**
  * What the services form renders after a submit.
@@ -34,28 +37,9 @@ export type ServiceFormState =
 
 export type ServiceFieldErrors = Partial<Record<keyof ServiceInput, string>>;
 
+// Every write in this file changes what a customer sees, so each one also calls
+// revalidatePublicPages.
 const SERVICES_PATH = "/dashboard/services";
-
-/**
- * Drops the public pages from the caches, because every write here changes what
- * a customer sees.
- *
- * The build reports `/b/[slug]` and its children as dynamic today, so there is
- * no full route cache to bust. What this actually clears is the *client* router
- * cache — and that path is real rather than theoretical: the dashboard header
- * carries a "View public page" link, so an owner who retires a service and
- * immediately clicks it is exactly the person who would be served the stale
- * payload. It also keeps this correct if those routes ever gain
- * generateStaticParams or a `revalidate` export.
- *
- * "layout" rather than "page": "page" would cover `/b/[slug]` alone and leave
- * `/b/[slug]/book` showing the retired service in its picker. The literal
- * `[slug]` is the route pattern, so it covers every tenant — a dashboard session
- * carries a tenantId, not a slug.
- */
-function revalidatePublicPages() {
-  revalidatePath("/b/[slug]", "layout");
-}
 
 /** Adds a service to the signed-in owner's shop. */
 export async function createServiceAction(
@@ -175,11 +159,8 @@ function parseForm(
 
   if (parsed.success) return { ok: true, input: parsed.data };
 
-  const fieldErrors: ServiceFieldErrors = {};
-  for (const issue of parsed.error.issues) {
-    const field = issue.path[0] as keyof ServiceInput;
-    fieldErrors[field] ??= issue.message;
-  }
-
-  return { ok: false, state: { status: "invalid", fieldErrors } };
+  return {
+    ok: false,
+    state: { status: "invalid", fieldErrors: fieldErrorsFrom(parsed.error) },
+  };
 }

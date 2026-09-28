@@ -46,6 +46,7 @@ import {
   deleteTimeOff,
   getActiveStaff,
   getStaffForManagement,
+  getStaffMember,
   getWorkingHoursForActiveStaff,
   replaceWorkingHours,
   setStaffActive,
@@ -90,7 +91,7 @@ const HOLIDAY = {
  *
  * Excludes the count check itself, which is reported separately below.
  */
-const EXPECTED_CHECKS = 37;
+const EXPECTED_CHECKS = 38;
 
 let checksRun = 0;
 let failures = 0;
@@ -361,6 +362,16 @@ async function main() {
         !crossDeactivate.ok &&
         (await getActiveStaff(OURS)).length === 1,
       `cross-tenant staff writes refused, barber still active`,
+    );
+
+    // The edit screen's read. The id is filtered in the query alongside the
+    // tenant, so another shop's session asking for this barber gets nothing.
+    const ownMember = await getStaffMember(OURS, barber.id, NOW);
+    const crossMember = await getStaffMember(THEIRS, barber.id, NOW);
+    check(
+      "D6",
+      ownMember?.id === barber.id && crossMember === null,
+      `getStaffMember finds the barber for its own tenant only`,
     );
 
     console.log("\nPhase E — time off, the second write with no tenantId column");

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
 import { StaffForm } from "@/components/dashboard/staff-form";
 import { TimeOffEditor } from "@/components/dashboard/time-off-editor";
@@ -11,12 +12,21 @@ import { getDashboardT } from "@/lib/i18n/server";
 
 type PageProps = { params: Promise<{ staffId: string }> };
 
+/**
+ * generateMetadata and the page both need the barber. Prisma calls get no
+ * request deduplication of their own, so without cache() this is the same
+ * query twice per render — same reasoning as getShop in (public)/b/[slug]/shop.ts.
+ */
+const getMember = cache((tenantId: string, staffId: string) =>
+  getStaffMember(tenantId, staffId, new Date()),
+);
+
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { staffId } = await params;
   const tenant = await getCurrentTenant();
-  const member = await getStaffMember(tenant.id, staffId, new Date());
+  const member = await getMember(tenant.id, staffId);
   const t = await getDashboardT();
 
   return { title: member ? member.name : t("staff.notFound") };
@@ -38,7 +48,7 @@ export async function generateMetadata({
 export default async function StaffMemberPage({ params }: PageProps) {
   const { staffId } = await params;
   const tenant = await getCurrentTenant();
-  const member = await getStaffMember(tenant.id, staffId, new Date());
+  const member = await getMember(tenant.id, staffId);
 
   if (!member) notFound();
 

@@ -235,7 +235,14 @@ export type BookingByToken = {
   endAt: Date;
   status: BookingStatus;
   cancelToken: string;
-  service: { name: string; durationMinutes: number; priceMinorUnits: number };
+  // nameEn for the booked and cancel pages in English (lib/i18n/service-text.ts).
+  // The emails ignore it and stay on `name` — they are always German.
+  service: {
+    name: string;
+    nameEn: string | null;
+    durationMinutes: number;
+    priceMinorUnits: number;
+  };
   staff: { name: string };
   customer: { name: string; email: string | null };
   tenant: {

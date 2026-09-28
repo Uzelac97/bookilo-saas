@@ -7,9 +7,8 @@
  * directive here would pull it — and everything importing it — into the client
  * bundle for no reason.
  *
- * Extracted from components/booking/booking-form.tsx on Day 11, when the
- * services, staff and manual-booking forms needed the same field. The styling
- * notes below travel with it because both of them were bugs first.
+ * Shared by the public booking form and the services, staff and manual-booking
+ * forms. Both styling notes below record a real bug the styling prevents.
  */
 export function Field({
   id,

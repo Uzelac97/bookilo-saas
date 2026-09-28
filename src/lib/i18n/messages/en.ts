@@ -52,6 +52,9 @@ export const en = {
   "booking.dateAtTime": "{date} at {time}",
   "booking.cancelledHeading": "This booking is cancelled",
   "booking.backTo": "Back to {shop}",
+  "booking.linkInvalidTitle": "This link isn't valid",
+  "booking.linkInvalidBody":
+    "It may be incomplete or out of date. Check the link in your confirmation email, or contact the place you booked with directly.",
 
   // ─── Public shop page ─────────────────────────────────────────────────────
   "shop.businessTypeBarbershop": "Barbershop",

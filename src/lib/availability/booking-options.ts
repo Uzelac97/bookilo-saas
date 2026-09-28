@@ -34,13 +34,11 @@ export const STRIP_LENGTH = 7;
  * The `?staff=` sentinel for "no preference" — never a real staff id.
  *
  * Lives in this plain module rather than beside the picker that renders it, and
- * that placement is load-bearing. It was previously exported from
- * components/booking/staff-picker.tsx, which is `"use client"`: every export of
- * a client module becomes a *client reference* when a server component imports
- * it, so the booking page's server render held a throwing proxy here instead of
- * the string "any". It happened to behave, because the sentinel was only ever
- * compared against itself — one `.startsWith()` or one comparison to the literal
- * "any" and it would have broken with no type error to warn anyone.
+ * that placement is load-bearing. staff-picker.tsx is `"use client"`, and every
+ * export of a client module becomes a *client reference* when a server
+ * component imports it: the booking page's server render would hold a throwing
+ * proxy instead of the string "any", with no type error to warn anyone (the
+ * ANY_STAFF case in CLAUDE.md).
  *
  * It sits next to resolveBookingDate on purpose: that function decides how the
  * `?date=` parameter is interpreted, and this is the same job for `?staff=`.
@@ -241,7 +239,13 @@ export function shiftByWeek(
   return resolveBookingDate(shifted ?? undefined, now, timezone);
 }
 
-/** The tenant-local calendar day containing `now`. */
+/**
+ * The tenant-local calendar day containing `now`.
+ *
+ * The one definition of "today" for the whole app: the booking flow, the
+ * dashboard overview and the calendar all call this, so they cannot disagree
+ * about which day it is at the shop.
+ */
 export function todayInZone(now: Date, timezone: string): string {
   const local = DateTime.fromJSDate(now).setZone(timezone);
   if (!local.isValid) {

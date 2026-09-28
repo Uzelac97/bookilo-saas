@@ -5,6 +5,7 @@ import { ServiceList } from "@/components/dashboard/service-list";
 import { getCurrentTenant } from "@/lib/auth/session";
 import { getServicesForTenant } from "@/lib/db/services";
 import { getDashboardT } from "@/lib/i18n/server";
+import { firstParam } from "@/lib/search-params";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getDashboardT();
@@ -14,11 +15,6 @@ export async function generateMetadata(): Promise<Metadata> {
 type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
-
-/** searchParams values are `string | string[]`; a repeated key takes the first. */
-function first(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
 
 /**
  * What the shop sells, and what it used to sell.
@@ -38,7 +34,7 @@ export default async function ServicesPage({ searchParams }: PageProps) {
   const services = await getServicesForTenant(tenant.id);
   const t = await getDashboardT();
 
-  const editingId = first(query.edit);
+  const editingId = firstParam(query.edit);
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6">

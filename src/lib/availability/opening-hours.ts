@@ -88,7 +88,7 @@ export function mergeOpeningHours(rows: WorkingHoursRow[]): DayOpeningHours[] {
 /**
  * The same sanity guard toWindow applies in slots.ts. A backwards or
  * out-of-range row is dropped rather than rendered as "18:00 – 09:00" — the
- * dashboard's staff-hours editor (Day 11) is what should prevent it existing,
+ * dashboard's staff-hours editor is what should prevent it existing,
  * but a public page is the wrong place to find out that it didn't.
  */
 function isUsableRow(row: WorkingHoursRow): boolean {

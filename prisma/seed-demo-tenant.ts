@@ -28,9 +28,10 @@
  * survived" isn't. Nothing of value is lost: a demo booking's job ends with the
  * demo.
  *
- * What it leaves alone: the owner's password, and the tenant's timezone and
- * booking rules — those are owner-editable and a reset of the diary has no
- * business reaching into the settings screen.
+ * What it leaves alone: the owner's login (email and password), the tenant's
+ * contactEmail, and the tenant's timezone and booking rules — those are
+ * owner-editable or point at a real person, and a reset of the diary has no
+ * business reaching into either. See resolveOwner.
  *
  * The blast radius is one tenant, resolved by the spec's fixed slug. It cannot
  * reach a real shop's data unless a real shop is given a demo's slug.
@@ -161,7 +162,7 @@ export async function seedDemoTenant<
   const ids = idsFor(spec.idPrefix);
 
   const tenant = await upsertTenant(spec);
-  const owner = await upsertOwner(spec, tenant.id);
+  const owner = await resolveOwner(spec, tenant.id);
 
   await upsertStaff(spec, ids, tenant.id);
   await upsertServices(spec, ids, tenant.id);
@@ -240,11 +241,16 @@ function idsFor(prefix: string) {
  * created.
  *
  * `timezone` and the three booking rules are set on create and never on update.
- * Both are owner-editable now (Day 12) and both have consequences a re-seed has
- * no business causing silently: changing a timezone redraws every existing
- * booking's displayed time without moving the stored instant, and raising the
+ * Both are owner-editable and both have consequences a re-seed has no business
+ * causing silently: changing a timezone redraws every existing booking's
+ * displayed time without moving the stored instant, and raising the
  * cancellation window can strand a customer who was promised a different one.
- * Same posture as the password below.
+ * Same posture as the owner in resolveOwner.
+ *
+ * `contactEmail` is create-only for a sharper reason: it is where every
+ * owner-notification email goes. On production it is a real inbox, and a re-seed
+ * run without SEED_OWNER_EMAIL would otherwise rewrite it to the demo default
+ * and silently redirect the shop's booking notifications.
  *
  * `businessType` is written on update too. Nothing in the app edits it, so
  * there is no owner's choice for a re-seed to overwrite.
@@ -257,7 +263,6 @@ async function upsertTenant(spec: DemoTenantSpec<string, string>) {
     // column alone", which would let a stray value survive a re-seed.
     heroImageUrl: spec.display.heroImageUrl ?? null,
     businessType: spec.businessType,
-    contactEmail: spec.owner.email,
   };
 
   const existing =
@@ -274,6 +279,7 @@ async function upsertTenant(spec: DemoTenantSpec<string, string>) {
     data: {
       id: spec.tenantId,
       timezone: spec.timezone,
+      contactEmail: spec.owner.email,
       ...(spec.bufferMinutes === undefined
         ? {}
         : { bufferMinutes: spec.bufferMinutes }),
@@ -282,15 +288,64 @@ async function upsertTenant(spec: DemoTenantSpec<string, string>) {
   });
 }
 
-async function upsertOwner(spec: DemoTenantSpec<string, string>, tenantId: string) {
-  const passwordHash = await hashPassword(spec.owner.password);
+/**
+ * The tenant's owner login: the one it already has, or a new one on a fresh
+ * database.
+ *
+ * RESOLVED OFF THE TENANT, NOT OFF THE SPEC'S EMAIL. The spec's email comes from
+ * SEED_OWNER_EMAIL with a demo default, and a re-seed run without that variable
+ * set is an easy mistake. Looking the owner up by that email would miss the real
+ * one and create a second OWNER on the shop, with the demo password that sits
+ * in plain text in seed.ts. So an existing owner is
+ * returned exactly as it is — email, password and tenant untouched — and the
+ * spec's email is only ever used to create the first one.
+ *
+ * It also never moves a user between tenants. If the tenant has no owner and
+ * the spec's email already belongs to another shop's user, this throws rather
+ * than re-homing that login and locking its shop out of its own dashboard.
+ *
+ * Never touches passwordHash on an existing user, so a password set via
+ * scripts/reset-password.ts survives a re-seed.
+ */
+async function resolveOwner(
+  spec: DemoTenantSpec<string, string>,
+  tenantId: string,
+): Promise<{ email: string }> {
+  const existing = await prisma.user.findFirst({
+    where: { tenantId, role: "OWNER" },
+    orderBy: { createdAt: "asc" },
+    select: { email: true },
+  });
 
-  return prisma.user.upsert({
+  if (existing) {
+    if (existing.email !== spec.owner.email) {
+      console.log(
+        `  note       owner email from the environment (${spec.owner.email}) ignored — this tenant's owner is ${existing.email}`,
+      );
+    }
+    return existing;
+  }
+
+  const taken = await prisma.user.findUnique({
     where: { email: spec.owner.email },
-    // Deliberately does NOT touch passwordHash on update — re-seeding must not
-    // silently undo a password set via scripts/reset-password.ts.
-    update: { tenantId },
-    create: { tenantId, email: spec.owner.email, passwordHash, role: "OWNER" },
+    select: { tenantId: true },
+  });
+
+  if (taken) {
+    throw new Error(
+      `Refusing to seed an owner for tenant ${tenantId}: ${spec.owner.email} already belongs to tenant ${taken.tenantId}. ` +
+        `Set a different owner email for this seed; a login is never moved between tenants.`,
+    );
+  }
+
+  return prisma.user.create({
+    data: {
+      tenantId,
+      email: spec.owner.email,
+      passwordHash: await hashPassword(spec.owner.password),
+      role: "OWNER",
+    },
+    select: { email: true },
   });
 }
 

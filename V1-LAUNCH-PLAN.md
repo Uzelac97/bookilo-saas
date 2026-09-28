@@ -207,7 +207,11 @@ Specific items found and deferred:
 
 - **The "Shop not found" error copy is misleading and should distinguish the two cases.** It fires both when a shop slug is genuinely invalid *and* when the shop is real but the cancel token is invalid or tampered with (found during 14.3's C7 tamper test). In the second case the shop *was* found — it was the token that failed — so a customer whose link got mangled in transit is told their barbershop doesn't exist. Split it into two messages. Low priority: it is reached by a broken or tampered link, not by any normal path.
 
+  **Closed in Phase 17.** The booked/ and cancel/ token segments now have their own 404 ("This link isn't valid"); the slug-level "Shop not found" is unchanged. Decision 22 in `EXECUTION-PLAN.md`.
+
 - **`SEED_OWNER_EMAIL` on a production re-seed — not a Phase 17 item, recorded here so it isn't lost. Read this before the next `db:seed` against prod.** Production's owner is `chairlyy@gmail.com`; `prisma/seed.ts` defaults `SEED_OWNER_EMAIL` to `owner@demo.test`. `upsertOwner` upserts *by email*, so a bare re-seed finds no match and **creates a second OWNER user on production** with the documented default password `demo-password-123` — and `upsertTenant` rewrites `Tenant.contactEmail` to the same default, silently redirecting owner-notification email away from the real address. Neither failure is visible in the seed's own output. Always run it as `$env:SEED_OWNER_EMAIL = 'chairlyy@gmail.com'` first, and read back `user.count()` and `tenant.contactEmail` afterwards to confirm they didn't move. The real fix, when Phase 17 arrives, is for the seed to resolve the existing owner off the tenant rather than off an env-var default.
+
+  **Closed in Phase 17 (code change; not yet exercised against a database).** `resolveOwner` in `prisma/seed-demo-tenant.ts` now returns the tenant's existing OWNER untouched, `contactEmail` is create-only, and the seed refuses to move a login between tenants. The read-back check above is still worth doing on the first re-seed after this change. Decision 21 in `EXECUTION-PLAN.md`.
 
 ---
 

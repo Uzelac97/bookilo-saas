@@ -2,8 +2,8 @@
  * Phone normalisation for the customer identity key.
  *
  * Phone is what identifies a customer within a tenant
- * (`@@unique([tenantId, phone])` in schema.prisma), and from Day 8 it's also
- * what the per-phone rate limiter counts against. Both of those compare stored
+ * (`@@unique([tenantId, phone])` in schema.prisma), and it's also what the
+ * per-phone rate limiter counts against. Both of those compare stored
  * strings, so "030 123 456" and "030/123456" being two different customers is
  * not a cosmetic problem: it forks one person's history in the dashboard, and
  * it hands a rate limiter an trivial bypass — retype the same number with

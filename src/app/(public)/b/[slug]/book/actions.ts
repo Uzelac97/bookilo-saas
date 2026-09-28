@@ -28,6 +28,12 @@ import {
   bookingSubmissionSchema,
   type CustomerDetails,
 } from "@/lib/validation/booking";
+import { fieldErrorsFrom } from "@/lib/validation/field-errors";
+
+/** The submission fields a customer typed, and so the only ones with an input to show an error on. */
+const CUSTOMER_FIELDS: ReadonlySet<PropertyKey | undefined> = new Set<
+  keyof CustomerDetails
+>(["name", "phone", "email"]);
 
 /**
  * What the form renders after a submit. Success is absent on purpose — it
@@ -45,10 +51,9 @@ import {
  * - `unavailable` — the request described a time the shop never offered: a stale
  *   bookmark, an expired lead time, or a tampered payload. Start over.
  *
- * An earlier version returned `unavailable` for all three. Measured against the
- * demo shop, that meant the everyday two-customer collision told the second one
- * "that time isn't available anymore" about a time that *was* still available
- * with the other barber — advice to give up on a booking they could still make.
+ * Folding `staff_taken` into `unavailable` in particular would tell the second
+ * customer in the everyday collision to give up on a time that is still free
+ * with another barber.
  */
 export type BookingSubmitState =
   | { status: "idle" }
@@ -146,22 +151,16 @@ export async function submitBooking(
   });
 
   if (!parsed.success) {
-    const fieldErrors: Partial<Record<keyof CustomerDetails, string>> = {};
-    for (const issue of parsed.error.issues) {
-      const field = issue.path[0];
-      // Only the three customer fields have inputs to attach a message to. A
-      // failure on slug/serviceId/staffId/startAt isn't something a customer can
-      // fix by typing — that's a stale or tampered payload, so it reads as
-      // "unavailable" and sends them back to a fresh list of times.
-      if (field === "name" || field === "phone" || field === "email") {
-        fieldErrors[field] ??= issue.message;
-        continue;
-      }
+    // Only the three customer fields have inputs to attach a message to. A
+    // failure on slug/serviceId/staffId/startAt isn't something a customer can
+    // fix by typing — that's a stale or tampered payload, so it reads as
+    // "unavailable" and sends them back to a fresh list of times.
+    const payloadInvalid = parsed.error.issues.some(
+      (issue) => !CUSTOMER_FIELDS.has(issue.path[0]),
+    );
+    if (payloadInvalid) return { status: "unavailable" };
 
-      return { status: "unavailable" };
-    }
-
-    return { status: "invalid", fieldErrors };
+    return { status: "invalid", fieldErrors: fieldErrorsFrom(parsed.error) };
   }
 
   const { slug, serviceId, staffId, startAt, ...customer } = parsed.data;
@@ -273,8 +272,6 @@ export async function submitBooking(
     //    necessarily the time: two simultaneous "Any barber" submissions both
     //    resolve to the same first-listed barber, so the loser very often still
     //    has a free colleague at that instant and only needs to confirm again.
-    //    Measured — before this, the loser was told to pick a different time
-    //    while another barber sat free in the same slot.
     if (!result.ok) {
       return classifyMiss(
         await getStaffAvailability(tenant.id, {

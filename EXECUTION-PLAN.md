@@ -911,6 +911,40 @@ else about that query changes.
 German on the Services screen and in the notification email. A half-translated menu
 now shows mixed languages in the calendar too, not only on the public pages.
 
+### Recorded during Phase 17
+
+Recorded 28 Sep 2026, during the reduced Phase 17 code-quality pass. Same format:
+what was decided, what it costs.
+
+**21. The demo seed resolves the owner off the tenant, never off `SEED_OWNER_EMAIL`.**
+`resolveOwner` in `prisma/seed-demo-tenant.ts` returns the tenant's existing OWNER
+untouched (email, password, tenant) and uses the spec's email only to create the first
+one. `Tenant.contactEmail` is written on create only, like `timezone`. If a tenant has
+no owner and the spec's email already belongs to another tenant's user, the seed throws
+instead of moving that login.
+
+- **The reason.** The old upsert keyed on the env-var email. A production re-seed run
+  without `SEED_OWNER_EMAIL` would have created a second OWNER with the demo password
+  from `seed.ts`, and rewritten `contactEmail` to the demo default, silently
+  redirecting owner notifications. Neither would have shown in the seed's output. The
+  same upsert would also have moved a user from another tenant onto this one if the
+  emails collided.
+- **Closes** the `SEED_OWNER_EMAIL` item in `V1-LAUNCH-PLAN.md`.
+
+*Cost:* changing `SEED_OWNER_EMAIL` no longer changes an existing demo's login or
+notification address. The seed prints a note and carries on. Changing either now
+takes `npm run reset-password` or a direct edit, not a re-seed.
+
+**22. A bad booked/ or cancel/ link gets its own 404, not "Shop not found".** Both
+token segments have a `not-found.tsx` rendering `booking.linkInvalidTitle` / `Body`
+("This link isn't valid"). The slug-level 404 is unchanged. "No such token" and
+"another shop's token" still produce the same page, so the 404 reveals nothing a
+probing request could use.
+
+*Cost:* the browser tab title on these 404s still comes from the page's own static
+metadata ("Booking confirmed" / "Cancel booking"), because a segment `not-found.tsx`
+cannot export metadata. It is the tab title only; the page itself is correct.
+
 ### Deferred out of Day 14
 
 - **The full production-readiness review was cut down to security only.** The

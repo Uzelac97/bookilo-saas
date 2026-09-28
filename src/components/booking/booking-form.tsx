@@ -20,6 +20,9 @@ import {
   customerDetailsSchema,
   type CustomerDetails,
 } from "@/lib/validation/booking";
+import { fieldErrorsFrom } from "@/lib/validation/field-errors";
+
+import { SummaryRow } from "./summary-row";
 
 type FieldErrors = Partial<Record<keyof CustomerDetails, string>>;
 
@@ -110,13 +113,7 @@ export function BookingForm({
 
     if (!parsed.success) {
       event.preventDefault();
-
-      const next: FieldErrors = {};
-      for (const issue of parsed.error.issues) {
-        const field = issue.path[0] as keyof CustomerDetails;
-        next[field] ??= issue.message;
-      }
-      setClientErrors(next);
+      setClientErrors(fieldErrorsFrom(parsed.error));
       return;
     }
 
@@ -243,17 +240,3 @@ function rateLimitMessage(
     ? t("book.rateLimitRecentPhone", { phone: shopPhone })
     : t("book.rateLimitRecent");
 }
-
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-4">
-      <dt className="text-fg-muted">{label}</dt>
-      <dd className="text-right font-medium text-fg">{value}</dd>
-    </div>
-  );
-}
-
-// Field moved to components/ui/field.tsx on Day 11 — the services, staff and
-// manual-booking forms needed the identical input, and this was the second copy
-// waiting to happen. Unchanged in behaviour; the styling rationale travelled
-// with it.

@@ -1,18 +1,11 @@
-import { DateTime } from "luxon";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { BookingSummary } from "@/components/booking/booking-summary";
 import { getBookingByCancelToken } from "@/lib/db/bookings";
-import {
-  formatBookingDate,
-  formatCancellationPolicy,
-  formatDuration,
-  formatPrice,
-  formatSlotTime,
-} from "@/lib/format";
+import { formatCancellationPolicy } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
-import { serviceName } from "@/lib/i18n/service-text";
 import { getLocale } from "@/lib/preferences-server";
 
 import { getShop } from "../../shop";
@@ -46,7 +39,7 @@ export default async function BookedPage({ params }: PageProps) {
   const booking = await getBookingByCancelToken(token, new Date());
   if (!booking || booking.tenant.slug !== slug) notFound();
 
-  const { tenant, service } = booking;
+  const { tenant } = booking;
   // The vertical comes from the slug's tenant, which the layout has already
   // resolved (a per-request memo hit, not a second query) and which the check
   // above has just proven is the booking's own.
@@ -55,9 +48,6 @@ export default async function BookedPage({ params }: PageProps) {
     getT(shop?.businessType ?? null),
     getLocale(),
   ]);
-  const date = DateTime.fromJSDate(booking.startAt)
-    .setZone(tenant.timezone)
-    .toISODate();
 
   return (
     <div className="flex flex-1 flex-col bg-canvas px-4 py-10 sm:py-16">
@@ -103,32 +93,7 @@ export default async function BookedPage({ params }: PageProps) {
           </p>
         </header>
 
-        <dl className="flex flex-col gap-1.5 rounded-2xl border border-line bg-surface p-5 text-sm shadow-sm">
-          <Row
-            label={t("booking.service")}
-            value={serviceName(service, locale)}
-          />
-          <Row label={t("booking.barber")} value={booking.staff.name} />
-          <Row
-            label={t("booking.when")}
-            value={
-              date
-                ? t("booking.dateAtTime", {
-                    date: formatBookingDate(date, tenant.timezone, locale),
-                    time: formatSlotTime(booking.startAt, tenant.timezone),
-                  })
-                : formatSlotTime(booking.startAt, tenant.timezone)
-            }
-          />
-          <Row
-            label={t("booking.duration")}
-            value={formatDuration(service.durationMinutes, locale)}
-          />
-          <Row
-            label={t("booking.price")}
-            value={formatPrice(service.priceMinorUnits)}
-          />
-        </dl>
+        <BookingSummary booking={booking} t={t} locale={locale} />
 
         {booking.status === "CANCELLED" ? null : (
           <p className="text-sm text-fg-muted">
@@ -151,15 +116,6 @@ export default async function BookedPage({ params }: PageProps) {
           {t("booking.backTo", { shop: tenant.name })}
         </Link>
       </main>
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-4">
-      <dt className="text-fg-muted">{label}</dt>
-      <dd className="text-right font-medium text-fg">{value}</dd>
     </div>
   );
 }

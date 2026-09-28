@@ -42,29 +42,11 @@ export default async function DashboardLayout({
     <VerticalProvider vertical={tenant.businessType}>
       <div className="flex flex-1 flex-col bg-canvas">
         <header className="border-b border-line bg-surface">
-          {/* NO max-width, deliberately, and this is the Day 13 resolution of the
-              header-inset question carried over from Day 10.
-
-              This was max-w-5xl, which lined the shop name and nav up with the
-              content column on four of the five dashboard pages. The calendar is
-              the fifth: it sizes itself to its own column count and runs far
-              past max-w-5xl, so on a wide monitor the grid visibly overhung the
-              bar above it and the alignment read as broken rather than absent.
-
-              Two ways to keep the alignment, both rejected. Widening the header to
-              the calendar's width breaks it on the other four pages instead.
-              Widening all five pages to match puts settings forms and the services
-              list on a calendar-width line, which is worse to read than any
-              misalignment.
-
-              So the alignment is abandoned on purpose: the header is now app
-              chrome that spans the viewport and lines up with nothing, which is
-              true at every width on every page — a rule, instead of a coincidence
-              that only held below 64rem. The five page wrappers keep their own
-              max-w-5xl and are untouched.
-
-              The cost, stated: on an ultrawide monitor the shop name and Sign out
-              sit at opposite edges of the screen. */}
+          {/* NO max-width, deliberately. The calendar runs far wider than the
+              other pages' max-w-5xl column, so no header width lines up with all
+              five; full-width app chrome that lines up with nothing is the
+              consistent choice. Options and cost: "Dashboard header inset" in
+              EXECUTION-PLAN.md. */}
           <div className="flex w-full flex-col gap-4 px-4 py-4 sm:px-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-col">
