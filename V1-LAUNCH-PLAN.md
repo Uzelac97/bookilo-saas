@@ -40,9 +40,9 @@ Everything here is a hard blocker. The project has never been imported to Vercel
 
 ### 14.1 — Env & config prep (local) — **closed**
 
-- New `RESEND_API_KEY` (fresh `chairlyy` Resend account) in local `.env` — done. The account email stays `chairlyy@gmail.com`; it is an internal account detail and not the product name.
+- New `RESEND_API_KEY` (from a fresh Resend account) in local `.env` — done. The account's own name and email are internal details, not the product name.
 - `bookilo.de` verified in Resend, so sending is no longer sandboxed. `EMAIL_FROM` is `Bookilo <noreply@bookilo.de>` in local `.env`, read from the environment by `lib/email/resend.ts` — no sender is hardcoded anywhere.
-- Grep for hardcoded `milan.uzelac1997@gmail.com`: **zero occurrences in code.** The only mentions were in this document's own prose. The owner address comes from `Tenant.owner`, and the seed reads `SEED_OWNER_EMAIL` (default `owner@demo.test`), which is left as it is.
+- Grep for a hardcoded owner-notification address: **zero occurrences in code.** The owner address comes from `Tenant.owner`, and the seed reads `SEED_OWNER_EMAIL` (default `owner@demo.test`), which is left as it is.
 - Resend `from` → display name format: already correct, and correct by construction rather than by luck — it's one env var read per call.
 - Product name applied to everything user-facing: root and dashboard metadata, the login screen, and a `Sent by Bookilo` sign-off on both emails. `Tenant.name` is untouched — that's the individual shop's name and must never be swept into a brand rename.
 - Env inventory below.
@@ -211,7 +211,7 @@ Specific items found and deferred:
 
   **Closed in Phase 17.** The booked/ and cancel/ token segments now have their own 404 ("This link isn't valid"); the slug-level "Shop not found" is unchanged. Decision 22 in `EXECUTION-PLAN.md`.
 
-- **`SEED_OWNER_EMAIL` on a production re-seed — not a Phase 17 item, recorded here so it isn't lost. Read this before the next `db:seed` against prod.** Production's owner is `chairlyy@gmail.com`; `prisma/seed.ts` defaults `SEED_OWNER_EMAIL` to `owner@demo.test`. `upsertOwner` upserts *by email*, so a bare re-seed finds no match and **creates a second OWNER user on production** with the documented default password `demo-password-123` — and `upsertTenant` rewrites `Tenant.contactEmail` to the same default, silently redirecting owner-notification email away from the real address. Neither failure is visible in the seed's own output. Always run it as `$env:SEED_OWNER_EMAIL = 'chairlyy@gmail.com'` first, and read back `user.count()` and `tenant.contactEmail` afterwards to confirm they didn't move. The real fix, when Phase 17 arrives, is for the seed to resolve the existing owner off the tenant rather than off an env-var default.
+- **`SEED_OWNER_EMAIL` on a production re-seed — not a Phase 17 item, recorded here so it isn't lost. Read this before the next `db:seed` against prod.** The production owner's email is a real address, not the default; `prisma/seed.ts` defaults `SEED_OWNER_EMAIL` to `owner@demo.test`. `upsertOwner` upserts *by email*, so a bare re-seed finds no match and **creates a second OWNER user on production** with the documented default password `demo-password-123` — and `upsertTenant` rewrites `Tenant.contactEmail` to the same default, silently redirecting owner-notification email away from the real address. Neither failure is visible in the seed's own output. Always run it with `$env:SEED_OWNER_EMAIL` set to the production owner's address first, and read back `user.count()` and `tenant.contactEmail` afterwards to confirm they didn't move. The real fix, when Phase 17 arrives, is for the seed to resolve the existing owner off the tenant rather than off an env-var default.
 
   **Closed in Phase 17 (code change; not yet exercised against a database).** `resolveOwner` in `prisma/seed-demo-tenant.ts` now returns the tenant's existing OWNER untouched, `contactEmail` is create-only, and the seed refuses to move a login between tenants. The read-back check above is still worth doing on the first re-seed after this change. Decision 21 in `EXECUTION-PLAN.md`.
 
@@ -231,12 +231,12 @@ was named Bookilo. The findings are folded into 14.1 above.
 ```
 Day 14, step 1 of the production deploy. Local changes only — no deploy yet.
 
-Context: I created a new Resend account under chairlyy@gmail.com. The old
-account (milan.uzelac1997@gmail.com) and its API key are dead. bookilo.de is
+Context: I created a new Resend account under [the production owner's
+address]. The old account and its API key are dead. bookilo.de is
 now verified on the new account, so sending is not sandboxed.
 
 Tasks:
-1. Grep the entire repo for milan.uzelac1997@gmail.com — including seed files,
+1. Grep the entire repo for [the old account's address] — including seed files,
    env examples, test fixtures, and any hardcoded owner-notification address.
    Report every occurrence with file and line before changing anything.
 2. Confirm the Resend `from` field is read from EMAIL_FROM rather than
