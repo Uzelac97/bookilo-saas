@@ -17,8 +17,11 @@
 export const LOCALES = ["de", "en"] as const;
 export type Locale = (typeof LOCALES)[number];
 
-/** The product is demoed and sold in Germany; English is the toggle. */
-export const DEFAULT_LOCALE: Locale = "de";
+/**
+ * English unless the browser has chosen otherwise; German is the toggle. It was
+ * German until EXECUTION-PLAN.md decision 23, which records what the change costs.
+ */
+export const DEFAULT_LOCALE: Locale = "en";
 
 /**
  * "system" is the absence of a choice — no `data-theme` on <html>, so

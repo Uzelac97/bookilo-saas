@@ -628,6 +628,9 @@ plus a toggle. Not locale-routed URLs, not per-tenant language settings, not a
 translation-management service — those stay excluded and would need their own
 decision.
 
+*(Amended 28 Sep 2026 by 23: the default is now English and German is the toggle.
+The scope limit above is unchanged.)*
+
 **2. Light/dark mode toggle — new deliberate addition, Phase 15a.** Not a
 reversal: dark mode has never been excluded in writing anywhere in this plan, in
 `V1-LAUNCH-PLAN.md`, or in `CLAUDE.md`, so it is recorded as a plain new decision
@@ -748,8 +751,10 @@ and time, at 30-minute granularity.
 (`de` | `en`) and `theme` (`system` | `light` | `dark`), read server-side in
 the root layout, so the first byte already has the right `lang` and `data-theme`. No
 flash, and no inline script. The toggles appear in the dashboard header and on the
-login page only. A customer on `/b/[slug]` gets German and their OS theme, with no
+login page only. A customer on `/b/[slug]` gets English and their OS theme, with no
 switch. *(Reversed in part by 17: the public pages now carry the switches too.)*
+*(Amended 28 Sep 2026 by 23: the no-cookie default was German when this was
+recorded.)*
 
 *Cost:* the choice doesn't follow an owner to another device, because storing it per
 user would be a schema change. Per-tenant language is excluded under item 1. A browser
@@ -944,6 +949,28 @@ probing request could use.
 *Cost:* the browser tab title on these 404s still comes from the page's own static
 metadata ("Booking confirmed" / "Cancel booking"), because a segment `not-found.tsx`
 cannot export metadata. It is the tab title only; the page itself is correct.
+
+### Recorded after Phase 17
+
+Recorded 28 Sep 2026. Same format: what was decided, what it costs.
+
+**23. The default interface language is English. German is the toggle.** A browser
+with no `locale` cookie, or one holding an unrecognised value, now renders English:
+`DEFAULT_LOCALE` in `lib/preferences.ts` is `"en"`. This amends 1 and 10 and
+changes nothing else. The toggle, the cookie, and any browser that already holds a
+`locale` cookie behave as before. Emails stay German (11), and sort order stays
+German (18).
+
+- **The reason.** The target is worldwide freelance work through Upwork and
+  Fiverr, not only the German market, so English as the default reaches a wider
+  first-time audience. Decision 1's audience, a German shop owner in an in-person
+  demo, is still served by the toggle.
+
+*Cost:* a German visitor with no cookie, including a customer of either demo shop,
+lands on English and has to find the toggle. For a tenant that hasn't filled in
+`nameEn`, the half-translated menu that 18 describes is now what a first visit
+shows, not only what the toggle shows. And a customer who books in the default
+language gets a German confirmation email (11).
 
 ### Deferred out of Day 14
 

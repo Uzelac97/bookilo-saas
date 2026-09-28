@@ -80,7 +80,7 @@ all deferred).
 
 **Phase 15a**, after the Phase 15 security audit and before the salon vertical:
 
-- **i18n** — German default with an English toggle. A default locale plus a toggle only:
+- **i18n** — English default with a German toggle. A default locale plus a toggle only:
   _not_ locale-routed URLs, per-tenant language settings, or a translation-management
   service. Those three remain excluded.
 - **Light/dark mode toggle** — the constraints are recorded in the code and should be

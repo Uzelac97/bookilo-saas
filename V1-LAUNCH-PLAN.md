@@ -117,6 +117,8 @@ German. English-only is an objection the prospect raises in the room, which is
 what moved this off the excluded list. Ship a default locale plus a toggle —
 **not** locale-routed URLs, per-tenant language settings, or a translation
 service; those remain out of scope and would need their own decision.
+*(Amended 28 Sep 2026: the default is now English and German is the toggle.
+EXECUTION-PLAN.md decision 23.)*
 
 The cost is that every user-facing string becomes two, and it lands before the
 salon vertical rather than after, so Phase 16 and the landing page both move

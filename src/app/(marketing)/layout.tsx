@@ -61,8 +61,8 @@ export default function MarketingLayout({
   //
   // lang="en" because this page's copy is the shop's own, written in English,
   // and is not translated with the app's interface language. <html lang> now
-  // follows that language (German by default), so without this a screen
-  // reader would read English copy with German pronunciation.
+  // follows that language, which a visitor can switch to German, so without
+  // this a screen reader would read English copy with German pronunciation.
   return (
     <div
       lang="en"

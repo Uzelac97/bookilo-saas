@@ -1,5 +1,5 @@
 /**
- * German — the default locale, and the source of truth for which keys exist.
+ * German — the source of truth for which keys exist.
  * `MessageKey` in ../translate.ts is derived from this object, and en.ts must
  * supply exactly the same keys or `tsc` fails.
  *
